@@ -6,21 +6,21 @@
   <title>Claude Wrapper Stack — Architecture &amp; Product Use Case</title>
   <style>
     :root {
-      --primary: #1a1a2e;
-      --secondary: #16213e;
-      --accent: #0f3460;
-      --highlight: #e94560;
-      --text: #eaeaea;
-      --text-muted: #a0a0b8;
-      --bg: #0d0d1a;
-      --surface: #141428;
-      --surface-alt: #1a1a35;
-      --border: #2a2a4a;
-      --code-bg: #0a0a18;
-      --success: #2ecc71;
-      --warning: #f39c12;
-      --danger: #e74c3c;
-      --info: #3498db;
+      --primary: #1e3a5f;
+      --secondary: #2c5282;
+      --accent: #2b6cb0;
+      --highlight: #2b6cb0;
+      --text: #1a202c;
+      --text-muted: #4a5568;
+      --bg: #ffffff;
+      --surface: #f7fafc;
+      --surface-alt: #edf2f7;
+      --border: #e2e8f0;
+      --code-bg: #f0f4f8;
+      --success: #276749;
+      --warning: #b7791f;
+      --danger: #c53030;
+      --info: #2b6cb0;
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -35,42 +35,33 @@
 
     /* Header */
     .hero {
-      background: linear-gradient(135deg, var(--primary), var(--accent), #1a0a30);
+      background: linear-gradient(135deg, #1e3a5f, #2c5282, #2b6cb0);
       padding: 80px 40px;
       text-align: center;
-      border-bottom: 3px solid var(--highlight);
+      border-bottom: 3px solid #2b6cb0;
       position: relative;
-      overflow: hidden;
-    }
-    .hero::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: radial-gradient(circle at 30% 50%, rgba(233,69,96,0.08) 0%, transparent 60%),
-                  radial-gradient(circle at 70% 50%, rgba(15,52,96,0.15) 0%, transparent 60%);
     }
     .hero h1 {
       font-size: 2.8em;
       font-weight: 700;
       letter-spacing: -0.5px;
       margin-bottom: 12px;
-      position: relative;
+      color: #ffffff;
     }
     .hero .subtitle {
       font-size: 1.15em;
-      color: var(--text-muted);
-      position: relative;
+      color: #cbd5e0;
     }
     .hero .version-badge {
       display: inline-block;
-      background: var(--highlight);
+      background: rgba(255,255,255,0.2);
       color: #fff;
       padding: 4px 16px;
       border-radius: 20px;
       font-size: 0.8em;
       font-weight: 600;
       margin-top: 16px;
-      position: relative;
+      border: 1px solid rgba(255,255,255,0.3);
     }
 
     /* Layout */
@@ -92,7 +83,7 @@
     .toc h2 {
       font-size: 1.3em;
       margin-bottom: 16px;
-      color: var(--highlight);
+      color: #2b6cb0;
     }
     .toc ol {
       list-style: none;
@@ -104,17 +95,17 @@
     }
     .toc li::before {
       content: counter(toc-counter, decimal-leading-zero);
-      color: var(--highlight);
+      color: #2b6cb0;
       font-weight: 700;
       margin-right: 12px;
       font-size: 0.9em;
     }
     .toc a {
-      color: var(--text);
+      color: #2d3748;
       text-decoration: none;
       transition: color 0.2s;
     }
-    .toc a:hover { color: var(--highlight); }
+    .toc a:hover { color: #2b6cb0; }
 
     /* Sections */
     section {
@@ -123,7 +114,7 @@
     section h2 {
       font-size: 2em;
       font-weight: 700;
-      color: #fff;
+      color: #1a202c;
       margin-bottom: 8px;
       padding-bottom: 12px;
       border-bottom: 2px solid var(--border);
@@ -132,8 +123,8 @@
       gap: 12px;
     }
     section h2 .section-num {
-      background: var(--highlight);
-      color: #fff;
+      background: #2b6cb0;
+      color: #ffffff;
       width: 40px;
       height: 40px;
       border-radius: 50%;
@@ -159,8 +150,8 @@
 
     /* Highlight Box */
     .highlight-box {
-      background: linear-gradient(135deg, var(--surface), var(--surface-alt));
-      border-left: 4px solid var(--highlight);
+      background: linear-gradient(135deg, #f0f7ff, #ebf4ff);
+      border-left: 4px solid #2b6cb0;
       border-radius: 0 8px 8px 0;
       padding: 24px 28px;
       margin: 24px 0;
@@ -176,30 +167,28 @@
 
     /* ASCII Diagrams */
     .diagram {
-      background: var(--code-bg);
-      border: 1px solid var(--border);
+      background: #f7fafc;
+      border: 1px solid #cbd5e0;
       border-radius: 8px;
-      padding: 24px;
+      padding: 0;
       margin: 20px 0;
       overflow-x: auto;
-      position: relative;
     }
     .diagram pre {
       font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
       font-size: 0.82em;
       line-height: 1.5;
-      color: #c0c0e0;
+      color: #2d3748;
       white-space: pre;
       margin: 0;
+      padding: 20px 24px;
     }
     .diagram .diagram-label {
-      position: absolute;
-      top: -12px;
-      left: 16px;
-      background: var(--accent);
+      display: block;
+      background: #2b6cb0;
       color: #fff;
-      padding: 2px 14px;
-      border-radius: 4px;
+      padding: 6px 16px;
+      border-radius: 7px 7px 0 0;
       font-size: 0.75em;
       font-weight: 600;
       letter-spacing: 0.5px;
@@ -250,8 +239,8 @@
       font-size: 0.92em;
     }
     thead th {
-      background: var(--accent);
-      color: #fff;
+      background: #2b6cb0;
+      color: #ffffff;
       padding: 12px 16px;
       text-align: left;
       font-weight: 600;
@@ -266,7 +255,7 @@
     }
     tbody tr { background: var(--surface); }
     tbody tr:nth-child(even) { background: var(--surface-alt); }
-    tbody tr:hover { background: rgba(233,69,96,0.06); }
+    tbody tr:hover { background: #ebf4ff; }
 
     /* Severity badges */
     .badge {
@@ -276,45 +265,43 @@
       font-size: 0.8em;
       font-weight: 600;
     }
-    .badge-critical { background: rgba(231,76,60,0.2); color: #e74c3c; }
-    .badge-high { background: rgba(243,156,18,0.2); color: #f39c12; }
-    .badge-medium { background: rgba(52,152,219,0.2); color: #3498db; }
+    .badge-critical { background: #fff5f5; color: #c53030; border: 1px solid #fed7d7; }
+    .badge-high { background: #fffff0; color: #b7791f; border: 1px solid #fefcbf; }
+    .badge-medium { background: #ebf8ff; color: #2b6cb0; border: 1px solid #bee3f8; }
 
     /* Code inline */
     code {
-      background: var(--code-bg);
+      background: #edf2f7;
       padding: 2px 8px;
       border-radius: 4px;
       font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
       font-size: 0.88em;
-      color: #e0a0c0;
+      color: #9b2c2c;
     }
 
     /* Code blocks */
     .code-block {
-      background: var(--code-bg);
-      border: 1px solid var(--border);
+      background: #f7fafc;
+      border: 1px solid #cbd5e0;
       border-radius: 8px;
-      padding: 20px 24px;
+      padding: 0;
       margin: 16px 0;
       overflow-x: auto;
-      position: relative;
     }
     .code-block pre {
       font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
       font-size: 0.85em;
       line-height: 1.6;
-      color: #c0c0e0;
+      color: #2d3748;
       margin: 0;
+      padding: 20px 24px;
     }
     .code-block .lang-label {
-      position: absolute;
-      top: -10px;
-      right: 16px;
-      background: var(--secondary);
-      color: var(--text-muted);
-      padding: 2px 12px;
-      border-radius: 4px;
+      display: block;
+      background: #4a5568;
+      color: #fff;
+      padding: 4px 16px;
+      border-radius: 7px 7px 0 0;
       font-size: 0.7em;
       font-weight: 600;
       text-transform: uppercase;
@@ -366,8 +353,8 @@
       gap: 8px;
     }
     .mode-card .mode-badge {
-      background: var(--highlight);
-      color: #fff;
+      background: #2b6cb0;
+      color: #ffffff;
       padding: 2px 10px;
       border-radius: 4px;
       font-size: 0.7em;
@@ -376,13 +363,14 @@
     .mode-card .flow {
       font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
       font-size: 0.82em;
-      color: var(--text-muted);
-      background: var(--code-bg);
+      color: #2d3748;
+      background: #f7fafc;
       padding: 16px;
       border-radius: 6px;
       margin-top: 12px;
       line-height: 1.6;
       white-space: pre;
+      border: 1px solid #e2e8f0;
     }
 
     /* Feature grid for value prop */
@@ -404,8 +392,8 @@
     .feature-icon {
       width: 40px;
       height: 40px;
-      background: rgba(233,69,96,0.15);
-      color: var(--highlight);
+      background: #ebf4ff;
+      color: #2b6cb0;
       border-radius: 8px;
       display: flex;
       align-items: center;
@@ -415,7 +403,7 @@
     }
     .feature-item h5 {
       font-size: 0.95em;
-      color: #fff;
+      color: #1a202c;
       margin-bottom: 4px;
     }
     .feature-item p {
@@ -453,7 +441,7 @@
     }
     .layer .layer-name {
       font-weight: 600;
-      color: #fff;
+      color: #1a202c;
       min-width: 140px;
     }
     .layer .layer-desc {
@@ -463,11 +451,11 @@
 
     /* Footer */
     footer {
-      background: var(--primary);
-      border-top: 1px solid var(--border);
+      background: #f7fafc;
+      border-top: 2px solid #e2e8f0;
       padding: 40px;
       text-align: center;
-      color: var(--text-muted);
+      color: #4a5568;
       font-size: 0.9em;
       margin-top: 80px;
     }
@@ -484,26 +472,12 @@
 
     /* Print */
     @media print {
-      body { background: #fff; color: #222; font-size: 11pt; }
-      .hero { background: #fff; border-bottom: 2px solid #333; padding: 20px; }
-      .hero h1 { color: #111; }
-      .hero .subtitle { color: #555; }
-      .hero .version-badge { background: #333; }
-      section h2 { color: #111; border-color: #ccc; }
-      section h2 .section-num { background: #333; }
-      section h3 { color: #333; }
-      .diagram, .code-block { border: 1px solid #ccc; background: #f5f5f5; }
-      .diagram pre, .code-block pre { color: #222; }
+      body { font-size: 11pt; }
+      .hero { background: #2b6cb0 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; padding: 24px; }
       table { font-size: 9pt; }
-      thead th { background: #333; }
-      tbody tr, tbody tr:nth-child(even) { background: #fff; }
-      tbody td { border-color: #ddd; }
-      .card, .mode-card, .comparison-card, .feature-item, .layer, .highlight-box, .toc {
-        background: #fff; border-color: #ddd;
-      }
-      .toc a { color: #222; }
-      code { background: #eee; color: #b03060; }
-      footer { background: #fff; border-color: #ccc; color: #666; }
+      thead th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .diagram .diagram-label, .code-block .lang-label { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      section h2 .section-num { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     }
   </style>
 </head>
@@ -605,7 +579,7 @@
 
   <div class="comparison">
     <div class="comparison-card before">
-      <h4 style="color: var(--danger);">Before (Direct Access)</h4>
+      <h4 style="color: #c53030;">Before (Direct Access)</h4>
       <ul>
         <li>No DLP scanning</li>
         <li>No per-user budgets</li>
@@ -615,7 +589,7 @@
       </ul>
     </div>
     <div class="comparison-card after">
-      <h4 style="color: var(--success);">After (Claude Wrapper Stack)</h4>
+      <h4 style="color: #276749;">After (Claude Wrapper Stack)</h4>
       <ul>
         <li>PII/PHI blocked in messages AND files</li>
         <li>Per-user daily spend caps</li>
@@ -1703,8 +1677,8 @@ terraform apply tfplan</pre>
   </table>
 
   <h3>Value Proposition</h3>
-  <div class="highlight-box" style="text-align: center; border-left-color: var(--success);">
-    <h4 style="color: #fff; font-size: 1.3em; margin-bottom: 16px;">&ldquo;Enterprise AI with Guardrails&rdquo;</h4>
+  <div class="highlight-box" style="text-align: center; border-left-color: #276749;">
+    <h4 style="color: #1a202c; font-size: 1.3em; margin-bottom: 16px;">&ldquo;Enterprise AI with Guardrails&rdquo;</h4>
     <p>Give your entire organization access to Claude AI while maintaining complete control.</p>
   </div>
 
@@ -1776,7 +1750,7 @@ terraform apply tfplan</pre>
   <h3>ROI Model</h3>
   <div class="comparison">
     <div class="comparison-card before">
-      <h4 style="color: var(--danger);">Without Guardrails</h4>
+      <h4 style="color: #c53030;">Without Guardrails</h4>
       <ul>
         <li>Uncontrolled API spend: $2,000&ndash;10,000/month</li>
         <li>Data breach (PII leak): $150+ per record (IBM 2025)</li>
@@ -1784,7 +1758,7 @@ terraform apply tfplan</pre>
       </ul>
     </div>
     <div class="comparison-card after">
-      <h4 style="color: var(--success);">With Claude Wrapper Stack</h4>
+      <h4 style="color: #276749;">With Claude Wrapper Stack</h4>
       <ul>
         <li>Controlled spend: $100/month global cap (configurable)</li>
         <li>DLP scans messages AND files (Excel, PDF, Word, etc.)</li>
