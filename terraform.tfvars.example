@@ -1,0 +1,105 @@
+###############################################################################
+# terraform.tfvars.example
+# Copy to terraform.tfvars and fill in your values
+###############################################################################
+
+# =============================================================================
+# REQUIRED: Hyper-V Host Connection
+# =============================================================================
+# For local Hyper-V on Windows 11 Pro:
+hyperv_user     = ".\\Administrator"
+hyperv_password = "YOUR_WINDOWS_ADMIN_PASSWORD"
+hyperv_host     = "127.0.0.1"
+hyperv_port     = 5985
+hyperv_https    = false
+hyperv_insecure = true
+
+# =============================================================================
+# REQUIRED: Anthropic API
+# =============================================================================
+anthropic_api_key = "sk-ant-api03-YOUR_KEY_HERE"
+
+# =============================================================================
+# VM Configuration (adjust as needed)
+# =============================================================================
+vm_name              = "claude-wrapper"
+vm_processor_count   = 4
+# vm_memory_startup_bytes = 8589934592    # 8 GB (default)
+# vm_disk_size_bytes      = 85899345920   # 80 GB (default)
+vm_path              = "C:\\HyperV\\VMs"
+vm_vhd_path          = "C:\\HyperV\\VHDs"
+vm_hostname          = "claude-wrapper"
+vm_domain            = "uniformedi.local"
+ubuntu_vhdx_source   = "C:\\HyperV\\Images\\ubuntu-24.04-cloudimg-amd64.vhdx"
+
+# =============================================================================
+# Network — choose ONE approach
+# =============================================================================
+
+# Option A: External switch (VM gets IP from your network DHCP/router)
+# vm_switch_name    = "External-Switch"
+# vm_switch_type    = "External"
+# vm_switch_adapter = "Ethernet"     # Your physical NIC name
+
+# Option B: Internal switch with static IP (default — NAT from host)
+vm_switch_name = "claude-internal"
+vm_switch_type = "Internal"
+vm_static_ip   = "192.168.100.10/24"
+vm_gateway     = "192.168.100.1"
+vm_dns_servers = ["8.8.8.8", "1.1.1.1"]
+
+# =============================================================================
+# SSH Access
+# =============================================================================
+ssh_admin_user      = "claude-admin"
+ssh_public_key_path = "C:\\Users\\Dan\\.ssh\\id_rsa.pub"
+
+# =============================================================================
+# LiteLLM Settings
+# =============================================================================
+# litellm_master_key = ""                   # Auto-generated if empty
+litellm_default_model      = "claude-sonnet"
+litellm_enable_haiku       = true
+litellm_enable_opus        = true
+litellm_global_max_budget  = 100            # USD/month
+litellm_default_user_budget = 5.0           # USD/day per user
+litellm_default_user_rpm   = 30
+litellm_default_user_tpm   = 100000
+
+# =============================================================================
+# SSO — Azure AD (uncomment and fill to enable)
+# =============================================================================
+# sso_provider          = "azure_ad"
+# azure_ad_client_id    = "YOUR_APP_CLIENT_ID"
+# azure_ad_client_secret = "YOUR_APP_CLIENT_SECRET"
+# azure_ad_tenant_id    = "YOUR_TENANT_ID"
+
+# =============================================================================
+# SSO — Okta (uncomment and fill to enable)
+# =============================================================================
+# sso_provider       = "okta"
+# okta_client_id     = "YOUR_OKTA_CLIENT_ID"
+# okta_client_secret = "YOUR_OKTA_CLIENT_SECRET"
+# okta_domain        = "your-org.okta.com"
+
+# =============================================================================
+# DLP (Data Loss Prevention)
+# =============================================================================
+dlp_enable           = true
+dlp_block_ssn        = true
+dlp_block_credit_cards = true
+dlp_block_phi        = true
+dlp_block_credentials = true
+# dlp_custom_patterns = {
+#   "client_account" = "\\bACCT[#-]?\\d{8,}\\b"
+#   "internal_code"  = "\\bUNI-\\d{4,}\\b"
+# }
+
+# =============================================================================
+# TLS — leave empty for auto-generated self-signed cert
+# =============================================================================
+# tls_cert_path = "C:\\certs\\claude-wrapper.crt"
+# tls_key_path  = "C:\\certs\\claude-wrapper.key"
+
+environment = "production"
+owner       = "Uniformedi LLC"
