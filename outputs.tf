@@ -50,7 +50,7 @@ output "deployment_notes" {
   value       = <<-EOT
 
     ╔══════════════════════════════════════════════════════════════╗
-    ║           Claude Wrapper Stack — Deployed                   ║
+    ║           Inside LLM — Deployed                   ║
     ╠══════════════════════════════════════════════════════════════╣
     ║                                                              ║
     ║  Open WebUI:   https://${data.external.vm_ip.result.ip}                      ║

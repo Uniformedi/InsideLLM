@@ -292,7 +292,7 @@ resource "hyperv_machine_instance" "claude_wrapper" {
   automatic_start_delay  = 0
 
   checkpoint_type     = "Disabled"
-  notes               = "Claude Wrapper Stack - ${var.environment} - Managed by Terraform"
+  notes               = "Inside LLM - ${var.environment} - Managed by Terraform"
 
   vm_firmware {
     enable_secure_boot   = "On"

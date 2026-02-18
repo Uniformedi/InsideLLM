@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# Post-deployment configuration for Claude Wrapper Stack
+# Post-deployment configuration for Inside LLM
 # Runs inside the VM after Docker containers are healthy
 # Managed by Terraform — do not edit manually
 # =============================================================================
@@ -134,7 +134,7 @@ log "Creating systemd service for auto-start..."
 
 cat > /etc/systemd/system/claude-wrapper.service << 'SYSTEMD'
 [Unit]
-Description=Claude Wrapper Stack (Docker Compose)
+Description=Inside LLM (Docker Compose)
 Requires=docker.service
 After=docker.service
 
@@ -161,7 +161,7 @@ VM_IP=$(hostname -I | awk '{print $1}')
 
 log ""
 log "=========================================="
-log "  Claude Wrapper Stack — READY"
+log "  Inside LLM — READY"
 log "=========================================="
 log ""
 log "  Open WebUI:   https://$VM_IP"

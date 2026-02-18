@@ -1,4 +1,4 @@
-# Claude Wrapper Stack — Architecture & Product Use Case
+# Inside LLM — Architecture & Product Use Case
 
 **Version:** 1.0 | **Author:** Dan Medina, Uniformedi LLC | **Date:** February 2026
 
@@ -23,7 +23,7 @@
 
 ## 1. Executive Summary
 
-The Claude Wrapper Stack is a **self-hosted, on-premises AI gateway** that provides
+The Inside LLM is a **self-hosted, on-premises AI gateway** that provides
 enterprise-grade access to Anthropic's Claude models. A single `terraform apply`
 deploys a fully configured Ubuntu VM on Windows Hyper-V, running five containerized
 services that deliver:
@@ -43,7 +43,7 @@ send, and how much they spend.
 +------------------------------------------------------------------+
 |                     ENTERPRISE BOUNDARY                          |
 |                                                                  |
-|   Users  ──────>  [ Claude Wrapper Stack ]  ──────>  Anthropic   |
+|   Users  ──────>  [ Inside LLM ]  ──────>  Anthropic   |
 |                    DLP | Auth | Budgets                API       |
 |                    Audit | Rate Limits                           |
 +------------------------------------------------------------------+
@@ -66,13 +66,13 @@ Organizations adopting AI face three critical challenges:
 
 ### The Solution
 
-The Claude Wrapper Stack sits between users and the Anthropic API, acting as an
+The Inside LLM sits between users and the Anthropic API, acting as an
 **intelligent proxy** that enforces DLP policies, authenticates users via
 corporate identity providers, enforces per-user spend limits, and logs every
 interaction — all without modifying the Claude API experience.
 
 ```
- BEFORE (Direct Access)              AFTER (Claude Wrapper Stack)
+ BEFORE (Direct Access)              AFTER (Inside LLM)
  ========================            ============================
 
  Employee ──> Anthropic API          Employee ──> [DLP + Auth + Budget] ──> Anthropic API
@@ -1100,7 +1100,7 @@ COST SAVINGS
 |   - Data breach (PII leak): $150+ per record (IBM 2025)     |
 |   - Compliance violation: $50K-$1.5M per incident           |
 |                                                             |
-| With Claude Wrapper Stack:                                  |
+| With Inside LLM:                                  |
 |   - Controlled spend: $100/month global cap (configurable)  |
 |   - DLP scans messages AND files (Excel, PDF, Word, etc.)   |
 |   - Audit trail satisfies compliance requirements           |

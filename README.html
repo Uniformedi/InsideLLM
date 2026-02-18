@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Claude Wrapper Stack — Architecture &amp; Product Use Case</title>
+  <title>Inside LLM — Architecture &amp; Product Use Case</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -249,7 +249,7 @@
 <!-- ================================================================ -->
 <div class="main">
 <header class="hero">
-  <h1>Claude Wrapper Stack</h1>
+  <h1>Inside LLM</h1>
   <p class="subtitle">Architecture &amp; Product Use Case</p>
   <span class="version-badge">Version 1.0 &mdash; February 2026 &mdash; Dan Medina, Uniformedi LLC</span>
 </header>
@@ -262,7 +262,7 @@
 <section id="s1">
   <h2><span class="section-num">01</span> Executive Summary</h2>
 
-  <p>The Claude Wrapper Stack is a <strong>self-hosted, on-premises AI gateway</strong> that provides
+  <p>The Inside LLM is a <strong>self-hosted, on-premises AI gateway</strong> that provides
   enterprise-grade access to Anthropic's Claude models. A single <code>terraform apply</code>
   deploys a fully configured Ubuntu VM on Windows Hyper-V, running five containerized
   services that deliver:</p>
@@ -288,7 +288,7 @@
 +------------------------------------------------------------------+
 |                     ENTERPRISE BOUNDARY                          |
 |                                                                  |
-|   Users  ------&gt;  [ Claude Wrapper Stack ]  ------&gt;  Anthropic   |
+|   Users  ------&gt;  [ Inside LLM ]  ------&gt;  Anthropic   |
 |                    DLP | Auth | Budgets                API       |
 |                    Audit | Rate Limits                           |
 +------------------------------------------------------------------+</pre>
@@ -310,7 +310,7 @@
   </ol>
 
   <h3>The Solution</h3>
-  <p>The Claude Wrapper Stack sits between users and the Anthropic API, acting as an
+  <p>The Inside LLM sits between users and the Anthropic API, acting as an
   <strong>intelligent proxy</strong> that enforces DLP policies, authenticates users via
   corporate identity providers, enforces per-user spend limits, and logs every
   interaction &mdash; all without modifying the Claude API experience.</p>
@@ -327,7 +327,7 @@
       </ul>
     </div>
     <div class="comparison-card after">
-      <h4 style="color:#276749;">After (Claude Wrapper Stack)</h4>
+      <h4 style="color:#276749;">After (Inside LLM)</h4>
       <ul>
         <li>PII/PHI blocked in messages AND files</li>
         <li>Per-user daily spend caps</li>
@@ -408,7 +408,7 @@
       </ul>
     </div>
     <div class="comparison-card after">
-      <h4 style="color:#276749;">With Claude Wrapper Stack</h4>
+      <h4 style="color:#276749;">With Inside LLM</h4>
       <ul>
         <li>Controlled spend: $100/month global cap (configurable)</li>
         <li>DLP scans messages AND files (Excel, PDF, Word, etc.)</li>
@@ -1389,7 +1389,7 @@ export ANTHROPIC_API_KEY=&lt;your-litellm-key&gt;</pre>
 </div><!-- /.main -->
 
 <footer>
-  <p><strong>Claude Wrapper Stack</strong> &mdash; Version 1.0 &mdash; Dan Medina, Uniformedi LLC &mdash; February 2026</p>
+  <p><strong>Inside LLM</strong> &mdash; Version 1.0 &mdash; Dan Medina, Uniformedi LLC &mdash; February 2026</p>
   <p>All components are free and open-source software. Anthropic API usage subject to Anthropic's terms of service.</p>
 </footer>
 

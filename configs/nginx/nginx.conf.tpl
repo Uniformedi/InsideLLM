@@ -1,5 +1,5 @@
 # =============================================================================
-# Nginx: Reverse proxy for Claude Wrapper Stack
+# Nginx: Reverse proxy for Inside LLM
 # Managed by Terraform
 # =============================================================================
 

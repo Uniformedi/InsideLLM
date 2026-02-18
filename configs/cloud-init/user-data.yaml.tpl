@@ -1,6 +1,6 @@
 #cloud-config
 # =============================================================================
-# Cloud-init: Ubuntu 24.04 provisioning for Claude Wrapper Stack
+# Cloud-init: Ubuntu 24.04 provisioning for Inside LLM
 # =============================================================================
 
 hostname: ${hostname}
@@ -143,6 +143,6 @@ runcmd:
 # Final message
 # ---------------------------------------------------------------------------
 final_message: |
-  Claude Wrapper Stack provisioning complete.
+  Inside LLM provisioning complete.
   System uptime: $UPTIME seconds.
   Cloud-init version: $VERSION

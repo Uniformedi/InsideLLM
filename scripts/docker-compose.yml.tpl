@@ -1,5 +1,5 @@
 # =============================================================================
-# Docker Compose: Claude Wrapper Stack
+# Docker Compose: Inside LLM
 # Managed by Terraform — do not edit manually
 # =============================================================================
 
