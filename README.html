@@ -1,0 +1,1863 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Claude Wrapper Stack — Architecture &amp; Product Use Case</title>
+  <style>
+    :root {
+      --primary: #1a1a2e;
+      --secondary: #16213e;
+      --accent: #0f3460;
+      --highlight: #e94560;
+      --text: #eaeaea;
+      --text-muted: #a0a0b8;
+      --bg: #0d0d1a;
+      --surface: #141428;
+      --surface-alt: #1a1a35;
+      --border: #2a2a4a;
+      --code-bg: #0a0a18;
+      --success: #2ecc71;
+      --warning: #f39c12;
+      --danger: #e74c3c;
+      --info: #3498db;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      font-size: 16px;
+    }
+
+    /* Header */
+    .hero {
+      background: linear-gradient(135deg, var(--primary), var(--accent), #1a0a30);
+      padding: 80px 40px;
+      text-align: center;
+      border-bottom: 3px solid var(--highlight);
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: radial-gradient(circle at 30% 50%, rgba(233,69,96,0.08) 0%, transparent 60%),
+                  radial-gradient(circle at 70% 50%, rgba(15,52,96,0.15) 0%, transparent 60%);
+    }
+    .hero h1 {
+      font-size: 2.8em;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      margin-bottom: 12px;
+      position: relative;
+    }
+    .hero .subtitle {
+      font-size: 1.15em;
+      color: var(--text-muted);
+      position: relative;
+    }
+    .hero .version-badge {
+      display: inline-block;
+      background: var(--highlight);
+      color: #fff;
+      padding: 4px 16px;
+      border-radius: 20px;
+      font-size: 0.8em;
+      font-weight: 600;
+      margin-top: 16px;
+      position: relative;
+    }
+
+    /* Layout */
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 32px;
+    }
+
+    /* Table of Contents */
+    .toc {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 32px 40px;
+      margin: 48px auto;
+      max-width: 700px;
+    }
+    .toc h2 {
+      font-size: 1.3em;
+      margin-bottom: 16px;
+      color: var(--highlight);
+    }
+    .toc ol {
+      list-style: none;
+      counter-reset: toc-counter;
+    }
+    .toc li {
+      counter-increment: toc-counter;
+      margin: 8px 0;
+    }
+    .toc li::before {
+      content: counter(toc-counter, decimal-leading-zero);
+      color: var(--highlight);
+      font-weight: 700;
+      margin-right: 12px;
+      font-size: 0.9em;
+    }
+    .toc a {
+      color: var(--text);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    .toc a:hover { color: var(--highlight); }
+
+    /* Sections */
+    section {
+      margin: 64px 0;
+    }
+    section h2 {
+      font-size: 2em;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 8px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    section h2 .section-num {
+      background: var(--highlight);
+      color: #fff;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.6em;
+      flex-shrink: 0;
+    }
+    section h3 {
+      font-size: 1.35em;
+      color: var(--info);
+      margin: 32px 0 12px;
+    }
+    section h4 {
+      font-size: 1.1em;
+      color: var(--warning);
+      margin: 24px 0 8px;
+    }
+    p { margin: 12px 0; }
+    ul, ol { margin: 12px 0 12px 24px; }
+    li { margin: 4px 0; }
+
+    /* Highlight Box */
+    .highlight-box {
+      background: linear-gradient(135deg, var(--surface), var(--surface-alt));
+      border-left: 4px solid var(--highlight);
+      border-radius: 0 8px 8px 0;
+      padding: 24px 28px;
+      margin: 24px 0;
+    }
+    .highlight-box ul { list-style: none; margin-left: 0; }
+    .highlight-box li { padding: 4px 0; }
+    .highlight-box li::before {
+      content: '✓';
+      color: var(--success);
+      font-weight: 700;
+      margin-right: 10px;
+    }
+
+    /* ASCII Diagrams */
+    .diagram {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 24px;
+      margin: 20px 0;
+      overflow-x: auto;
+      position: relative;
+    }
+    .diagram pre {
+      font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+      font-size: 0.82em;
+      line-height: 1.5;
+      color: #c0c0e0;
+      white-space: pre;
+      margin: 0;
+    }
+    .diagram .diagram-label {
+      position: absolute;
+      top: -12px;
+      left: 16px;
+      background: var(--accent);
+      color: #fff;
+      padding: 2px 14px;
+      border-radius: 4px;
+      font-size: 0.75em;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    /* Before/After Comparison */
+    .comparison {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin: 24px 0;
+    }
+    .comparison-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 24px;
+    }
+    .comparison-card.before {
+      border-top: 3px solid var(--danger);
+    }
+    .comparison-card.after {
+      border-top: 3px solid var(--success);
+    }
+    .comparison-card h4 {
+      margin-top: 0;
+    }
+    .comparison-card ul { list-style: none; margin-left: 0; }
+    .comparison-card.before li::before {
+      content: '✗';
+      color: var(--danger);
+      font-weight: 700;
+      margin-right: 10px;
+    }
+    .comparison-card.after li::before {
+      content: '✓';
+      color: var(--success);
+      font-weight: 700;
+      margin-right: 10px;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+      font-size: 0.92em;
+    }
+    thead th {
+      background: var(--accent);
+      color: #fff;
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 0.9em;
+      letter-spacing: 0.3px;
+    }
+    thead th:first-child { border-radius: 8px 0 0 0; }
+    thead th:last-child { border-radius: 0 8px 0 0; }
+    tbody td {
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    tbody tr { background: var(--surface); }
+    tbody tr:nth-child(even) { background: var(--surface-alt); }
+    tbody tr:hover { background: rgba(233,69,96,0.06); }
+
+    /* Severity badges */
+    .badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 4px;
+      font-size: 0.8em;
+      font-weight: 600;
+    }
+    .badge-critical { background: rgba(231,76,60,0.2); color: #e74c3c; }
+    .badge-high { background: rgba(243,156,18,0.2); color: #f39c12; }
+    .badge-medium { background: rgba(52,152,219,0.2); color: #3498db; }
+
+    /* Code inline */
+    code {
+      background: var(--code-bg);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+      font-size: 0.88em;
+      color: #e0a0c0;
+    }
+
+    /* Code blocks */
+    .code-block {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px 24px;
+      margin: 16px 0;
+      overflow-x: auto;
+      position: relative;
+    }
+    .code-block pre {
+      font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+      font-size: 0.85em;
+      line-height: 1.6;
+      color: #c0c0e0;
+      margin: 0;
+    }
+    .code-block .lang-label {
+      position: absolute;
+      top: -10px;
+      right: 16px;
+      background: var(--secondary);
+      color: var(--text-muted);
+      padding: 2px 12px;
+      border-radius: 4px;
+      font-size: 0.7em;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    /* Info cards grid */
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 20px;
+      margin: 24px 0;
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 24px;
+      transition: border-color 0.2s;
+    }
+    .card:hover { border-color: var(--accent); }
+    .card h4 {
+      color: var(--info);
+      margin: 0 0 8px;
+      font-size: 1.05em;
+    }
+    .card p {
+      color: var(--text-muted);
+      font-size: 0.92em;
+      margin: 0;
+    }
+
+    /* DLP Mode cards */
+    .mode-cards {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin: 24px 0;
+    }
+    .mode-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 24px;
+    }
+    .mode-card h4 {
+      margin-top: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .mode-card .mode-badge {
+      background: var(--highlight);
+      color: #fff;
+      padding: 2px 10px;
+      border-radius: 4px;
+      font-size: 0.7em;
+      font-weight: 600;
+    }
+    .mode-card .flow {
+      font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+      font-size: 0.82em;
+      color: var(--text-muted);
+      background: var(--code-bg);
+      padding: 16px;
+      border-radius: 6px;
+      margin-top: 12px;
+      line-height: 1.6;
+      white-space: pre;
+    }
+
+    /* Feature grid for value prop */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin: 24px 0;
+    }
+    .feature-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+    }
+    .feature-icon {
+      width: 40px;
+      height: 40px;
+      background: rgba(233,69,96,0.15);
+      color: var(--highlight);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2em;
+      flex-shrink: 0;
+    }
+    .feature-item h5 {
+      font-size: 0.95em;
+      color: #fff;
+      margin-bottom: 4px;
+    }
+    .feature-item p {
+      font-size: 0.85em;
+      color: var(--text-muted);
+      margin: 0;
+    }
+
+    /* Layer stack for security */
+    .layer-stack { margin: 24px 0; }
+    .layer {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--accent);
+      border-radius: 0 8px 8px 0;
+      padding: 16px 24px;
+      margin: 8px 0;
+      display: flex;
+      align-items: baseline;
+      gap: 16px;
+    }
+    .layer:nth-child(1) { border-left-color: #e74c3c; }
+    .layer:nth-child(2) { border-left-color: #e67e22; }
+    .layer:nth-child(3) { border-left-color: #f1c40f; }
+    .layer:nth-child(4) { border-left-color: #2ecc71; }
+    .layer:nth-child(5) { border-left-color: #3498db; }
+    .layer:nth-child(6) { border-left-color: #9b59b6; }
+    .layer:nth-child(7) { border-left-color: #1abc9c; }
+    .layer:nth-child(8) { border-left-color: #e84393; }
+    .layer .layer-num {
+      font-weight: 700;
+      color: var(--text-muted);
+      font-size: 0.85em;
+      min-width: 70px;
+    }
+    .layer .layer-name {
+      font-weight: 600;
+      color: #fff;
+      min-width: 140px;
+    }
+    .layer .layer-desc {
+      color: var(--text-muted);
+      font-size: 0.9em;
+    }
+
+    /* Footer */
+    footer {
+      background: var(--primary);
+      border-top: 1px solid var(--border);
+      padding: 40px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.9em;
+      margin-top: 80px;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .hero { padding: 48px 20px; }
+      .hero h1 { font-size: 1.8em; }
+      .container { padding: 0 16px; }
+      .comparison, .mode-cards { grid-template-columns: 1fr; }
+      section h2 { font-size: 1.5em; }
+      .layer { flex-direction: column; gap: 4px; }
+    }
+
+    /* Print */
+    @media print {
+      body { background: #fff; color: #222; font-size: 11pt; }
+      .hero { background: #fff; border-bottom: 2px solid #333; padding: 20px; }
+      .hero h1 { color: #111; }
+      .hero .subtitle { color: #555; }
+      .hero .version-badge { background: #333; }
+      section h2 { color: #111; border-color: #ccc; }
+      section h2 .section-num { background: #333; }
+      section h3 { color: #333; }
+      .diagram, .code-block { border: 1px solid #ccc; background: #f5f5f5; }
+      .diagram pre, .code-block pre { color: #222; }
+      table { font-size: 9pt; }
+      thead th { background: #333; }
+      tbody tr, tbody tr:nth-child(even) { background: #fff; }
+      tbody td { border-color: #ddd; }
+      .card, .mode-card, .comparison-card, .feature-item, .layer, .highlight-box, .toc {
+        background: #fff; border-color: #ddd;
+      }
+      .toc a { color: #222; }
+      code { background: #eee; color: #b03060; }
+      footer { background: #fff; border-color: #ccc; color: #666; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ================================================================ -->
+<!-- HERO                                                             -->
+<!-- ================================================================ -->
+<header class="hero">
+  <h1>Claude Wrapper Stack</h1>
+  <p class="subtitle">Architecture &amp; Product Use Case</p>
+  <span class="version-badge">Version 1.0 &mdash; February 2026 &mdash; Uniformedi LLC</span>
+</header>
+
+<div class="container">
+
+<!-- ================================================================ -->
+<!-- TABLE OF CONTENTS                                                -->
+<!-- ================================================================ -->
+<nav class="toc">
+  <h2>Table of Contents</h2>
+  <ol>
+    <li><a href="#s1">Executive Summary</a></li>
+    <li><a href="#s2">Solution Overview</a></li>
+    <li><a href="#s3">Architecture Diagram</a></li>
+    <li><a href="#s4">Technology Stack</a></li>
+    <li><a href="#s5">Infrastructure Layer</a></li>
+    <li><a href="#s6">Service Architecture</a></li>
+    <li><a href="#s7">Data Loss Prevention (DLP)</a></li>
+    <li><a href="#s8">Identity &amp; Access Management</a></li>
+    <li><a href="#s9">Security Architecture</a></li>
+    <li><a href="#s10">Cost Governance &amp; Rate Limiting</a></li>
+    <li><a href="#s11">Deployment &amp; Operations</a></li>
+    <li><a href="#s12">Product Use Case</a></li>
+  </ol>
+</nav>
+
+<!-- ================================================================ -->
+<!-- 1. EXECUTIVE SUMMARY                                             -->
+<!-- ================================================================ -->
+<section id="s1">
+  <h2><span class="section-num">01</span> Executive Summary</h2>
+
+  <p>The Claude Wrapper Stack is a <strong>self-hosted, on-premises AI gateway</strong> that provides
+  enterprise-grade access to Anthropic's Claude models. A single <code>terraform apply</code>
+  deploys a fully configured Ubuntu VM on Windows Hyper-V, running five containerized
+  services that deliver:</p>
+
+  <div class="highlight-box">
+    <ul>
+      <li><strong>Chat interface</strong> for non-technical users (Open WebUI)</li>
+      <li><strong>API gateway</strong> for developers and CLI tools (LiteLLM)</li>
+      <li><strong>Data Loss Prevention</strong> scanning on every message and uploaded file (custom pipeline)</li>
+      <li><strong>SSO integration</strong> with Azure AD or Okta (OIDC)</li>
+      <li><strong>Per-user budgets and rate limits</strong> with real-time enforcement</li>
+      <li><strong>Full audit trail</strong> of every API call</li>
+    </ul>
+  </div>
+
+  <p>All traffic to Anthropic's API is brokered through this internal stack. The
+  organization retains complete control over who accesses Claude, what data they
+  send, and how much they spend.</p>
+
+  <div class="diagram">
+    <span class="diagram-label">Enterprise Boundary</span>
+    <pre>
++------------------------------------------------------------------+
+|                     ENTERPRISE BOUNDARY                          |
+|                                                                  |
+|   Users  ──────&gt;  [ Claude Wrapper Stack ]  ──────&gt;  Anthropic   |
+|                    DLP | Auth | Budgets                API       |
+|                    Audit | Rate Limits                           |
++------------------------------------------------------------------+</pre>
+  </div>
+</section>
+
+<!-- ================================================================ -->
+<!-- 2. SOLUTION OVERVIEW                                             -->
+<!-- ================================================================ -->
+<section id="s2">
+  <h2><span class="section-num">02</span> Solution Overview</h2>
+
+  <h3>The Problem</h3>
+  <p>Organizations adopting AI face three critical challenges:</p>
+  <ol>
+    <li><strong>Data Leakage</strong> &mdash; Employees paste sensitive data (SSNs, PHI, credentials)
+    into AI chat interfaces with no guardrails</li>
+    <li><strong>Cost Control</strong> &mdash; Unmanaged API usage can generate thousands of dollars
+    in charges within hours</li>
+    <li><strong>Compliance</strong> &mdash; No audit trail of what data was sent to AI services,
+    making regulatory compliance impossible</li>
+  </ol>
+
+  <h3>The Solution</h3>
+  <p>The Claude Wrapper Stack sits between users and the Anthropic API, acting as an
+  <strong>intelligent proxy</strong> that enforces DLP policies, authenticates users via
+  corporate identity providers, enforces per-user spend limits, and logs every
+  interaction &mdash; all without modifying the Claude API experience.</p>
+
+  <div class="comparison">
+    <div class="comparison-card before">
+      <h4 style="color: var(--danger);">Before (Direct Access)</h4>
+      <ul>
+        <li>No DLP scanning</li>
+        <li>No per-user budgets</li>
+        <li>No audit trail</li>
+        <li>No SSO integration</li>
+        <li>Shared API key</li>
+      </ul>
+    </div>
+    <div class="comparison-card after">
+      <h4 style="color: var(--success);">After (Claude Wrapper Stack)</h4>
+      <ul>
+        <li>PII/PHI blocked in messages AND files</li>
+        <li>Per-user daily spend caps</li>
+        <li>Full audit trail (Langfuse)</li>
+        <li>Azure AD / Okta SSO</li>
+        <li>Individual user keys</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================ -->
+<!-- 3. ARCHITECTURE DIAGRAM                                          -->
+<!-- ================================================================ -->
+<section id="s3">
+  <h2><span class="section-num">03</span> Architecture Diagram</h2>
+
+  <h3>High-Level Architecture</h3>
+  <div class="diagram">
+    <span class="diagram-label">Infrastructure</span>
+    <pre>
+                         +----------------------------------------------+
+                         |          Windows Hyper-V Host                 |
+                         |          (Windows 11 Pro / Server)            |
+                         |                                              |
+                         |  +----------------------------------------+  |
+                         |  |         Ubuntu 24.04 LTS VM             |  |
+                         |  |         4 vCPU | 8 GB RAM | 80 GB      |  |
+                         |  |                                         |  |
++----------+ HTTPS 443   |  |  +-----------------------------------+  |  |
+|          |-------------+--+-&gt;|          Nginx 1.27                |  |  |
+|  Users   |             |  |  |   TLS 1.2/1.3 Termination         |  |  |
+| (Browser)|             |  |  |   HSTS | Security Headers         |  |  |
++----------+             |  |  +-----+----------+----------+-------+  |  |
+                         |  |        |          |          |          |  |
++----------+ HTTPS 443   |  |   /    |    /v1/  |  /litellm/         |  |
+|  Claude  |-------------+--+-&gt;      |          |          |          |  |
+|  Code    |             |  |        v          v          v          |  |
+|  CLI     |             |  |  +-----------+  +------------+         |  |
++----------+             |  |  | Open      |  | LiteLLM    |         |  |
+                         |  |  | WebUI     |  | Proxy      |&lt;--+     |  |
+                         |  |  | :8080     |  | :4000      |   |     |  |
+                         |  |  +-----+-----+  +------+-----+   |     |  |
+                         |  |        |               |          |     |  |
+                         |  |   DLP Pipeline    Budget/Rate     |     |  |
+                         |  |   (inlet/outlet)  Enforcement     |     |  |
+                         |  |        |               |          |     |  |
+                         |  |        +-------+-------+          |     |  |
+                         |  |                |                  |     |  |
+                         |  |                v                  |     |  |
+                         |  |  +-------------+  +----------+   |     |  |
+                         |  |  | PostgreSQL  |  | Redis    |---+     |  |
+                         |  |  | 16-alpine   |  | 7-alpine |         |  |
+                         |  |  | Users,Spend |  | Rate     |         |  |
+                         |  |  | Audit,Teams |  | Limits   |         |  |
+                         |  |  +-------------+  +----------+         |  |
+                         |  +----------------------------------------+  |
+                         +----------------------------------------------+
+                                         |
+                                         | HTTPS (api.anthropic.com)
+                                         v
+                                  +---------------+
+                                  |  Anthropic    |
+                                  |  Claude API   |
+                                  | Sonnet|Haiku  |
+                                  | Opus          |
+                                  +---------------+</pre>
+  </div>
+
+  <h3>Container Network Topology</h3>
+  <div class="diagram">
+    <span class="diagram-label">Docker Bridge 172.28.0.0/16</span>
+    <pre>
++--------------+     +--------------+
+| PostgreSQL   |     | Redis        |
+| :5432        |     | :6379        |
+| (internal)   |     | (internal)   |
++------+-------+     +------+-------+
+       |                     |
+       +---------+-----------+
+                 |
+          +------+-------+
+          |   LiteLLM    |-----------&gt;  api.anthropic.com
+          |   :4000      |
+          +------+-------+
+                 |
+          +------+-------+
+          | Open WebUI   |
+          | :8080        |
+          +------+-------+
+                 |
+          +------+-------+
+          |   Nginx      |
+          |  :80  :443   |  &lt;--------  External Users
+          +--------------+
+
+Exposed Host Ports:
+  80   -&gt; Nginx   (HTTP redirect to HTTPS)
+  443  -&gt; Nginx   (HTTPS -- primary entry point)
+  4000 -&gt; LiteLLM (direct API access)</pre>
+  </div>
+
+  <h3>Request Flow</h3>
+  <div class="diagram">
+    <span class="diagram-label">Message Lifecycle</span>
+    <pre>
+  User types message in Open WebUI
+           |
+           v
+  +------------------+
+  | Nginx            |  HTTPS termination, add security headers
+  | (reverse proxy)  |
+  +--------+---------+
+           |
+           v
+  +------------------+
+  | Open WebUI       |
+  | DLP Pipeline     |---- INLET: Scan message text + uploaded files
+  | (pre-processing) |     - Excel, CSV, PDF, Word, PPTX scanned
+  |                  |     - SSN? BLOCK
+  |                  |     - Credit card? BLOCK
+  |                  |     - PHI? BLOCK
+  |                  |     - API keys? BLOCK
+  |                  |     - Custom patterns? BLOCK
+  +--------+---------+
+           | Message + clean files pass DLP
+           v
+  +------------------+
+  | LiteLLM Proxy    |  1. Authenticate user (SSO token / API key)
+  |                  |  2. Check budget (PostgreSQL: $5/day remaining?)
+  |                  |  3. Check rate limit (Redis: 30 RPM / 100K TPM?)
+  |                  |  4. Check cache (Redis: seen this prompt before?)
+  |                  |  5. Route to correct Claude model
+  +--------+---------+
+           |
+           v
+  +------------------+
+  | Anthropic API    |  Claude generates response
+  +--------+---------+
+           |
+           v
+  +------------------+
+  | LiteLLM Proxy    |  6. Record token usage + cost in PostgreSQL
+  |                  |  7. Log to Langfuse (audit trail)
+  |                  |  8. Update Redis rate limit counters
+  +--------+---------+
+           |
+           v
+  +------------------+
+  | Open WebUI       |
+  | DLP Pipeline     |---- OUTLET: Scan assistant response
+  | (post-processing)|     - Redact any echoed-back PII/PHI/creds
+  +--------+---------+
+           |
+           v
+  User sees the response</pre>
+  </div>
+</section>
+
+<!-- ================================================================ -->
+<!-- 4. TECHNOLOGY STACK                                              -->
+<!-- ================================================================ -->
+<section id="s4">
+  <h2><span class="section-num">04</span> Technology Stack</h2>
+
+  <p>All components are <strong>free and open-source software (FOSS)</strong>:</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Component</th>
+        <th>Project</th>
+        <th>License</th>
+        <th>Version</th>
+        <th>Purpose</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>API Gateway</strong></td>
+        <td>LiteLLM</td>
+        <td>MIT</td>
+        <td>latest</td>
+        <td>Authentication, model routing, budgets, rate limiting, audit</td>
+      </tr>
+      <tr>
+        <td><strong>Chat Interface</strong></td>
+        <td>Open WebUI</td>
+        <td>MIT</td>
+        <td>latest</td>
+        <td>Browser-based chat UI, RAG, document upload, pipeline host</td>
+      </tr>
+      <tr>
+        <td><strong>Reverse Proxy</strong></td>
+        <td>Nginx</td>
+        <td>BSD-2</td>
+        <td>1.27</td>
+        <td>TLS termination, HTTPS routing, security headers</td>
+      </tr>
+      <tr>
+        <td><strong>Database</strong></td>
+        <td>PostgreSQL</td>
+        <td>PostgreSQL</td>
+        <td>16</td>
+        <td>User data, spend tracking, team budgets, audit logs</td>
+      </tr>
+      <tr>
+        <td><strong>Cache</strong></td>
+        <td>Redis</td>
+        <td>BSD-3</td>
+        <td>7</td>
+        <td>Rate limit counters, response cache, session data</td>
+      </tr>
+      <tr>
+        <td><strong>Containers</strong></td>
+        <td>Docker + Compose</td>
+        <td>Apache 2.0</td>
+        <td>CE</td>
+        <td>Container orchestration, networking, health checks</td>
+      </tr>
+      <tr>
+        <td><strong>IaC</strong></td>
+        <td>Terraform</td>
+        <td>BSL 1.1</td>
+        <td>&ge; 1.5</td>
+        <td>Infrastructure provisioning, config templating</td>
+      </tr>
+      <tr>
+        <td><strong>Provisioning</strong></td>
+        <td>cloud-init</td>
+        <td>Apache 2.0</td>
+        <td>default</td>
+        <td>First-boot VM automation</td>
+      </tr>
+      <tr>
+        <td><strong>Hypervisor</strong></td>
+        <td>Hyper-V</td>
+        <td>Windows</td>
+        <td>Win 11 Pro</td>
+        <td>Virtual machine hosting (included in Windows Pro/Enterprise)</td>
+      </tr>
+      <tr>
+        <td><strong>Audit</strong></td>
+        <td>Langfuse</td>
+        <td>MIT</td>
+        <td>callback</td>
+        <td>LLM observability, prompt logging, cost tracking</td>
+      </tr>
+      <tr>
+        <td><strong>Guest OS</strong></td>
+        <td>Ubuntu</td>
+        <td>FOSS</td>
+        <td>24.04 LTS</td>
+        <td>Server operating system</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Why These Technologies?</h3>
+  <div class="cards">
+    <div class="card">
+      <h4>LiteLLM</h4>
+      <p>Only FOSS proxy with per-user budgets + SSO. OpenAI-compatible API (works with Claude Code). Built-in admin UI for non-technical admins.</p>
+    </div>
+    <div class="card">
+      <h4>Open WebUI</h4>
+      <p>ChatGPT-like UX (zero learning curve). Pipeline system enables custom DLP filters. RAG built-in for document Q&amp;A out of the box.</p>
+    </div>
+    <div class="card">
+      <h4>PostgreSQL</h4>
+      <p>Enterprise-proven, ACID-compliant. Perfect for financial data (spend tracking).</p>
+    </div>
+    <div class="card">
+      <h4>Redis</h4>
+      <p>Sub-millisecond rate limit enforcement. Response caching reduces API costs.</p>
+    </div>
+    <div class="card">
+      <h4>Nginx</h4>
+      <p>Industry standard for TLS termination. WebSocket support for streaming responses.</p>
+    </div>
+    <div class="card">
+      <h4>Hyper-V</h4>
+      <p>Built into Windows Pro/Enterprise (no cost). IT departments already have Hyper-V expertise.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================ -->
+<!-- 5. INFRASTRUCTURE LAYER                                          -->
+<!-- ================================================================ -->
+<section id="s5">
+  <h2><span class="section-num">05</span> Infrastructure Layer</h2>
+
+  <h3>Deployment Target</h3>
+  <p>The stack deploys to a single VM on a Windows Hyper-V host. This is ideal for
+  organizations that want AI capabilities without cloud dependencies.</p>
+
+  <div class="diagram">
+    <span class="diagram-label">VM Provisioning</span>
+    <pre>
++--------------------------------------------------+
+| Windows 11 Pro / Server 2022+                    |
+| (Hyper-V enabled)                                |
+|                                                  |
+|  Terraform (local exec)                          |
+|      |                                           |
+|      | WinRM (NTLM, port 5985)                   |
+|      v                                           |
+|  Hyper-V Manager                                 |
+|      |                                           |
+|      | Creates VM + attaches cloud-init ISO       |
+|      v                                           |
+|  +--------------------------------------------+  |
+|  | Ubuntu 24.04 LTS VM                        |  |
+|  |   - Gen 2 (UEFI + Secure Boot)            |  |
+|  |   - 4 vCPU, 8 GB RAM, 80 GB disk          |  |
+|  |   - Internal switch + NAT (isolated)       |  |
+|  |   - SSH key-only access                    |  |
+|  +--------------------------------------------+  |
++--------------------------------------------------+</pre>
+  </div>
+
+  <h3>Networking Models</h3>
+  <table>
+    <thead>
+      <tr><th>Mode</th><th>Description</th><th>Use Case</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Internal + NAT</strong> (default)</td>
+        <td>VM on isolated virtual switch (<code>192.168.100.0/24</code>), NAT for internet</td>
+        <td>Single-host deployments, maximum isolation</td>
+      </tr>
+      <tr>
+        <td><strong>External</strong></td>
+        <td>VM bridged to physical NIC, gets LAN IP</td>
+        <td>Multi-host access, existing network infrastructure</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>VM Provisioning Pipeline</h3>
+  <div class="diagram">
+    <span class="diagram-label">terraform apply</span>
+    <pre>
+ terraform apply
+       |
+       v
+ 1. Generate secrets (random_password)
+ 2. Generate TLS cert (tls_self_signed_cert) -- or use BYOC
+ 3. Render all templates (docker-compose, nginx, litellm, cloud-init)
+ 4. Create Hyper-V VM (hyperv_machine_instance)
+ 5. Resize boot VHDX to 80 GB
+ 6. Build cloud-init ISO (genisoimage via WSL)
+ 7. Attach ISO + boot VM
+ 8. Wait for cloud-init completion (SSH poll, up to 10 min)
+ 9. Verify services are healthy
+       |
+       v
+ All 5 containers running. Stack operational.</pre>
+  </div>
+</section>
+
+<!-- ================================================================ -->
+<!-- 6. SERVICE ARCHITECTURE                                          -->
+<!-- ================================================================ -->
+<section id="s6">
+  <h2><span class="section-num">06</span> Service Architecture</h2>
+
+  <h3>PostgreSQL 16</h3>
+  <p><strong>Role:</strong> Persistent state store for LiteLLM.</p>
+  <table>
+    <thead><tr><th>Data Stored</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td>User records</td><td>Who has accessed the system</td></tr>
+      <tr><td>API keys</td><td>Per-user and per-team authentication tokens</td></tr>
+      <tr><td>Spend tracking</td><td>Token usage and dollar amounts per user per day</td></tr>
+      <tr><td>Team budgets</td><td>Organizational budget allocations</td></tr>
+      <tr><td>Team membership</td><td>User-to-team assignments</td></tr>
+      <tr><td>Audit logs</td><td>Historical record of API calls</td></tr>
+    </tbody>
+  </table>
+  <ul>
+    <li><strong>Volume:</strong> <code>/opt/claude-wrapper/data/postgres</code> (persistent across restarts)</li>
+    <li><strong>Health check:</strong> <code>pg_isready -U litellm</code> every 10s</li>
+    <li><strong>Not exposed</strong> to host network &mdash; internal access only</li>
+  </ul>
+
+  <h3>Redis 7</h3>
+  <p><strong>Role:</strong> High-speed cache and rate limiter.</p>
+  <table>
+    <thead><tr><th>Data Stored</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td>Rate limit counters</td><td>Requests-per-minute (RPM) and tokens-per-minute (TPM) per user</td></tr>
+      <tr><td>Response cache</td><td>Deduplicate identical prompts (cost savings)</td></tr>
+      <tr><td>Session data</td><td>Temporary session state</td></tr>
+    </tbody>
+  </table>
+  <ul>
+    <li><strong>Memory:</strong> Capped at 256 MB with LRU eviction</li>
+    <li><strong>Volume:</strong> <code>/opt/claude-wrapper/data/redis</code> (persistence for cache warmth)</li>
+    <li><strong>Health check:</strong> <code>redis-cli ping</code> every 10s</li>
+  </ul>
+
+  <h3>LiteLLM Proxy</h3>
+  <p><strong>Role:</strong> Central API gateway &mdash; the brain of the stack.</p>
+
+  <div class="diagram">
+    <span class="diagram-label">LiteLLM Internals</span>
+    <pre>
++--------------------------------------------------------------+
+|                       LiteLLM Proxy                          |
++--------------------------------------------------------------+
+|                                                              |
+|  Authentication                                              |
+|  +------------------+  +------------------+                  |
+|  | Master Key       |  | Per-User API Keys|                  |
+|  | (admin access)   |  | (team-scoped)    |                  |
+|  +------------------+  +------------------+                  |
+|  +------------------+  +------------------+                  |
+|  | Azure AD SSO     |  | Okta SSO         |                  |
+|  | (OIDC)           |  | (OIDC)           |                  |
+|  +------------------+  +------------------+                  |
+|                                                              |
+|  Model Routing                                               |
+|  +------------------+  +------------------+  +-----------+   |
+|  | claude-sonnet    |  | claude-haiku     |  | claude-   |   |
+|  | (4.5)            |  | (4.5)            |  | opus(4.6) |   |
+|  +------------------+  +------------------+  +-----------+   |
+|                                                              |
+|  Governance                                                  |
+|  +------------------+  +------------------+  +-----------+   |
+|  | Per-user budgets |  | Rate limiting    |  | Global    |   |
+|  | $5/day default   |  | 30 RPM/100K TPM  |  | $100/mo   |   |
+|  +------------------+  +------------------+  +-----------+   |
+|                                                              |
+|  Observability                                               |
+|  +------------------+  +------------------+                  |
+|  | Langfuse audit   |  | Admin dashboard  |                  |
+|  | (every API call) |  | (spend, usage)   |                  |
+|  +------------------+  +------------------+                  |
++--------------------------------------------------------------+</pre>
+  </div>
+
+  <p><strong>Available Claude Models:</strong></p>
+  <table>
+    <thead><tr><th>Model Alias</th><th>Backend</th><th>Default</th></tr></thead>
+    <tbody>
+      <tr><td><code>claude-sonnet</code></td><td><code>anthropic/claude-sonnet-4-5-20250929</code></td><td>Always on</td></tr>
+      <tr><td><code>claude-haiku</code></td><td><code>anthropic/claude-haiku-4-5-20251001</code></td><td>Enabled</td></tr>
+      <tr><td><code>claude-opus</code></td><td><code>anthropic/claude-opus-4-6</code></td><td>Enabled</td></tr>
+    </tbody>
+  </table>
+  <p>Anthropic prompt caching is handled automatically by LiteLLM when applicable.</p>
+
+  <h3>Open WebUI</h3>
+  <p><strong>Role:</strong> User-facing chat interface with pipeline extensibility.</p>
+  <ul>
+    <li><strong>ChatGPT-like interface</strong> &mdash; zero learning curve for end users</li>
+    <li><strong>Pipeline system</strong> &mdash; hosts the DLP filter that scans messages and uploaded files</li>
+    <li><strong>RAG (Retrieval-Augmented Generation)</strong> &mdash; users upload documents and ask questions against them using <code>text-embedding-3-small</code></li>
+    <li><strong>User management</strong> &mdash; self-registration with role-based access</li>
+    <li><strong>Community sharing disabled</strong> &mdash; no data leaves the organization</li>
+  </ul>
+
+  <h3>Nginx 1.27</h3>
+  <p><strong>Role:</strong> Secure entry point, TLS termination, request routing.</p>
+
+  <div class="diagram">
+    <span class="diagram-label">Routing Rules</span>
+    <pre>
+Port 80 (HTTP)                   Port 443 (HTTPS)
++------------------+             +-----------------------------------+
+| /health -&gt; 200   |             | /          -&gt; Open WebUI (:8080)  |
+| /*      -&gt; 301   |--redirect--&gt;| /litellm/  -&gt; LiteLLM UI (:4000) |
+|   to HTTPS       |             | /v1/       -&gt; LiteLLM API (:4000)|
++------------------+             | /nginx-health -&gt; 200 OK          |
+                                 +-----------------------------------+</pre>
+  </div>
+
+  <p><strong>TLS Configuration:</strong></p>
+  <ul>
+    <li>Protocols: TLS 1.2 and TLS 1.3 only</li>
+    <li>Cipher suite: <code>HIGH:!aNULL:!MD5</code></li>
+    <li>HSTS: 1 year with subdomains</li>
+    <li>HTTP/2 enabled</li>
+    <li>Self-signed cert auto-generated (or BYOC)</li>
+  </ul>
+</section>
+
+<!-- ================================================================ -->
+<!-- 7. DATA LOSS PREVENTION (DLP)                                    -->
+<!-- ================================================================ -->
+<section id="s7">
+  <h2><span class="section-num">07</span> Data Loss Prevention (DLP)</h2>
+
+  <h3>Overview</h3>
+  <p>The DLP system is implemented as an <strong>Open WebUI Filter Pipeline</strong> (v2.0) &mdash; a
+  Python module that intercepts every message and uploaded file at two critical
+  points in the conversation flow. It is the primary compliance control in the stack.</p>
+
+  <div class="diagram">
+    <span class="diagram-label">DLP Pipeline Flow</span>
+    <pre>
++=============================================================+
+|                     DLP Pipeline Flow                        |
++=============================================================+
+|                                                             |
+|  USER MESSAGE + UPLOADED FILES                              |
+|      |                                                      |
+|      v                                                      |
+|  +-------------------------------------------------------+  |
+|  |              INLET (Pre-Processing)                    |  |
+|  |                                                        |  |
+|  |  1. Scan message text:                                 |  |
+|  |     - Extract text (plain or multimodal)               |  |
+|  |     - Run ALL active regex patterns                    |  |
+|  |                                                        |  |
+|  |  2. Scan uploaded files:                               |  |
+|  |     - Read file from disk (before RAG sees it)         |  |
+|  |     - Extract text per format:                         |  |
+|  |       Excel (.xlsx/.xls) | CSV/TSV | PDF               |  |
+|  |       Word (.docx) | PowerPoint (.pptx)                |  |
+|  |       Plain text (.txt, .md, .json, .xml, etc.)        |  |
+|  |     - Run ALL active regex patterns on content         |  |
+|  |                                                        |  |
+|  |  3. If match found:                                    |  |
+|  |     - BLOCK mode: Reject with error message            |  |
+|  |     - REDACT mode: Strip flagged files, redact text    |  |
+|  |  4. Log detection (without sensitive data)             |  |
+|  +-------------------------------------------------------+  |
+|      |                                                      |
+|      | Clean message + clean files only                     |
+|      v                                                      |
+|  [ RAG --&gt; LiteLLM --&gt; Anthropic API --&gt; Claude ]            |
+|      |                                                      |
+|      | Claude's response                                    |
+|      v                                                      |
+|  +-------------------------------------------------------+  |
+|  |             OUTLET (Post-Processing)                   |  |
+|  |                                                        |  |
+|  |  For each assistant message:                           |  |
+|  |    1. Scan response text (incl. RAG excerpts)          |  |
+|  |    2. If sensitive data echoed back:                   |  |
+|  |       - Always REDACT (never show to user)             |  |
+|  |    3. Log detection                                    |  |
+|  +-------------------------------------------------------+  |
+|      |                                                      |
+|      v                                                      |
+|  SANITIZED RESPONSE shown to user                           |
++=============================================================+</pre>
+  </div>
+
+  <h3>File Upload Scanning</h3>
+  <p>The DLP pipeline runs <strong>before</strong> Open WebUI's RAG pipeline, meaning files are
+  scanned at the raw content level before any text extraction or embedding occurs.
+  If a file contains sensitive data, it is blocked before the LLM ever sees it.</p>
+
+  <table>
+    <thead>
+      <tr><th>Format</th><th>Library</th><th>What Gets Scanned</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>.xlsx</code> / <code>.xlsm</code></td><td>openpyxl</td><td>All cells from all sheets</td></tr>
+      <tr><td><code>.xls</code></td><td>xlrd</td><td>All cells from all sheets</td></tr>
+      <tr><td><code>.csv</code> / <code>.tsv</code></td><td>stdlib csv</td><td>All rows and columns</td></tr>
+      <tr><td><code>.pdf</code></td><td>pypdf</td><td>Text from all pages</td></tr>
+      <tr><td><code>.docx</code></td><td>docx2txt</td><td>All paragraphs</td></tr>
+      <tr><td><code>.pptx</code></td><td>python-pptx</td><td>Text from all slides</td></tr>
+      <tr><td><code>.txt</code> <code>.md</code> <code>.json</code> <code>.xml</code> <code>.py</code> <code>.js</code> <code>.yaml</code> <code>.sql</code></td><td>plain read</td><td>Full file content</td></tr>
+    </tbody>
+  </table>
+  <p>Files &gt; 50 MB (configurable) are skipped for performance. Unsupported formats are logged and skipped (never blocked).</p>
+
+  <h3>Block Mode Error Example</h3>
+  <div class="code-block">
+    <span class="lang-label">User Feedback</span>
+    <pre>DLP Filter Blocked This Message
+
+Uploaded files contain sensitive information:
+  - employees.xlsx: Social Security Number, Credit Card Number
+  - patient_notes.pdf: Medical Record Number, Date of Birth
+
+Please remove the sensitive data and try again.</pre>
+  </div>
+  <p>In <strong>redact mode</strong>, flagged files are stripped from the request (never sent to
+  RAG or the LLM), and a system message notifies the user which files were removed.</p>
+
+  <h3>Operating Modes</h3>
+  <div class="mode-cards">
+    <div class="mode-card">
+      <h4><span class="mode-badge">DEFAULT</span> Block Mode</h4>
+      <p>The entire message is rejected. Nothing reaches Claude.</p>
+      <div class="flow">User: "My SSN is 123-45-6789"
+       |
+       v
+  DLP BLOCKS MESSAGE
+       |
+       v
+  "Your message contains data
+   that appears to be sensitive
+   information (Social Security
+   Number). This message has
+   been blocked."
+
+  Message NEVER reaches Claude.</div>
+    </div>
+    <div class="mode-card">
+      <h4><span class="mode-badge">OPTIONAL</span> Redact Mode</h4>
+      <p>Sensitive data is replaced with tokens. The message still goes through.</p>
+      <div class="flow">User: "My SSN is 123-45-6789"
+       |
+       v
+  DLP REDACTS MESSAGE
+       |
+       v
+  Sent to Claude as:
+  "My SSN is [REDACTED-SSN]"
+       |
+       v
+  Claude responds normally
+  (never sees real SSN)</div>
+    </div>
+  </div>
+
+  <h3>Detection Categories</h3>
+
+  <h4>Personally Identifiable Information (PII)</h4>
+  <table>
+    <thead><tr><th>Pattern</th><th>What It Detects</th><th>Severity</th></tr></thead>
+    <tbody>
+      <tr><td>SSN</td><td><code>123-45-6789</code>, <code>123 45 6789</code>, <code>123456789</code></td><td><span class="badge badge-critical">Critical</span></td></tr>
+      <tr><td>Credit Card (branded)</td><td>Visa (4xxx), MC (5[1-5]xx), Amex (3[47]xx), Discover (6011/65xx)</td><td><span class="badge badge-critical">Critical</span></td></tr>
+      <tr><td>Credit Card (generic)</td><td>Any <code>xxxx-xxxx-xxxx-xxxx</code> pattern</td><td><span class="badge badge-high">High</span></td></tr>
+      <tr><td>Bank Routing</td><td>Routing/ABA numbers (9 digits)</td><td><span class="badge badge-critical">Critical</span></td></tr>
+      <tr><td>Bank Account</td><td>Account numbers (8-17 digits)</td><td><span class="badge badge-critical">Critical</span></td></tr>
+    </tbody>
+  </table>
+
+  <h4>Protected Health Information (PHI / HIPAA)</h4>
+  <table>
+    <thead><tr><th>Pattern</th><th>What It Detects</th><th>Severity</th></tr></thead>
+    <tbody>
+      <tr><td>Medical Record #</td><td>MRN, Medical Record, Patient ID + digits</td><td><span class="badge badge-critical">Critical</span></td></tr>
+      <tr><td>Date of Birth</td><td>DOB/Date of Birth + date (in medical context)</td><td><span class="badge badge-high">High</span></td></tr>
+      <tr><td>Diagnosis Codes</td><td>ICD-9 and ICD-10-CM/PCS codes</td><td><span class="badge badge-medium">Medium</span></td></tr>
+    </tbody>
+  </table>
+
+  <h4>Credentials &amp; Secrets</h4>
+  <table>
+    <thead><tr><th>Pattern</th><th>What It Detects</th><th>Severity</th></tr></thead>
+    <tbody>
+      <tr><td>API Keys</td><td><code>sk-xxxx...</code>, <code>api_key=xxxx</code></td><td><span class="badge badge-critical">Critical</span></td></tr>
+      <tr><td>Passwords</td><td><code>password=</code>, <code>passwd=</code>, <code>pwd=</code> + value</td><td><span class="badge badge-critical">Critical</span></td></tr>
+      <tr><td>Connection Strings</td><td><code>Server=...;Password=...</code></td><td><span class="badge badge-critical">Critical</span></td></tr>
+      <tr><td>AWS Keys</td><td><code>AKIA</code>/<code>ASIA</code> prefix + 16 characters</td><td><span class="badge badge-critical">Critical</span></td></tr>
+      <tr><td>Private Keys</td><td><code>-----BEGIN PRIVATE KEY-----</code></td><td><span class="badge badge-critical">Critical</span></td></tr>
+    </tbody>
+  </table>
+
+  <h4>Custom Patterns (organization-defined)</h4>
+  <p>Administrators can add arbitrary regex patterns via Terraform variables or
+  the Open WebUI admin panel at runtime &mdash; no redeployment needed.</p>
+
+  <h3>DLP Configuration</h3>
+
+  <p><strong>1. Terraform Variables (deploy-time)</strong></p>
+  <div class="code-block">
+    <span class="lang-label">HCL</span>
+    <pre># terraform.tfvars
+dlp_enable             = true
+dlp_block_ssn          = true
+dlp_block_credit_cards = true
+dlp_block_phi          = true
+dlp_block_credentials  = true
+dlp_custom_patterns    = {
+  "client_account" = "\\bACCT[#-]?\\d{8,}\\b"
+  "internal_id"    = "\\bUID-[A-Z]{2}\\d{6}\\b"
+}</pre>
+  </div>
+
+  <p><strong>2. Open WebUI Admin Panel (runtime)</strong></p>
+  <p>Navigate to <strong>Admin &gt; Pipelines &gt; DLP Filter &gt; Valves</strong>:</p>
+  <table>
+    <thead><tr><th>Setting</th><th>Default</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>enabled</code></td><td><code>true</code></td><td>Master on/off</td></tr>
+      <tr><td><code>mode</code></td><td><code>block</code></td><td><code>block</code> or <code>redact</code></td></tr>
+      <tr><td><code>block_ssn</code></td><td><code>true</code></td><td>SSN detection</td></tr>
+      <tr><td><code>block_credit_cards</code></td><td><code>true</code></td><td>Credit card detection</td></tr>
+      <tr><td><code>block_phi</code></td><td><code>true</code></td><td>PHI detection</td></tr>
+      <tr><td><code>block_credentials</code></td><td><code>true</code></td><td>Secret detection</td></tr>
+      <tr><td><code>block_bank_accounts</code></td><td><code>true</code></td><td>Bank info detection</td></tr>
+      <tr><td><code>scan_file_uploads</code></td><td><code>true</code></td><td>Scan uploaded files (Excel, PDF, etc.)</td></tr>
+      <tr><td><code>max_file_size_mb</code></td><td><code>50</code></td><td>Max file size to scan (larger files skipped)</td></tr>
+      <tr><td><code>log_detections</code></td><td><code>true</code></td><td>Audit logging</td></tr>
+      <tr><td><code>custom_patterns</code></td><td><code>{}</code></td><td>JSON regex map</td></tr>
+    </tbody>
+  </table>
+
+  <h3>DLP Audit Logging</h3>
+  <p>Detections are logged <strong>without the actual sensitive data</strong>, creating an
+  audit trail that is itself compliant:</p>
+  <div class="code-block">
+    <span class="lang-label">Log Output</span>
+    <pre>WARNING - DLP: Detected sensitive data from user=john.doe:
+         Social Security Number (critical), API Key (critical)
+
+What IS logged:     Pattern name, severity, user ID, timestamp
+What is NOT logged: The actual sensitive values</pre>
+  </div>
+
+  <h3>Multimodal Content Handling</h3>
+  <p>The DLP pipeline handles plain text, multimodal (text + image) messages, and
+  uploaded files. For multimodal content, it extracts all text portions and scans
+  them. For files, it reads them directly from disk before RAG processes them,
+  extracting text using format-specific parsers (openpyxl for Excel, pypdf for
+  PDF, docx2txt for Word, python-pptx for PowerPoint, stdlib csv for CSV/TSV,
+  and plain reads for text-based formats).</p>
+</section>
+
+<!-- ================================================================ -->
+<!-- 8. IDENTITY & ACCESS MANAGEMENT                                  -->
+<!-- ================================================================ -->
+<section id="s8">
+  <h2><span class="section-num">08</span> Identity &amp; Access Management</h2>
+
+  <h3>Authentication Layers</h3>
+  <div class="layer-stack">
+    <div class="layer">
+      <span class="layer-num">Layer 1</span>
+      <span class="layer-name">Nginx (TLS)</span>
+      <span class="layer-desc">HTTPS required for all access. Self-signed or organization CA cert.</span>
+    </div>
+    <div class="layer">
+      <span class="layer-num">Layer 2</span>
+      <span class="layer-name">Open WebUI</span>
+      <span class="layer-desc">Self-registration with email + password. First registrant becomes admin. Role-based access: admin / user.</span>
+    </div>
+    <div class="layer">
+      <span class="layer-num">Layer 3</span>
+      <span class="layer-name">LiteLLM (SSO)</span>
+      <span class="layer-desc">Master key (admin), per-user API keys (team-scoped), Azure AD SSO (OIDC), Okta SSO (OIDC).</span>
+    </div>
+  </div>
+
+  <h3>Azure Active Directory (Microsoft Entra ID) Integration</h3>
+  <p>For organizations using Microsoft 365 / Azure AD:</p>
+
+  <div class="diagram">
+    <span class="diagram-label">Azure AD SSO Flow</span>
+    <pre>
+ +---------------------------+         +---------------------------+
+ |     Azure AD Tenant       |         |     Claude Wrapper        |
+ |                           |         |                           |
+ |  1. Register App          |         |  4. LiteLLM validates     |
+ |     - Client ID           |--------&gt;|     token via Microsoft   |
+ |     - Client Secret       |         |     OIDC endpoints        |
+ |     - Redirect URI        |         |                           |
+ |                           |         |  5. User auto-provisioned |
+ |  2. User clicks "Login    |         |     with AD email/name    |
+ |     with Microsoft"       |         |                           |
+ |                           |         |  6. Assigned to team      |
+ |  3. Azure AD authenticates|         |     based on AD groups    |
+ |     and returns OIDC token|         |     (manual mapping)      |
+ +---------------------------+         +---------------------------+</pre>
+  </div>
+
+  <p><strong>Setup Steps:</strong></p>
+  <ol>
+    <li>In Azure Portal, go to <strong>Azure Active Directory &gt; App Registrations &gt; New</strong></li>
+    <li>Set Redirect URI to <code>https://&lt;vm-ip&gt;/litellm/sso/callback</code></li>
+    <li>Create a Client Secret under <strong>Certificates &amp; Secrets</strong></li>
+    <li>Note the Application (Client) ID, Client Secret, and Tenant ID</li>
+  </ol>
+
+  <p><strong>Configuration:</strong></p>
+  <div class="code-block">
+    <span class="lang-label">HCL</span>
+    <pre># terraform.tfvars
+sso_provider           = "azure_ad"
+azure_ad_client_id     = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+azure_ad_client_secret = "your-client-secret"
+azure_ad_tenant_id     = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"</pre>
+  </div>
+
+  <p><strong>Environment variables injected into LiteLLM:</strong></p>
+  <table>
+    <thead><tr><th>Variable</th><th>Source</th></tr></thead>
+    <tbody>
+      <tr><td><code>MICROSOFT_CLIENT_ID</code></td><td>App Registration &gt; Application (client) ID</td></tr>
+      <tr><td><code>MICROSOFT_CLIENT_SECRET</code></td><td>App Registration &gt; Certificates &amp; Secrets</td></tr>
+      <tr><td><code>MICROSOFT_TENANT</code></td><td>Azure AD &gt; Tenant ID</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Okta Integration</h3>
+  <p>For organizations using Okta as their identity provider:</p>
+
+  <div class="diagram">
+    <span class="diagram-label">Okta SSO Flow</span>
+    <pre>
+ +---------------------------+         +---------------------------+
+ |     Okta Tenant           |         |     Claude Wrapper        |
+ |                           |         |                           |
+ |  1. Create OIDC App       |         |  4. LiteLLM validates     |
+ |     - Client ID           |--------&gt;|     token via Okta        |
+ |     - Client Secret       |         |     OIDC endpoints        |
+ |     - Assign users/groups |         |                           |
+ |                           |         |  5. User auto-provisioned |
+ |  2. User clicks "Login    |         |     with Okta profile:    |
+ |     with Okta"            |         |     - sub (user ID)       |
+ |                           |         |     - email               |
+ |  3. Okta authenticates    |         |     - name (display name) |
+ |     and returns OIDC token|         |                           |
+ +---------------------------+         +---------------------------+</pre>
+  </div>
+
+  <p><strong>Setup Steps:</strong></p>
+  <ol>
+    <li>In Okta Admin Console, go to <strong>Applications &gt; Create App Integration</strong></li>
+    <li>Select <strong>OIDC - OpenID Connect</strong> and <strong>Web Application</strong></li>
+    <li>Set Sign-in redirect URI to <code>https://&lt;vm-ip&gt;/litellm/sso/callback</code></li>
+    <li>Assign users or groups to the application</li>
+    <li>Note the Client ID, Client Secret, and your Okta domain</li>
+  </ol>
+
+  <p><strong>Configuration:</strong></p>
+  <div class="code-block">
+    <span class="lang-label">HCL</span>
+    <pre># terraform.tfvars
+sso_provider       = "okta"
+okta_client_id     = "0oaxxxxxxxxxxxxxxxx"
+okta_client_secret = "your-client-secret"
+okta_domain        = "your-org.okta.com"</pre>
+  </div>
+
+  <p><strong>Terraform auto-constructs Okta OIDC endpoint URLs:</strong></p>
+  <table>
+    <thead><tr><th>Variable</th><th>Constructed Value</th></tr></thead>
+    <tbody>
+      <tr><td><code>GENERIC_AUTHORIZATION_ENDPOINT</code></td><td><code>https://{okta_domain}/oauth2/v1/authorize</code></td></tr>
+      <tr><td><code>GENERIC_TOKEN_ENDPOINT</code></td><td><code>https://{okta_domain}/oauth2/v1/token</code></td></tr>
+      <tr><td><code>GENERIC_USERINFO_ENDPOINT</code></td><td><code>https://{okta_domain}/oauth2/v1/userinfo</code></td></tr>
+      <tr><td><code>GENERIC_USER_ID_ATTRIBUTE</code></td><td><code>sub</code></td></tr>
+      <tr><td><code>GENERIC_USER_EMAIL_ATTRIBUTE</code></td><td><code>email</code></td></tr>
+      <tr><td><code>GENERIC_USER_DISPLAY_NAME_ATTRIBUTE</code></td><td><code>name</code></td></tr>
+    </tbody>
+  </table>
+
+  <h3>Team-Based Access Control</h3>
+  <p>LiteLLM organizes users into teams with distinct permissions, auto-provisioned on first deployment:</p>
+  <table>
+    <thead><tr><th>Team</th><th>Budget</th><th>Period</th><th>TPM</th><th>RPM</th><th>Models</th></tr></thead>
+    <tbody>
+      <tr><td><strong>administrators</strong></td><td>unlimited</td><td>30d</td><td>500,000</td><td>100</td><td>ALL</td></tr>
+      <tr><td><strong>general-users</strong></td><td>$5/day</td><td>1d</td><td>100,000</td><td>30</td><td>Sonnet, Haiku</td></tr>
+      <tr><td><strong>power-users</strong></td><td>$20/day</td><td>1d</td><td>200,000</td><td>60</td><td>ALL</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ================================================================ -->
+<!-- 9. SECURITY ARCHITECTURE                                         -->
+<!-- ================================================================ -->
+<section id="s9">
+  <h2><span class="section-num">09</span> Security Architecture</h2>
+
+  <h3>Defense in Depth</h3>
+  <div class="layer-stack">
+    <div class="layer">
+      <span class="layer-num">Layer 1</span>
+      <span class="layer-name">Network</span>
+      <span class="layer-desc">UFW Firewall (deny all except SSH, HTTP, HTTPS, LiteLLM). Docker bridge isolation on 172.28.0.0/16. Optional isolated Hyper-V switch.</span>
+    </div>
+    <div class="layer">
+      <span class="layer-num">Layer 2</span>
+      <span class="layer-name">Transport</span>
+      <span class="layer-desc">TLS 1.2/1.3 only. HSTS enforced (1 year). HTTP &rarr; HTTPS redirect (301). HTTP/2 enabled.</span>
+    </div>
+    <div class="layer">
+      <span class="layer-num">Layer 3</span>
+      <span class="layer-name">Application</span>
+      <span class="layer-desc">Security headers (X-Frame-Options, X-Content-Type-Options, X-XSS-Protection, Referrer-Policy, HSTS). WebSocket support. 50 MB body limit.</span>
+    </div>
+    <div class="layer">
+      <span class="layer-num">Layer 4</span>
+      <span class="layer-name">Authentication</span>
+      <span class="layer-desc">Azure AD / Okta SSO (OIDC). Per-user API keys (team-scoped). Master key for admin. SSH key-only access.</span>
+    </div>
+    <div class="layer">
+      <span class="layer-num">Layer 5</span>
+      <span class="layer-name">Authorization</span>
+      <span class="layer-desc">Team-based model access (not all users get Opus). Role-based UI access (admin / user). Community sharing disabled.</span>
+    </div>
+    <div class="layer">
+      <span class="layer-num">Layer 6</span>
+      <span class="layer-name">Data Protection</span>
+      <span class="layer-desc">DLP pipeline: PII, PHI, credentials blocked/redacted. Inlet scanning (messages + uploaded files). Outlet scanning (assistant responses + RAG excerpts).</span>
+    </div>
+    <div class="layer">
+      <span class="layer-num">Layer 7</span>
+      <span class="layer-name">Cost Protection</span>
+      <span class="layer-desc">Per-user daily budgets ($5/day default). Global monthly cap ($100/month). Rate limiting: 30 RPM / 100K TPM. 80% budget alert via Slack.</span>
+    </div>
+    <div class="layer">
+      <span class="layer-num">Layer 8</span>
+      <span class="layer-name">Audit</span>
+      <span class="layer-desc">Langfuse callbacks on every LLM call. DLP detection logging (without sensitive data). PostgreSQL spend tracking. Docker health checks.</span>
+    </div>
+  </div>
+
+  <h3>Secret Management</h3>
+  <table>
+    <thead><tr><th>Secret</th><th>Generation</th><th>Storage</th></tr></thead>
+    <tbody>
+      <tr><td>LiteLLM master key</td><td><code>random_password</code> (32 chars, <code>sk-</code> prefix)</td><td>Terraform state (sensitive)</td></tr>
+      <tr><td>PostgreSQL password</td><td><code>random_password</code> (24 chars)</td><td>Terraform state (sensitive)</td></tr>
+      <tr><td>WebUI session secret</td><td><code>random_password</code> (32 chars)</td><td>Terraform state (sensitive)</td></tr>
+      <tr><td>TLS private key</td><td><code>tls_private_key</code> (RSA 2048) or BYOC</td><td>VM filesystem (mode 0600)</td></tr>
+      <tr><td>Anthropic API key</td><td>User-provided</td><td>Terraform state (sensitive)</td></tr>
+      <tr><td>SSH private key</td><td>User's <code>~/.ssh/id_rsa</code></td><td>Never leaves host machine</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ================================================================ -->
+<!-- 10. COST GOVERNANCE & RATE LIMITING                              -->
+<!-- ================================================================ -->
+<section id="s10">
+  <h2><span class="section-num">10</span> Cost Governance &amp; Rate Limiting</h2>
+
+  <h3>Budget Hierarchy</h3>
+  <div class="diagram">
+    <span class="diagram-label">Budget Structure</span>
+    <pre>
++------------------------------------------------+
+| GLOBAL CAP: $100/month                         |
+| (hard stop -- no API calls after this)         |
+|                                                |
+|  +------------------------------------------+  |
+|  | TEAM: administrators -- unlimited        |  |
+|  +------------------------------------------+  |
+|  | TEAM: power-users -- $20/day             |  |
+|  +------------------------------------------+  |
+|  | TEAM: general-users -- $5/day            |  |
+|  |                                          |  |
+|  |  +------+  +------+  +------+  +------+  |  |
+|  |  |User A|  |User B|  |User C|  |User D|  |  |
+|  |  |$5/day|  |$5/day|  |$5/day|  |$5/day|  |  |
+|  |  +------+  +------+  +------+  +------+  |  |
+|  +------------------------------------------+  |
++------------------------------------------------+</pre>
+  </div>
+
+  <h3>Rate Limiting</h3>
+  <div class="cards">
+    <div class="card">
+      <h4>Per-User Limits</h4>
+      <p>Enforced in Redis (sub-millisecond):<br>
+      <strong>RPM:</strong> 30 requests/min<br>
+      <strong>TPM:</strong> 100,000 tokens/min<br>
+      <strong>Counting:</strong> input + output tokens</p>
+    </div>
+    <div class="card">
+      <h4>System-Wide Limit</h4>
+      <p><strong>Max parallel requests:</strong> 50<br><br>
+      When limits are exceeded:<br>
+      HTTP 429 Too Many Requests<br>
+      Retry-After header included</p>
+    </div>
+  </div>
+
+  <h3>Alerting</h3>
+  <p>When any budget reaches 80% utilization, a Slack notification is sent
+  automatically via LiteLLM's built-in alerting system.</p>
+</section>
+
+<!-- ================================================================ -->
+<!-- 11. DEPLOYMENT & OPERATIONS                                      -->
+<!-- ================================================================ -->
+<section id="s11">
+  <h2><span class="section-num">11</span> Deployment &amp; Operations</h2>
+
+  <h3>Prerequisites</h3>
+  <table>
+    <thead><tr><th>Requirement</th><th>Details</th></tr></thead>
+    <tbody>
+      <tr><td>Windows 11 Pro or Server 2022+</td><td>Hyper-V capable</td></tr>
+      <tr><td>16 GB+ host RAM</td><td>8 GB for VM + headroom</td></tr>
+      <tr><td>100 GB+ free disk</td><td>VM disk + images</td></tr>
+      <tr><td>Terraform &ge; 1.5</td><td>IaC tool</td></tr>
+      <tr><td>WSL2</td><td>For genisoimage (cloud-init ISO creation)</td></tr>
+      <tr><td>Anthropic API key</td><td>From console.anthropic.com</td></tr>
+    </tbody>
+  </table>
+
+  <h3>One-Command Deployment</h3>
+  <div class="code-block">
+    <span class="lang-label">PowerShell</span>
+    <pre># 1. Run prerequisites (once, requires admin)
+.\Setup-Prerequisites.ps1
+
+# 2. Configure
+cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars with your settings
+
+# 3. Deploy
+terraform init
+terraform plan -out=tfplan
+terraform apply tfplan</pre>
+  </div>
+
+  <h3>Auto-Start on Boot</h3>
+  <p>The stack is configured as a <strong>systemd service</strong> on the VM:</p>
+  <div class="code-block">
+    <pre>VM Boot -&gt; systemd -&gt; claude-wrapper.service -&gt; docker compose up -d</pre>
+  </div>
+  <p>All containers have <code>restart: always</code>, so individual container crashes
+  are automatically recovered.</p>
+
+  <h3>Health Monitoring</h3>
+  <table>
+    <thead><tr><th>Container</th><th>Health Check</th><th>Interval</th></tr></thead>
+    <tbody>
+      <tr><td>PostgreSQL</td><td><code>pg_isready -U litellm</code></td><td>10s</td></tr>
+      <tr><td>Redis</td><td><code>redis-cli ping</code></td><td>10s</td></tr>
+      <tr><td>LiteLLM</td><td><code>python3 urllib &gt; /health/liveliness</code></td><td>15s</td></tr>
+      <tr><td>Open WebUI</td><td><code>curl &gt; /health</code></td><td>15s</td></tr>
+      <tr><td>Nginx</td><td>Depends on Open WebUI health</td><td>&mdash;</td></tr>
+    </tbody>
+  </table>
+
+  <p>External monitoring endpoints:</p>
+  <ul>
+    <li><code>http://&lt;host&gt;/health</code> (Nginx HTTP)</li>
+    <li><code>https://&lt;host&gt;/nginx-health</code> (Nginx HTTPS)</li>
+  </ul>
+
+  <h3>File Structure</h3>
+  <div class="code-block">
+    <span class="lang-label">Project Layout</span>
+    <pre>InternalClaude/
+├── main.tf                             # Root module: VM + provisioning
+├── variables.tf                        # All input variables
+├── outputs.tf                          # VM IP, URLs, secrets
+├── providers.tf                        # Hyper-V provider config
+├── terraform.tfvars.example            # Template for your values
+├── Setup-Prerequisites.ps1             # Windows host preparation
+├── configs/
+│   ├── cloud-init/
+│   │   ├── user-data.yaml.tpl          # VM first-boot provisioning
+│   │   ├── meta-data.yaml.tpl          # Cloud-init identity
+│   │   └── network-config.yaml.tpl     # Static IP / DHCP config
+│   ├── litellm/
+│   │   └── config.yaml.tpl             # API gateway configuration
+│   ├── nginx/
+│   │   └── nginx.conf.tpl              # Reverse proxy + TLS
+│   └── open-webui/
+│       └── dlp-pipeline.py             # DLP filter (messages + files)
+└── scripts/
+    ├── docker-compose.yml.tpl          # All 5 services definition
+    └── post-deploy.sh.tpl              # Team creation, systemd setup</pre>
+  </div>
+</section>
+
+<!-- ================================================================ -->
+<!-- 12. PRODUCT USE CASE                                             -->
+<!-- ================================================================ -->
+<section id="s12">
+  <h2><span class="section-num">12</span> Product Use Case</h2>
+
+  <h3>Target Customer Profile</h3>
+  <table>
+    <thead><tr><th>Attribute</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Organization size</strong></td><td>10&ndash;500 employees</td></tr>
+      <tr><td><strong>Industry</strong></td><td>Healthcare, Finance, Legal, Government &mdash; regulated sectors</td></tr>
+      <tr><td><strong>IT infrastructure</strong></td><td>Existing Windows Server / Hyper-V environment</td></tr>
+      <tr><td><strong>Pain point</strong></td><td>Want AI capabilities but cannot send sensitive data to cloud AI</td></tr>
+      <tr><td><strong>Budget</strong></td><td>Controls on AI spend are a hard requirement</td></tr>
+      <tr><td><strong>Compliance</strong></td><td>HIPAA, PCI-DSS, SOX, or internal data governance policies</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Value Proposition</h3>
+  <div class="highlight-box" style="text-align: center; border-left-color: var(--success);">
+    <h4 style="color: #fff; font-size: 1.3em; margin-bottom: 16px;">&ldquo;Enterprise AI with Guardrails&rdquo;</h4>
+    <p>Give your entire organization access to Claude AI while maintaining complete control.</p>
+  </div>
+
+  <div class="feature-grid">
+    <div class="feature-item">
+      <div class="feature-icon">&#128274;</div>
+      <div>
+        <h5>Data Protection (DLP)</h5>
+        <p>PII, PHI, and credentials blocked in messages and uploaded files before reaching the AI.</p>
+      </div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-icon">&#128100;</div>
+      <div>
+        <h5>Corporate SSO</h5>
+        <p>Azure AD or Okta OIDC integration. Users log in with their existing corporate credentials.</p>
+      </div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-icon">&#128176;</div>
+      <div>
+        <h5>Per-User Budgets</h5>
+        <p>Daily spend caps per user with global monthly limits. Never get a surprise API bill.</p>
+      </div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-icon">&#128202;</div>
+      <div>
+        <h5>Role-Based Access</h5>
+        <p>Control which models each team can use. Not everyone needs Opus-level reasoning.</p>
+      </div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-icon">&#128209;</div>
+      <div>
+        <h5>Full Audit Trail</h5>
+        <p>Every interaction logged via Langfuse. Satisfies compliance requirements for regulated industries.</p>
+      </div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-icon">&#127968;</div>
+      <div>
+        <h5>On Your Infrastructure</h5>
+        <p>Deployed on your existing Hyper-V host. Your rules, your network, your control.</p>
+      </div>
+    </div>
+  </div>
+
+  <h3>Competitive Comparison</h3>
+  <table>
+    <thead><tr><th>Feature</th><th>Claude Wrapper</th><th>Direct API</th><th>ChatGPT Enterprise</th></tr></thead>
+    <tbody>
+      <tr><td>DLP scanning</td><td><strong>Messages + files</strong></td><td>None</td><td>Limited</td></tr>
+      <tr><td>SSO (Azure AD)</td><td>Yes (OIDC)</td><td>N/A</td><td>Yes</td></tr>
+      <tr><td>SSO (Okta)</td><td>Yes (OIDC)</td><td>N/A</td><td>Yes</td></tr>
+      <tr><td>Per-user budgets</td><td>Yes ($5/day default)</td><td>No</td><td>No</td></tr>
+      <tr><td>Per-user rate limits</td><td>Yes (RPM + TPM)</td><td>No</td><td>No</td></tr>
+      <tr><td>Team-based model access</td><td>Yes</td><td>No</td><td>Limited</td></tr>
+      <tr><td>On-premises deployment</td><td>Yes (Hyper-V)</td><td>N/A</td><td>No (cloud only)</td></tr>
+      <tr><td>Audit trail</td><td>Full (Langfuse)</td><td>Manual</td><td>Limited</td></tr>
+      <tr><td>File upload scanning</td><td><strong>Excel, PDF, Word, CSV, PPTX</strong></td><td>No</td><td>No</td></tr>
+      <tr><td>Custom DLP patterns</td><td>Yes (regex)</td><td>No</td><td>No</td></tr>
+      <tr><td>Self-hosted</td><td>Yes</td><td>N/A</td><td>No</td></tr>
+      <tr><td>Cost</td><td>FOSS + API usage</td><td>API only</td><td>Per-seat licensing</td></tr>
+      <tr><td>Setup time</td><td>~30 minutes</td><td>N/A</td><td>Weeks (enterprise sales)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>ROI Model</h3>
+  <div class="comparison">
+    <div class="comparison-card before">
+      <h4 style="color: var(--danger);">Without Guardrails</h4>
+      <ul>
+        <li>Uncontrolled API spend: $2,000&ndash;10,000/month</li>
+        <li>Data breach (PII leak): $150+ per record (IBM 2025)</li>
+        <li>Compliance violation: $50K&ndash;$1.5M per incident</li>
+      </ul>
+    </div>
+    <div class="comparison-card after">
+      <h4 style="color: var(--success);">With Claude Wrapper Stack</h4>
+      <ul>
+        <li>Controlled spend: $100/month global cap (configurable)</li>
+        <li>DLP scans messages AND files (Excel, PDF, Word, etc.)</li>
+        <li>Audit trail satisfies compliance requirements</li>
+        <li>Infrastructure cost: ~$0 (runs on existing Hyper-V)</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>Compliance Mapping</h3>
+  <table>
+    <thead><tr><th>Regulation</th><th>Requirement</th><th>How the Stack Addresses It</th></tr></thead>
+    <tbody>
+      <tr><td><strong>HIPAA</strong></td><td>PHI must not be disclosed to unauthorized parties</td><td>DLP blocks MRN, DOB, ICD codes in messages and uploaded files</td></tr>
+      <tr><td><strong>PCI-DSS</strong></td><td>Cardholder data must be protected</td><td>DLP blocks credit cards and bank accounts in messages and files</td></tr>
+      <tr><td><strong>SOX</strong></td><td>Audit trail for financial data access</td><td>Langfuse logs every API call; DLP logs detections</td></tr>
+      <tr><td><strong>GDPR</strong></td><td>Personal data processing must be lawful and limited</td><td>DLP blocks SSNs and PII in messages and files; per-user controls</td></tr>
+      <tr><td><strong>Internal Policy</strong></td><td>Only authorized employees access AI</td><td>SSO via Azure AD or Okta; team-based permissions</td></tr>
+      <tr><td><strong>Budget Control</strong></td><td>AI spend must be predictable</td><td>Per-user daily caps, global monthly cap, Slack alerts</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ================================================================ -->
+<!-- APPENDIX                                                         -->
+<!-- ================================================================ -->
+<section id="appendix">
+  <h2><span class="section-num">A</span> Quick Reference</h2>
+
+  <h3>Key Terraform Variables</h3>
+  <table>
+    <thead><tr><th>Variable</th><th>Default</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>anthropic_api_key</code></td><td><em>(required)</em></td><td>Anthropic API key</td></tr>
+      <tr><td><code>sso_provider</code></td><td><code>none</code></td><td><code>azure_ad</code>, <code>okta</code>, or <code>none</code></td></tr>
+      <tr><td><code>litellm_global_max_budget</code></td><td><code>100</code></td><td>Global monthly cap (USD)</td></tr>
+      <tr><td><code>litellm_default_user_budget</code></td><td><code>5.0</code></td><td>Per-user daily cap (USD)</td></tr>
+      <tr><td><code>litellm_default_user_rpm</code></td><td><code>30</code></td><td>Requests per minute per user</td></tr>
+      <tr><td><code>litellm_default_user_tpm</code></td><td><code>100000</code></td><td>Tokens per minute per user</td></tr>
+      <tr><td><code>dlp_enable</code></td><td><code>true</code></td><td>Enable DLP pipeline</td></tr>
+      <tr><td><code>dlp_block_ssn</code></td><td><code>true</code></td><td>Block SSNs</td></tr>
+      <tr><td><code>dlp_block_credit_cards</code></td><td><code>true</code></td><td>Block credit card numbers</td></tr>
+      <tr><td><code>dlp_block_phi</code></td><td><code>true</code></td><td>Block PHI (HIPAA)</td></tr>
+      <tr><td><code>dlp_block_credentials</code></td><td><code>true</code></td><td>Block API keys, passwords</td></tr>
+      <tr><td><code>dlp_custom_patterns</code></td><td><code>{}</code></td><td>Organization-specific regex</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Post-Deployment URLs</h3>
+  <table>
+    <thead><tr><th>Service</th><th>URL</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td>Chat Interface</td><td><code>https://&lt;vm-ip&gt;/</code></td><td>End-user chat with Claude</td></tr>
+      <tr><td>LiteLLM Admin</td><td><code>https://&lt;vm-ip&gt;/litellm/ui</code></td><td>Admin dashboard</td></tr>
+      <tr><td>LiteLLM API</td><td><code>https://&lt;vm-ip&gt;/v1/</code></td><td>OpenAI-compatible endpoint</td></tr>
+      <tr><td>SSH</td><td><code>ssh claude-admin@&lt;vm-ip&gt;</code></td><td>VM administration</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Claude Code CLI Setup</h3>
+  <div class="code-block">
+    <span class="lang-label">Bash</span>
+    <pre>export ANTHROPIC_BASE_URL=https://&lt;vm-ip&gt;/v1
+export ANTHROPIC_API_KEY=&lt;your-litellm-key&gt;</pre>
+  </div>
+</section>
+
+</div><!-- /.container -->
+
+<footer>
+  <p><strong>Claude Wrapper Stack</strong> &mdash; Version 1.0 &mdash; Uniformedi LLC &mdash; February 2026</p>
+  <p>All components are free and open-source software. Anthropic API usage subject to Anthropic's terms of service.</p>
+</footer>
+
+</body>
+</html>
