@@ -52,7 +52,7 @@ vm_dns_servers = ["8.8.8.8", "1.1.1.1"]
 # SSH Access
 # =============================================================================
 ssh_admin_user      = "claude-admin"
-ssh_public_key_path = "C:\\Users\\Dan\\.ssh\\id_rsa.pub"
+ssh_public_key_path = "C:\\Users\\[YOUR USERNAME]\\.ssh\\id_rsa.pub"
 
 # =============================================================================
 # LiteLLM Settings
@@ -102,4 +102,4 @@ dlp_block_credentials = true
 # tls_key_path  = "C:\\certs\\claude-wrapper.key"
 
 environment = "production"
-owner       = "Uniformedi LLC"
+owner       = "[YOUR ORG]"
