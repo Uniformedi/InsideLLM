@@ -1,6 +1,6 @@
 # Claude Wrapper Stack — Architecture & Product Use Case
 
-**Version:** 1.0 | **Author:** [YOUR ORG] | **Date:** February 2026
+**Version:** 1.0 | **Author:** Dan Medina, Uniformedi LLC | **Date:** February 2026
 
 ---
 
