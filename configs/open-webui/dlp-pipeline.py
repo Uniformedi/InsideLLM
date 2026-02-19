@@ -519,6 +519,18 @@ class Pipeline:
         messages = body.get("messages", [])
         user_id = __user__.get("id", "unknown") if __user__ else "unknown"
 
+        # --- Sanitize empty content blocks (Claude API rejects empty text) ---
+        for message in messages:
+            content = message.get("content", "")
+            if isinstance(content, list):
+                for item in content:
+                    if (isinstance(item, dict)
+                            and item.get("type") == "text"
+                            and not item.get("text", "").strip()):
+                        item["text"] = "Please analyze the attached file."
+            elif isinstance(content, str) and not content.strip():
+                message["content"] = "Please analyze the attached file."
+
         # --- Scan message text ---
         message_detections = []
         for i, message in enumerate(messages):

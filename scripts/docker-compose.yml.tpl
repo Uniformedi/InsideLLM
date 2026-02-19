@@ -117,9 +117,9 @@ services:
       DEFAULT_USER_ROLE: "user"
       ENABLE_COMMUNITY_SHARING: "false"
 
-      # RAG settings
-      RAG_EMBEDDING_ENGINE: "openai"
-      RAG_EMBEDDING_MODEL: "text-embedding-3-small"
+      # RAG settings — use built-in sentence-transformers (no external API needed)
+      RAG_EMBEDDING_ENGINE: ""
+      RAG_EMBEDDING_MODEL: "sentence-transformers/all-MiniLM-L6-v2"
       CHUNK_SIZE: "1500"
       CHUNK_OVERLAP: "100"
 
