@@ -657,3 +657,8 @@ class Pipeline:
                         )
 
         return body
+
+
+# Open WebUI v0.8+ expects a class named "Filter" or "Function" for filter modules
+Filter = Pipeline
+Function = Pipeline
