@@ -122,6 +122,7 @@ services:
       RAG_EMBEDDING_MODEL: "sentence-transformers/all-MiniLM-L6-v2"
       CHUNK_SIZE: "1500"
       CHUNK_OVERLAP: "100"
+      RAG_FULL_CONTEXT: "true"
 
       # Security
       WEBUI_AUTH: "true"

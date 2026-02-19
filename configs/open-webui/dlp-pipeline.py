@@ -89,7 +89,7 @@ class Pipeline:
 
     def __init__(self):
         self.name = "DLP Filter"
-        self.file_handler = True
+        self.file_handler = False
         self.valves = self.Valves()
 
         # Core detection patterns
