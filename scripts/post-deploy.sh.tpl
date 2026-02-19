@@ -44,6 +44,51 @@ wait_for_service "$LITELLM_URL/health/liveliness" "LiteLLM"
 wait_for_service "http://localhost:8080/health" "Open WebUI"
 
 # ---------------------------------------------------------------------------
+# Register DLP pipeline as a global filter in Open WebUI
+# ---------------------------------------------------------------------------
+log "Registering DLP pipeline as a global filter..."
+
+docker exec claude-open-webui python3 -c "
+import sys
+sys.path.insert(0, '/app/backend')
+
+from open_webui.models.functions import Functions, FunctionForm, FunctionMeta
+
+FUNC_ID = 'dlp_filter'
+SYSTEM_USER = '00000000-0000-0000-0000-000000000000'
+
+with open('/app/backend/pipelines/dlp-pipeline.py', 'r') as f:
+    code = f.read()
+
+# Update if already registered, otherwise create new
+existing = Functions.get_function_by_id(FUNC_ID)
+if existing:
+    Functions.update_function_by_id(FUNC_ID, {
+        'content': code,
+        'is_active': True,
+        'is_global': True
+    })
+    print('DLP filter updated and activated')
+else:
+    form = FunctionForm(
+        id=FUNC_ID,
+        name='DLP Filter Pipeline',
+        content=code,
+        meta=FunctionMeta(
+            description='Data Loss Prevention filter that scans messages and files for PII, PHI, SSNs, credit cards, API keys, and connection strings.',
+            manifest={}
+        )
+    )
+    result = Functions.insert_new_function(SYSTEM_USER, 'filter', form)
+    if result:
+        Functions.update_function_by_id(result.id, {'is_active': True, 'is_global': True})
+        print(f'DLP filter registered and activated (id={result.id})')
+    else:
+        print('ERROR: Failed to register DLP filter')
+        sys.exit(1)
+" >> "$LOG" 2>&1 || log "WARNING: DLP pipeline registration failed — register manually via Admin > Functions"
+
+# ---------------------------------------------------------------------------
 # Create default teams in LiteLLM
 # ---------------------------------------------------------------------------
 log "Creating default teams..."
