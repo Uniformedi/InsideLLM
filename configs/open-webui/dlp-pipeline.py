@@ -66,6 +66,10 @@ class Pipeline:
             default=True,
             description="Detect bank account and routing numbers"
         )
+        block_standalone_dates: bool = Field(
+            default=True,
+            description="Detect standalone date patterns (MM/DD/YYYY, YYYY-MM-DD) that may be dates of birth"
+        )
         scan_file_uploads: bool = Field(
             default=True,
             description="Scan uploaded files (Excel, CSV, PDF, Word, etc.) for sensitive data"
@@ -91,8 +95,14 @@ class Pipeline:
         # Core detection patterns
         self.patterns: Dict[str, Dict] = {
             "ssn": {
-                "regex": r'\b\d{3}[-\s]?\d{2}[-\s]?\d{4}\b',
+                "regex": r'\b\d{3}[-\u2013\u2014\s]?\d{2}[-\u2013\u2014\s]?\d{4}\b',
                 "description": "Social Security Number",
+                "valve": "block_ssn",
+                "severity": "critical",
+            },
+            "ssn_labeled": {
+                "regex": r'(?:social\s*security(?:\s*(?:number|no\.?|num\.?|#))?|ssn|ss\s*#|ss\s*no\.?)[\s:.=#]*\d{3}[-\u2013\u2014\s]?\d{2}[-\u2013\u2014\s]?\d{4}',
+                "description": "Social Security Number (labeled)",
                 "valve": "block_ssn",
                 "severity": "critical",
             },
@@ -115,10 +125,34 @@ class Pipeline:
                 "severity": "critical",
             },
             "phi_dob": {
-                "regex": r'\b(?:DOB|Date of Birth|born)[\s:]*\d{1,2}[/\-]\d{1,2}[/\-]\d{2,4}\b',
-                "description": "Date of Birth (PHI context)",
+                "regex": r'\b(?:DOB|D\.O\.B\.?|date\s+of\s+birth|birth\s*date|birth\s*day|b[\-\s]?day|born(?:\s+on)?|fecha\s+de\s+nacimiento)[\s:]*\d{1,2}[/\-\.]\d{1,2}[/\-\.]\d{2,4}\b',
+                "description": "Date of Birth (labeled)",
                 "valve": "block_phi",
                 "severity": "high",
+            },
+            "phi_dob_iso": {
+                "regex": r'\b(?:DOB|D\.O\.B\.?|date\s+of\s+birth|birth\s*date|birth\s*day|b[\-\s]?day|born(?:\s+on)?)[\s:]*\d{4}[/\-\.]\d{1,2}[/\-\.]\d{1,2}\b',
+                "description": "Date of Birth - ISO format",
+                "valve": "block_phi",
+                "severity": "high",
+            },
+            "phi_dob_text_month": {
+                "regex": r'\b(?:DOB|D\.O\.B\.?|date\s+of\s+birth|birth\s*date|birth\s*day|b[\-\s]?day|born(?:\s+on)?)[\s:]*(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\.?\s+\d{1,2},?\s+\d{2,4}',
+                "description": "Date of Birth - text month",
+                "valve": "block_phi",
+                "severity": "high",
+            },
+            "phi_dob_standalone": {
+                "regex": r'\b(?:0?[1-9]|1[0-2])[/\-](?:0?[1-9]|[12]\d|3[01])[/\-](?:19|20)\d{2}\b',
+                "description": "Date Pattern (MM/DD/YYYY)",
+                "valve": "block_standalone_dates",
+                "severity": "medium",
+            },
+            "phi_dob_standalone_iso": {
+                "regex": r'\b(?:19|20)\d{2}[/\-](?:0?[1-9]|1[0-2])[/\-](?:0?[1-9]|[12]\d|3[01])\b',
+                "description": "Date Pattern (YYYY-MM-DD)",
+                "valve": "block_standalone_dates",
+                "severity": "medium",
             },
             "phi_diagnosis": {
                 "regex": r'\b(?:ICD[-\s]?(?:9|10)[-\s]?(?:CM|PCS)?[\s:#]*[A-Z]\d{2}(?:\.\d{1,4})?)\b',
