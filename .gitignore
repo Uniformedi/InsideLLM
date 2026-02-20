@@ -30,3 +30,23 @@ desktop.ini
 
 # Cloud-init temp files
 *cloud-init-temp/
+
+# Debug / helper scripts
+check-docker.ps1
+check-hyperv.ps1
+check-nat.ps1
+check-services.ps1
+check-vm.ps1
+debug-litellm.ps1
+fix-healthcheck.ps1
+fix-healthcheck2.sh
+fix_compose.py
+run-apply.ps1
+setup-nat.ps1
+start-services.ps1
+test-ssh.ps1
+test-winrm.ps1
+
+# Build artifacts
+terraform-claude-wrapper.tar.gz
+tfplan
