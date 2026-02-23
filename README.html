@@ -234,6 +234,7 @@
     <li><a href="#s6">Infrastructure Layer</a></li>
     <li><a href="#s7">Service Architecture</a></li>
     <li><a href="#s8">Data Loss Prevention</a></li>
+    <li><a href="#s8a">RAG (Document Q&amp;A)</a></li>
     <li><a href="#s9">Identity &amp; Access Mgmt</a></li>
     <li><a href="#s10">Security Architecture</a></li>
     <li><a href="#s11">Cost &amp; Rate Limiting</a></li>
@@ -272,6 +273,7 @@
       <li><strong>Chat interface</strong> for non-technical users (Open WebUI)</li>
       <li><strong>API gateway</strong> for developers and CLI tools (LiteLLM)</li>
       <li><strong>Data Loss Prevention</strong> scanning on every message and uploaded file (custom pipeline)</li>
+      <li><strong>Document Q&amp;A (RAG)</strong> with local embeddings &mdash; upload files and ask questions against them</li>
       <li><strong>SSO integration</strong> with Azure AD or Okta (OIDC)</li>
       <li><strong>Per-user budgets and rate limits</strong> with real-time enforcement</li>
       <li><strong>Full audit trail</strong> of every API call</li>
@@ -323,6 +325,7 @@
         <li>No per-user budgets</li>
         <li>No audit trail</li>
         <li>No SSO integration</li>
+        <li>No document Q&amp;A</li>
         <li>Shared API key</li>
       </ul>
     </div>
@@ -333,6 +336,7 @@
         <li>Per-user daily spend caps</li>
         <li>Full audit trail (Langfuse)</li>
         <li>Azure AD / Okta SSO</li>
+        <li>RAG with local embeddings (no data leaves network)</li>
         <li>Individual user keys</li>
       </ul>
     </div>
@@ -390,6 +394,7 @@
       <tr><td>On-premises deployment</td><td>Yes (Hyper-V)</td><td>N/A</td><td>No (cloud only)</td></tr>
       <tr><td>Audit trail</td><td>Full (Langfuse)</td><td>Manual</td><td>Limited</td></tr>
       <tr><td>File upload scanning</td><td><strong>Excel, PDF, Word, CSV, PPTX</strong></td><td>No</td><td>No</td></tr>
+      <tr><td>Document Q&amp;A (RAG)</td><td><strong>Local embeddings, full-context</strong></td><td>N/A</td><td>Yes (cloud)</td></tr>
       <tr><td>Custom DLP patterns</td><td>Yes (regex)</td><td>No</td><td>No</td></tr>
       <tr><td>Self-hosted</td><td>Yes</td><td>N/A</td><td>No</td></tr>
       <tr><td>Cost</td><td>FOSS + API usage</td><td>API only</td><td>Per-seat licensing</td></tr>
@@ -765,7 +770,7 @@ All 5 containers running. Stack operational.</pre>
   <ul>
     <li><strong>ChatGPT-like interface</strong> &mdash; zero learning curve for end users</li>
     <li><strong>Pipeline system</strong> &mdash; hosts the DLP filter that scans messages and uploaded files</li>
-    <li><strong>RAG (Retrieval-Augmented Generation)</strong> &mdash; users upload documents and ask questions against them using <code>text-embedding-3-small</code></li>
+    <li><strong>RAG (Retrieval-Augmented Generation)</strong> &mdash; users upload documents and ask questions against them using local <code>sentence-transformers/all-MiniLM-L6-v2</code> embeddings (no external API needed). Full-context mode injects entire file contents into the prompt for maximum accuracy.</li>
     <li><strong>User management</strong> &mdash; self-registration with role-based access</li>
     <li><strong>Community sharing disabled</strong> &mdash; no data leaves the organization</li>
   </ul>
@@ -930,7 +935,8 @@ Please remove the sensitive data and try again.</pre>
   <table>
     <thead><tr><th>Pattern</th><th>What It Detects</th><th>Severity</th></tr></thead>
     <tbody>
-      <tr><td>SSN</td><td><code>123-45-6789</code>, <code>123 45 6789</code>, <code>123456789</code></td><td><span class="badge badge-critical">Critical</span></td></tr>
+      <tr><td>SSN</td><td><code>123-45-6789</code>, <code>123 45 6789</code>, <code>123456789</code> (incl. Unicode dashes)</td><td><span class="badge badge-critical">Critical</span></td></tr>
+      <tr><td>SSN (labeled)</td><td><code>SSN: 123456789</code>, <code>Social Security: 123-45-6789</code></td><td><span class="badge badge-critical">Critical</span></td></tr>
       <tr><td>Credit Card (branded)</td><td>Visa (4xxx), MC (5[1-5]xx), Amex (3[47]xx), Discover (6011/65xx)</td><td><span class="badge badge-critical">Critical</span></td></tr>
       <tr><td>Credit Card (generic)</td><td>Any <code>xxxx-xxxx-xxxx-xxxx</code> pattern</td><td><span class="badge badge-high">High</span></td></tr>
       <tr><td>Bank Routing</td><td>Routing/ABA numbers (9 digits)</td><td><span class="badge badge-critical">Critical</span></td></tr>
@@ -943,7 +949,10 @@ Please remove the sensitive data and try again.</pre>
     <thead><tr><th>Pattern</th><th>What It Detects</th><th>Severity</th></tr></thead>
     <tbody>
       <tr><td>Medical Record #</td><td>MRN, Medical Record, Patient ID + digits</td><td><span class="badge badge-critical">Critical</span></td></tr>
-      <tr><td>Date of Birth</td><td>DOB/Date of Birth + date (in medical context)</td><td><span class="badge badge-high">High</span></td></tr>
+      <tr><td>Date of Birth (labeled)</td><td>DOB, Date of Birth, birthday, birthdate, born on, D.O.B., fecha de nacimiento + date</td><td><span class="badge badge-high">High</span></td></tr>
+      <tr><td>Date of Birth (ISO)</td><td><code>YYYY-MM-DD</code> standalone dates (e.g., <code>1955-11-09</code>)</td><td><span class="badge badge-medium">Medium</span></td></tr>
+      <tr><td>Date of Birth (text month)</td><td>Dates with text months (e.g., <code>November 9, 1955</code>)</td><td><span class="badge badge-medium">Medium</span></td></tr>
+      <tr><td>Date of Birth (standalone)</td><td><code>MM/DD/YYYY</code> and <code>DD/MM/YYYY</code> standalone dates</td><td><span class="badge badge-medium">Medium</span></td></tr>
       <tr><td>Diagnosis Codes</td><td>ICD-9 and ICD-10-CM/PCS codes</td><td><span class="badge badge-medium">Medium</span></td></tr>
     </tbody>
   </table>
@@ -991,6 +1000,7 @@ dlp_custom_patterns    = {
       <tr><td><code>block_phi</code></td><td><code>true</code></td><td>PHI detection</td></tr>
       <tr><td><code>block_credentials</code></td><td><code>true</code></td><td>Secret detection</td></tr>
       <tr><td><code>block_bank_accounts</code></td><td><code>true</code></td><td>Bank info detection</td></tr>
+      <tr><td><code>block_standalone_dates</code></td><td><code>true</code></td><td>Detect standalone date patterns (MM/DD/YYYY, YYYY-MM-DD)</td></tr>
       <tr><td><code>scan_file_uploads</code></td><td><code>true</code></td><td>Scan uploaded files (Excel, PDF, etc.)</td></tr>
       <tr><td><code>max_file_size_mb</code></td><td><code>50</code></td><td>Max file size to scan (larger files skipped)</td></tr>
       <tr><td><code>log_detections</code></td><td><code>true</code></td><td>Audit logging</td></tr>
@@ -1015,6 +1025,99 @@ What is NOT logged: The actual sensitive values</pre>
   directly from disk before RAG processes them, extracting text using format-specific parsers
   (openpyxl for Excel, pypdf for PDF, docx2txt for Word, python-pptx for PowerPoint, stdlib csv
   for CSV/TSV, and plain reads for text-based formats).</p>
+
+  <h3>Auto-Registration on Deployment</h3>
+  <p>The DLP pipeline is <strong>automatically registered</strong> as a global filter function in
+  Open WebUI during the post-deployment step. No manual configuration is needed &mdash;
+  <code>terraform apply</code> handles everything:</p>
+  <ol>
+    <li>Services start and pass health checks</li>
+    <li><code>post-deploy.sh</code> registers the DLP pipeline as an Open WebUI Function</li>
+    <li>The function is activated globally (applies to all users and models)</li>
+    <li>On subsequent deploys, the function is updated in-place (idempotent)</li>
+  </ol>
+</section>
+
+<!-- ================================================================ -->
+<!-- 8a. RETRIEVAL-AUGMENTED GENERATION (RAG)                         -->
+<!-- ================================================================ -->
+<section id="s8a">
+  <h2><span class="section-num">8a</span> Retrieval-Augmented Generation (RAG)</h2>
+
+  <h3>Overview</h3>
+  <p>Open WebUI includes built-in RAG capabilities that allow users to upload documents
+  and ask questions about their contents. Claude receives the full file context
+  alongside the user's message, enabling accurate document-based Q&amp;A.</p>
+
+  <div class="diagram">
+    <span class="diagram-label">RAG Pipeline Flow</span>
+    <pre>
+  User uploads file (Excel, CSV, PDF, Word, etc.)
+       |
+       v
+  +----------------------------+
+  | Open WebUI File Handler    |
+  |  1. Extract text content   |
+  |  2. Chunk and embed with   |
+  |     sentence-transformers  |
+  |  3. Store in ChromaDB      |
+  +----------------------------+
+       |
+       v
+  User asks a question
+       |
+       v
+  +----------------------------+
+  | DLP Pipeline (inlet)       |  &lt;-- Scans message + file for PII
+  +----------------------------+
+       |
+       v
+  +----------------------------+
+  | RAG Context Injection      |
+  |  Full-context mode:        |
+  |  Entire file content is    |
+  |  injected into the prompt  |
+  +----------------------------+
+       |
+       v
+  +----------------------------+
+  | LiteLLM -&gt; Claude API      |  Claude sees file content + question
+  +----------------------------+</pre>
+  </div>
+
+  <h3>Configuration</h3>
+  <table>
+    <thead><tr><th>Setting</th><th>Value</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>RAG_EMBEDDING_ENGINE</code></td><td><em>(empty)</em></td><td>Uses local sentence-transformers (no external API)</td></tr>
+      <tr><td><code>RAG_EMBEDDING_MODEL</code></td><td><code>sentence-transformers/all-MiniLM-L6-v2</code></td><td>Lightweight, fast embedding model</td></tr>
+      <tr><td><code>RAG_FULL_CONTEXT</code></td><td><code>true</code></td><td>Injects entire file content (not just similar chunks)</td></tr>
+      <tr><td><code>CHUNK_SIZE</code></td><td><code>1500</code></td><td>Characters per chunk for vector storage</td></tr>
+      <tr><td><code>CHUNK_OVERLAP</code></td><td><code>100</code></td><td>Overlap between chunks</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Why Local Embeddings?</h3>
+  <p>The stack uses <strong>local sentence-transformers</strong> instead of OpenAI's embedding API:</p>
+  <div class="highlight-box">
+    <ul>
+      <li><strong>No additional API key required</strong> &mdash; works with only the Anthropic API key</li>
+      <li><strong>No data leaves the network</strong> &mdash; embeddings are computed inside the container</li>
+      <li><strong>No per-token cost</strong> &mdash; embedding operations are free</li>
+      <li><strong>Consistent with the on-premises design philosophy</strong> &mdash; all processing stays local</li>
+    </ul>
+  </div>
+
+  <h3>DLP + RAG Integration</h3>
+  <p>The DLP pipeline and RAG system work together in sequence:</p>
+  <ol>
+    <li><strong>DLP scans first</strong> &mdash; uploaded files are checked for sensitive data before processing</li>
+    <li><strong>RAG processes clean files</strong> &mdash; only files that pass DLP are embedded and stored</li>
+    <li><strong>Full context injection</strong> &mdash; Claude receives the complete file content alongside the user's question</li>
+    <li><strong>DLP scans the response</strong> &mdash; the outlet filter checks Claude's response for any echoed-back PII</li>
+  </ol>
+  <p>If a file contains sensitive data (SSNs, credit cards, PHI), the DLP filter blocks the
+  entire request before RAG or Claude ever see the file contents.</p>
 </section>
 
 <!-- ================================================================ -->
@@ -1362,6 +1465,7 @@ terraform apply tfplan</pre>
       <tr><td><code>dlp_block_credit_cards</code></td><td><code>true</code></td><td>Block credit card numbers</td></tr>
       <tr><td><code>dlp_block_phi</code></td><td><code>true</code></td><td>Block PHI (HIPAA)</td></tr>
       <tr><td><code>dlp_block_credentials</code></td><td><code>true</code></td><td>Block API keys, passwords</td></tr>
+      <tr><td><code>dlp_block_standalone_dates</code></td><td><code>true</code></td><td>Block standalone date patterns (DOB)</td></tr>
       <tr><td><code>dlp_custom_patterns</code></td><td><code>{}</code></td><td>Organization-specific regex</td></tr>
     </tbody>
   </table>
