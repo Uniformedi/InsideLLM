@@ -13,6 +13,7 @@
 5. [Infrastructure Layer](#5-infrastructure-layer)
 6. [Service Architecture](#6-service-architecture)
 7. [Data Loss Prevention (DLP)](#7-data-loss-prevention-dlp)
+7a. [Retrieval-Augmented Generation (RAG)](#7a-retrieval-augmented-generation-rag)
 8. [Identity & Access Management](#8-identity--access-management)
 9. [Security Architecture](#9-security-architecture)
 10. [Cost Governance & Rate Limiting](#10-cost-governance--rate-limiting)
@@ -31,6 +32,7 @@ services that deliver:
 - **Chat interface** for non-technical users (Open WebUI)
 - **API gateway** for developers and CLI tools (LiteLLM)
 - **Data Loss Prevention** scanning on every message and uploaded file (custom pipeline)
+- **Document Q&A (RAG)** with local embeddings — upload files and ask questions against them
 - **SSO integration** with Azure AD or Okta (OIDC)
 - **Per-user budgets and rate limits** with real-time enforcement
 - **Full audit trail** of every API call
@@ -81,6 +83,7 @@ interaction — all without modifying the Claude API experience.
  - No per-user budgets                      - Per-user daily spend caps
  - No audit trail                           - Full audit trail (Langfuse)
  - No SSO integration                       - Azure AD / Okta SSO
+ - No document Q&A                          - RAG with local embeddings (no data leaves network)
  - Shared API key                           - Individual user keys
 ```
 
@@ -428,7 +431,9 @@ Anthropic prompt caching is handled automatically by LiteLLM when applicable.
 - **ChatGPT-like interface** -- zero learning curve for end users
 - **Pipeline system** -- hosts the DLP filter that scans messages and uploaded files
 - **RAG (Retrieval-Augmented Generation)** -- users upload documents and ask
-  questions against them using `text-embedding-3-small`
+  questions against them using local `sentence-transformers/all-MiniLM-L6-v2`
+  embeddings (no external API needed). Full-context mode injects entire file
+  contents into the prompt for maximum accuracy.
 - **User management** -- self-registration with role-based access
 - **Community sharing disabled** -- no data leaves the organization
 
@@ -586,7 +591,8 @@ RAG or the LLM), and a system message notifies the user which files were removed
 
 | Pattern | What It Detects | Severity |
 |---------|----------------|----------|
-| SSN | `123-45-6789`, `123 45 6789`, `123456789` | Critical |
+| SSN | `123-45-6789`, `123 45 6789`, `123456789` (incl. Unicode dashes) | Critical |
+| SSN (labeled) | `SSN: 123456789`, `Social Security: 123-45-6789` | Critical |
 | Credit Card (branded) | Visa (4xxx), MC (5[1-5]xx), Amex (3[47]xx), Discover (6011/65xx) | Critical |
 | Credit Card (generic) | Any `xxxx-xxxx-xxxx-xxxx` pattern | High |
 | Bank Routing | Routing/ABA numbers (9 digits) | Critical |
@@ -597,7 +603,10 @@ RAG or the LLM), and a system message notifies the user which files were removed
 | Pattern | What It Detects | Severity |
 |---------|----------------|----------|
 | Medical Record # | MRN, Medical Record, Patient ID + digits | Critical |
-| Date of Birth | DOB/Date of Birth + date (in medical context) | High |
+| Date of Birth (labeled) | DOB, Date of Birth, birthday, birthdate, born on, D.O.B., fecha de nacimiento + date | High |
+| Date of Birth (ISO) | `YYYY-MM-DD` standalone dates (e.g., `1955-11-09`) | Medium |
+| Date of Birth (text month) | Dates with text months (e.g., `November 9, 1955`, `9 Nov 1955`) | Medium |
+| Date of Birth (standalone) | `MM/DD/YYYY` and `DD/MM/YYYY` standalone dates | Medium |
 | Diagnosis Codes | ICD-9 and ICD-10-CM/PCS codes | Medium |
 
 #### Credentials & Secrets
@@ -647,6 +656,7 @@ Navigate to **Admin > Pipelines > DLP Filter > Valves**:
 | `block_phi` | `true` | PHI detection |
 | `block_credentials` | `true` | Secret detection |
 | `block_bank_accounts` | `true` | Bank info detection |
+| `block_standalone_dates` | `true` | Detect standalone date patterns (MM/DD/YYYY, YYYY-MM-DD) |
 | `scan_file_uploads` | `true` | Scan uploaded files (Excel, PDF, etc.) |
 | `max_file_size_mb` | `50` | Max file size to scan (larger files skipped) |
 | `log_detections` | `true` | Audit logging |
@@ -674,6 +684,92 @@ them. For files, it reads them directly from disk before RAG processes them,
 extracting text using format-specific parsers (openpyxl for Excel, pypdf for
 PDF, docx2txt for Word, python-pptx for PowerPoint, stdlib csv for CSV/TSV,
 and plain reads for text-based formats).
+
+### Auto-Registration on Deployment
+
+The DLP pipeline is **automatically registered** as a global filter function in
+Open WebUI during the post-deployment step. No manual configuration is needed --
+`terraform apply` handles everything:
+
+1. Services start and pass health checks
+2. `post-deploy.sh` registers the DLP pipeline as an Open WebUI Function
+3. The function is activated globally (applies to all users and models)
+4. On subsequent deploys, the function is updated in-place (idempotent)
+
+---
+
+## 7a. Retrieval-Augmented Generation (RAG)
+
+### Overview
+
+Open WebUI includes built-in RAG capabilities that allow users to upload documents
+and ask questions about their contents. Claude receives the full file context
+alongside the user's message, enabling accurate document-based Q&A.
+
+```
+  User uploads file (Excel, CSV, PDF, Word, etc.)
+       |
+       v
+  +----------------------------+
+  | Open WebUI File Handler    |
+  |  1. Extract text content   |
+  |  2. Chunk and embed with   |
+  |     sentence-transformers  |
+  |  3. Store in ChromaDB      |
+  +----------------------------+
+       |
+       v
+  User asks a question
+       |
+       v
+  +----------------------------+
+  | DLP Pipeline (inlet)       |  <-- Scans message + file for PII
+  +----------------------------+
+       |
+       v
+  +----------------------------+
+  | RAG Context Injection      |
+  |  Full-context mode:        |
+  |  Entire file content is    |
+  |  injected into the prompt  |
+  +----------------------------+
+       |
+       v
+  +----------------------------+
+  | LiteLLM -> Claude API      |  Claude sees file content + question
+  +----------------------------+
+```
+
+### Configuration
+
+| Setting | Value | Description |
+|---------|-------|-------------|
+| `RAG_EMBEDDING_ENGINE` | *(empty)* | Uses local sentence-transformers (no external API) |
+| `RAG_EMBEDDING_MODEL` | `sentence-transformers/all-MiniLM-L6-v2` | Lightweight, fast embedding model |
+| `RAG_FULL_CONTEXT` | `true` | Injects entire file content (not just similar chunks) |
+| `CHUNK_SIZE` | `1500` | Characters per chunk for vector storage |
+| `CHUNK_OVERLAP` | `100` | Overlap between chunks |
+
+### Why Local Embeddings?
+
+The stack uses **local sentence-transformers** instead of OpenAI's embedding API:
+
+- **No additional API key required** -- works with only the Anthropic API key
+- **No data leaves the network** -- embeddings are computed inside the container
+- **No per-token cost** -- embedding operations are free
+- **Consistent with the on-premises design philosophy** -- all processing stays local
+
+### DLP + RAG Integration
+
+The DLP pipeline and RAG system work together in sequence:
+
+1. **DLP scans first** -- uploaded files are checked for sensitive data before processing
+2. **RAG processes clean files** -- only files that pass DLP are embedded and stored
+3. **Full context injection** -- Claude receives the complete file content alongside the user's question
+4. **DLP scans the response** -- the outlet filter checks Claude's response for any echoed-back PII
+
+If a file contains sensitive data (SSNs, credit cards, PHI), the DLP filter blocks the
+entire request before RAG or Claude ever see the file contents.
 
 ---
 
@@ -1085,6 +1181,7 @@ InternalClaude/
 | On-premises deployment | Yes (Hyper-V) | N/A | No (cloud only) |
 | Audit trail | Full (Langfuse) | Manual | Limited |
 | File upload scanning | Excel, PDF, Word, CSV, PPTX | No | No |
+| Document Q&A (RAG) | Local embeddings, full-context | N/A | Yes (cloud) |
 | Custom DLP patterns | Yes (regex) | No | No |
 | Self-hosted | Yes | N/A | No |
 | Cost | FOSS + API usage | API only | Per-seat licensing |
@@ -1138,6 +1235,7 @@ COST SAVINGS
 | `dlp_block_credit_cards` | `true` | Block credit card numbers |
 | `dlp_block_phi` | `true` | Block PHI (HIPAA) |
 | `dlp_block_credentials` | `true` | Block API keys, passwords |
+| `dlp_block_standalone_dates` | `true` | Block standalone date patterns (DOB) |
 | `dlp_custom_patterns` | `{}` | Organization-specific regex |
 
 ### Post-Deployment URLs
