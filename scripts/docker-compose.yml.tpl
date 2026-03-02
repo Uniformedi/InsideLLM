@@ -59,7 +59,7 @@ services:
       REDIS_PORT: "6379"
       LITELLM_MASTER_KEY: "${litellm_master_key}"
       ANTHROPIC_API_KEY: "${anthropic_api_key}"
-      LITELLM_LOG: "DEBUG"
+      LITELLM_LOG: "INFO"
       UI_USERNAME: "admin"
       UI_PASSWORD: "${litellm_master_key}"
 %{ if sso_provider == "azure_ad" ~}
@@ -81,7 +81,12 @@ services:
 %{ endif ~}
     volumes:
       - /opt/claude-wrapper/litellm-config.yaml:/app/config.yaml
-    command: ["--config", "/app/config.yaml", "--port", "4000", "--detailed_debug"]
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
     depends_on:
       postgres:
         condition: service_healthy
