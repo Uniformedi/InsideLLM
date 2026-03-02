@@ -61,6 +61,7 @@ litellm_settings:
 # General Settings
 # =============================================================================
 general_settings:
+  server_root_path: "/litellm"
   master_key: os.environ/LITELLM_MASTER_KEY
   database_url: os.environ/DATABASE_URL
   allow_user_auth: true

@@ -1092,6 +1092,67 @@ The stack is configured as a **systemd service** on the VM:
 All containers have `restart: always`, so individual container crashes
 are automatically recovered.
 
+### Updating Services
+
+All containerized services use rolling-release tags (`:latest` or `:main-latest`),
+so updating to the newest versions is straightforward.
+
+**Update all services:**
+
+```bash
+# SSH into the VM
+ssh claude-admin@<vm-ip>
+
+# Pull latest images and recreate containers
+cd /opt/claude-wrapper
+sudo docker compose pull
+sudo docker compose up -d
+```
+
+**Update a single service** (e.g., Open WebUI only):
+
+```bash
+sudo docker compose pull open-webui
+sudo docker compose up -d open-webui
+```
+
+**What gets updated:**
+
+| Service | Image Tag | What Changes |
+|---------|-----------|-------------|
+| Open WebUI | `ghcr.io/open-webui/open-webui:latest` | Chat UI, pipeline engine, RAG |
+| LiteLLM | `ghcr.io/berriai/litellm:main-latest` | API gateway, admin dashboard, budget engine |
+| PostgreSQL | `postgres:16-alpine` | Database engine (data preserved on volume) |
+| Redis | `redis:7-alpine` | Cache engine (data preserved on volume) |
+| Nginx | `nginx:1.27-alpine` | Reverse proxy |
+
+**Important notes:**
+
+- **Data is preserved** -- PostgreSQL, Redis, and Open WebUI data live on
+  Docker volumes (`/opt/claude-wrapper/data/`), so container recreation
+  does not lose data
+- **Configuration is preserved** -- config files are bind-mounted from the
+  host filesystem, not baked into images
+- **DLP pipeline persists** -- the pipeline is stored in Open WebUI's
+  database and survives container updates
+- **Downtime** -- expect 30-60 seconds of downtime while containers restart.
+  Services with health checks will wait for dependencies before starting
+- **Rollback** -- if an update causes issues, you can pin a specific image
+  version in `/opt/claude-wrapper/docker-compose.yml` (e.g.,
+  `ghcr.io/open-webui/open-webui:v0.5.10`) and recreate
+
+**Verify after update:**
+
+```bash
+# Check all containers are healthy
+sudo docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}'
+
+# Check service health
+curl -sk https://localhost/nginx-health         # Nginx
+curl -sk https://localhost/litellm/health/liveliness  # LiteLLM
+curl -sk https://localhost/health               # Open WebUI (via Nginx)
+```
+
 ### Health Monitoring
 
 | Container | Health Check | Interval |
