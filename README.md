@@ -645,6 +645,10 @@ dlp_custom_patterns    = {
 
 **2. Open WebUI Admin Panel (runtime)**
 
+All DLP settings -- including those set at deploy-time -- can be adjusted at
+runtime without redeployment. Settings marked with **(runtime only)** below
+are not configurable via Terraform and must be changed in the admin panel.
+
 Navigate to **Admin > Pipelines > DLP Filter > Valves**:
 
 | Setting | Default | Description |
@@ -655,11 +659,11 @@ Navigate to **Admin > Pipelines > DLP Filter > Valves**:
 | `block_credit_cards` | `true` | Credit card detection |
 | `block_phi` | `true` | PHI detection |
 | `block_credentials` | `true` | Secret detection |
-| `block_bank_accounts` | `true` | Bank info detection |
-| `block_standalone_dates` | `true` | Detect standalone date patterns (MM/DD/YYYY, YYYY-MM-DD) |
-| `scan_file_uploads` | `true` | Scan uploaded files (Excel, PDF, etc.) |
-| `max_file_size_mb` | `50` | Max file size to scan (larger files skipped) |
-| `log_detections` | `true` | Audit logging |
+| `block_bank_accounts` | `true` | Bank info detection **(runtime only)** |
+| `block_standalone_dates` | `true` | Detect standalone date patterns (MM/DD/YYYY, YYYY-MM-DD) **(runtime only)** |
+| `scan_file_uploads` | `true` | Scan uploaded files (Excel, PDF, etc.) **(runtime only)** |
+| `max_file_size_mb` | `50` | Max file size to scan (larger files skipped) **(runtime only)** |
+| `log_detections` | `true` | Audit logging **(runtime only)** |
 | `custom_patterns` | `{}` | JSON regex map |
 
 ### DLP Audit Logging
@@ -1092,6 +1096,10 @@ The stack is configured as a **systemd service** on the VM:
 All containers have `restart: always`, so individual container crashes
 are automatically recovered.
 
+**Log rotation:** The LiteLLM container uses Docker's `json-file` logging
+driver with a 50 MB per-file limit and 3-file rotation (150 MB max). This
+prevents debug-level logging from filling the disk.
+
 ### Updating Services
 
 All containerized services use rolling-release tags (`:latest` or `:main-latest`),
@@ -1296,7 +1304,6 @@ COST SAVINGS
 | `dlp_block_credit_cards` | `true` | Block credit card numbers |
 | `dlp_block_phi` | `true` | Block PHI (HIPAA) |
 | `dlp_block_credentials` | `true` | Block API keys, passwords |
-| `dlp_block_standalone_dates` | `true` | Block standalone date patterns (DOB) |
 | `dlp_custom_patterns` | `{}` | Organization-specific regex |
 
 ### Post-Deployment URLs

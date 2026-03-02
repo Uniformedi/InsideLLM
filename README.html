@@ -989,6 +989,7 @@ dlp_custom_patterns    = {
   </div>
 
   <p><strong>2. Open WebUI Admin Panel (runtime)</strong></p>
+  <p>All DLP settings &mdash; including those set at deploy-time &mdash; can be adjusted at runtime without redeployment. Settings marked with <strong>(runtime only)</strong> below are not configurable via Terraform and must be changed in the admin panel.</p>
   <p>Navigate to <strong>Admin &gt; Pipelines &gt; DLP Filter &gt; Valves</strong>:</p>
   <table>
     <thead><tr><th>Setting</th><th>Default</th><th>Description</th></tr></thead>
@@ -999,11 +1000,11 @@ dlp_custom_patterns    = {
       <tr><td><code>block_credit_cards</code></td><td><code>true</code></td><td>Credit card detection</td></tr>
       <tr><td><code>block_phi</code></td><td><code>true</code></td><td>PHI detection</td></tr>
       <tr><td><code>block_credentials</code></td><td><code>true</code></td><td>Secret detection</td></tr>
-      <tr><td><code>block_bank_accounts</code></td><td><code>true</code></td><td>Bank info detection</td></tr>
-      <tr><td><code>block_standalone_dates</code></td><td><code>true</code></td><td>Detect standalone date patterns (MM/DD/YYYY, YYYY-MM-DD)</td></tr>
-      <tr><td><code>scan_file_uploads</code></td><td><code>true</code></td><td>Scan uploaded files (Excel, PDF, etc.)</td></tr>
-      <tr><td><code>max_file_size_mb</code></td><td><code>50</code></td><td>Max file size to scan (larger files skipped)</td></tr>
-      <tr><td><code>log_detections</code></td><td><code>true</code></td><td>Audit logging</td></tr>
+      <tr><td><code>block_bank_accounts</code></td><td><code>true</code></td><td>Bank info detection <strong>(runtime only)</strong></td></tr>
+      <tr><td><code>block_standalone_dates</code></td><td><code>true</code></td><td>Detect standalone date patterns (MM/DD/YYYY, YYYY-MM-DD) <strong>(runtime only)</strong></td></tr>
+      <tr><td><code>scan_file_uploads</code></td><td><code>true</code></td><td>Scan uploaded files (Excel, PDF, etc.) <strong>(runtime only)</strong></td></tr>
+      <tr><td><code>max_file_size_mb</code></td><td><code>50</code></td><td>Max file size to scan (larger files skipped) <strong>(runtime only)</strong></td></tr>
+      <tr><td><code>log_detections</code></td><td><code>true</code></td><td>Audit logging <strong>(runtime only)</strong></td></tr>
       <tr><td><code>custom_patterns</code></td><td><code>{}</code></td><td>JSON regex map</td></tr>
     </tbody>
   </table>
@@ -1366,6 +1367,7 @@ terraform apply tfplan</pre>
     <pre>VM Boot -&gt; systemd -&gt; claude-wrapper.service -&gt; docker compose up -d</pre>
   </div>
   <p>All containers have <code>restart: always</code>, so individual container crashes are automatically recovered.</p>
+  <p><strong>Log rotation:</strong> The LiteLLM container uses Docker's <code>json-file</code> logging driver with a 50 MB per-file limit and 3-file rotation (150 MB max). This prevents debug-level logging from filling the disk.</p>
 
   <h3>Updating Services</h3>
   <p>All containerized services use rolling-release tags (<code>:latest</code> or <code>:main-latest</code>), so updating to the newest versions is straightforward.</p>
@@ -1520,7 +1522,6 @@ curl -sk https://localhost/health                     # Open WebUI (via Nginx)</
       <tr><td><code>dlp_block_credit_cards</code></td><td><code>true</code></td><td>Block credit card numbers</td></tr>
       <tr><td><code>dlp_block_phi</code></td><td><code>true</code></td><td>Block PHI (HIPAA)</td></tr>
       <tr><td><code>dlp_block_credentials</code></td><td><code>true</code></td><td>Block API keys, passwords</td></tr>
-      <tr><td><code>dlp_block_standalone_dates</code></td><td><code>true</code></td><td>Block standalone date patterns (DOB)</td></tr>
       <tr><td><code>dlp_custom_patterns</code></td><td><code>{}</code></td><td>Organization-specific regex</td></tr>
     </tbody>
   </table>
