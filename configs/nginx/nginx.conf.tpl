@@ -103,6 +103,17 @@ http {
             proxy_read_timeout 300s;
         }
 
+        # --- LiteLLM UI static assets ---
+        # Next.js dashboard uses assetPrefix "/litellm-asset-prefix"
+        location /litellm-asset-prefix/ {
+            proxy_pass http://litellm/litellm-asset-prefix/;
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
         # --- LiteLLM OpenAI-compatible endpoint ---
         # For Claude Code: ANTHROPIC_BASE_URL=https://host/v1
         location /v1/ {
