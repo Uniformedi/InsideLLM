@@ -1367,6 +1367,61 @@ terraform apply tfplan</pre>
   </div>
   <p>All containers have <code>restart: always</code>, so individual container crashes are automatically recovered.</p>
 
+  <h3>Updating Services</h3>
+  <p>All containerized services use rolling-release tags (<code>:latest</code> or <code>:main-latest</code>), so updating to the newest versions is straightforward.</p>
+
+  <p><strong>Update all services:</strong></p>
+  <div class="code-block">
+    <span class="lang-label">Bash</span>
+    <pre># SSH into the VM
+ssh claude-admin@&lt;vm-ip&gt;
+
+# Pull latest images and recreate containers
+cd /opt/claude-wrapper
+sudo docker compose pull
+sudo docker compose up -d</pre>
+  </div>
+
+  <p><strong>Update a single service</strong> (e.g., Open WebUI only):</p>
+  <div class="code-block">
+    <span class="lang-label">Bash</span>
+    <pre>sudo docker compose pull open-webui
+sudo docker compose up -d open-webui</pre>
+  </div>
+
+  <p><strong>What gets updated:</strong></p>
+  <table>
+    <thead><tr><th>Service</th><th>Image Tag</th><th>What Changes</th></tr></thead>
+    <tbody>
+      <tr><td>Open WebUI</td><td><code>ghcr.io/open-webui/open-webui:latest</code></td><td>Chat UI, pipeline engine, RAG</td></tr>
+      <tr><td>LiteLLM</td><td><code>ghcr.io/berriai/litellm:main-latest</code></td><td>API gateway, admin dashboard, budget engine</td></tr>
+      <tr><td>PostgreSQL</td><td><code>postgres:16-alpine</code></td><td>Database engine (data preserved on volume)</td></tr>
+      <tr><td>Redis</td><td><code>redis:7-alpine</code></td><td>Cache engine (data preserved on volume)</td></tr>
+      <tr><td>Nginx</td><td><code>nginx:1.27-alpine</code></td><td>Reverse proxy</td></tr>
+    </tbody>
+  </table>
+
+  <p><strong>Important notes:</strong></p>
+  <ul>
+    <li><strong>Data is preserved</strong> &mdash; PostgreSQL, Redis, and Open WebUI data live on Docker volumes (<code>/opt/claude-wrapper/data/</code>), so container recreation does not lose data</li>
+    <li><strong>Configuration is preserved</strong> &mdash; config files are bind-mounted from the host filesystem, not baked into images</li>
+    <li><strong>DLP pipeline persists</strong> &mdash; the pipeline is stored in Open WebUI's database and survives container updates</li>
+    <li><strong>Downtime</strong> &mdash; expect 30&ndash;60 seconds of downtime while containers restart. Services with health checks will wait for dependencies before starting</li>
+    <li><strong>Rollback</strong> &mdash; if an update causes issues, you can pin a specific image version in <code>/opt/claude-wrapper/docker-compose.yml</code> (e.g., <code>ghcr.io/open-webui/open-webui:v0.5.10</code>) and recreate</li>
+  </ul>
+
+  <p><strong>Verify after update:</strong></p>
+  <div class="code-block">
+    <span class="lang-label">Bash</span>
+    <pre># Check all containers are healthy
+sudo docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}'
+
+# Check service health
+curl -sk https://localhost/nginx-health              # Nginx
+curl -sk https://localhost/litellm/health/liveliness  # LiteLLM
+curl -sk https://localhost/health                     # Open WebUI (via Nginx)</pre>
+  </div>
+
   <h3>Health Monitoring</h3>
   <table>
     <thead><tr><th>Container</th><th>Health Check</th><th>Interval</th></tr></thead>

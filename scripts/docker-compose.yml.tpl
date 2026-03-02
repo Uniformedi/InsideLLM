@@ -60,6 +60,7 @@ services:
       LITELLM_MASTER_KEY: "${litellm_master_key}"
       ANTHROPIC_API_KEY: "${anthropic_api_key}"
       LITELLM_LOG: "INFO"
+      SERVER_ROOT_PATH: "/litellm"
       UI_USERNAME: "admin"
       UI_PASSWORD: "${litellm_master_key}"
 %{ if sso_provider == "azure_ad" ~}
