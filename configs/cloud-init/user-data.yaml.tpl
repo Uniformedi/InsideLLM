@@ -86,6 +86,58 @@ write_files:
     content: |
       ${indent(6, dlp_pipeline_py)}
 
+  # --- Docker daemon config (log rotation) ---
+  - path: /etc/docker/daemon.json
+    permissions: "0644"
+    owner: root:root
+    content: |
+      {
+        "log-driver": "json-file",
+        "log-opts": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      }
+
+  # --- Journald size limits ---
+  - path: /etc/systemd/journald.conf.d/size-limit.conf
+    permissions: "0644"
+    owner: root:root
+    content: |
+      [Journal]
+      SystemMaxUse=500M
+      SystemKeepFree=1G
+      MaxFileSec=1week
+
+  # --- Disk monitoring script ---
+  - path: /usr/local/bin/disk-monitor.sh
+    permissions: "0755"
+    owner: root:root
+    content: |
+      #!/bin/bash
+      THRESHOLD=80
+      USAGE=$(df / | tail -1 | awk '{print $5}' | tr -d '%')
+
+      if [ "$USAGE" -ge "$THRESHOLD" ]; then
+          logger -t disk-monitor "WARNING: Disk usage at $${USAGE}% — running cleanup"
+
+          # Prune old journal logs
+          journalctl --vacuum-time=3d 2>/dev/null
+
+          # Prune dangling Docker images
+          docker image prune -f 2>/dev/null
+
+          # Truncate large syslog files
+          for f in /var/log/syslog /var/log/kern.log; do
+              if [ -f "$f" ] && [ "$(stat -c%s "$f" 2>/dev/null)" -gt 104857600 ]; then
+                  truncate -s 10M "$f"
+                  logger -t disk-monitor "Truncated $f"
+              fi
+          done
+
+          logger -t disk-monitor "Cleanup complete. Usage now: $(df / | tail -1 | awk '{print $5}')"
+      fi
+
   # --- Post-deploy script ---
   - path: /opt/claude-wrapper/post-deploy.sh
     permissions: "0750"
@@ -106,6 +158,12 @@ runcmd:
     systemctl enable docker
     systemctl start docker
     usermod -aG docker ${ssh_admin_user}
+
+  # --- Configure log rotation and disk monitoring ---
+  - |
+    mkdir -p /etc/systemd/journald.conf.d
+    systemctl restart systemd-journald
+    (crontab -l 2>/dev/null; echo "*/15 * * * * /usr/local/bin/disk-monitor.sh") | crontab -
 
   # --- Configure UFW Firewall ---
   - |
