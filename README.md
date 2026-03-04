@@ -1,6 +1,7 @@
 # Inside LLM — Architecture & Product Use Case
 
 **Version:** 1.0 | **Author:** Dan Medina, Uniformedi LLC | **Date:** February 2026
+**Source:** [github.com/Uniformedi/InsideLLM](https://github.com/Uniformedi/InsideLLM) | **License:** MIT
 
 ---
 
@@ -1321,3 +1322,13 @@ COST SAVINGS
 export ANTHROPIC_BASE_URL=https://<vm-ip>/v1
 export ANTHROPIC_API_KEY=<your-litellm-key>
 ```
+
+---
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
+
+Copyright (c) 2026 Uniformedi
+
+Source code: [https://github.com/Uniformedi/InsideLLM](https://github.com/Uniformedi/InsideLLM)
