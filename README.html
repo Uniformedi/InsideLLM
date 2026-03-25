@@ -1542,8 +1542,13 @@ curl -sk https://localhost/health                     # Open WebUI (via Nginx)</
   <h3>Claude Code CLI Setup</h3>
   <div class="code-block">
     <span class="lang-label">Bash</span>
-    <pre>export ANTHROPIC_BASE_URL=https://&lt;vm-ip&gt;/v1
-export ANTHROPIC_API_KEY=&lt;your-litellm-key&gt;</pre>
+    <pre>export ANTHROPIC_BASE_URL=http://&lt;vm-ip&gt;:4000
+export ANTHROPIC_AUTH_TOKEN=&lt;your-litellm-key&gt;</pre>
+  </div>
+  <div class="code-block">
+    <span class="lang-label">PowerShell</span>
+    <pre>$env:ANTHROPIC_BASE_URL = "http://&lt;vm-ip&gt;:4000"
+$env:ANTHROPIC_AUTH_TOKEN = "&lt;your-litellm-key&gt;"</pre>
   </div>
 </section>
 
