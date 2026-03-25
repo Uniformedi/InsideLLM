@@ -1319,8 +1319,14 @@ COST SAVINGS
 ### Claude Code CLI Setup
 
 ```bash
-export ANTHROPIC_BASE_URL=https://<vm-ip>/v1
-export ANTHROPIC_API_KEY=<your-litellm-key>
+export ANTHROPIC_BASE_URL=http://<vm-ip>:4000
+export ANTHROPIC_AUTH_TOKEN=<your-litellm-key>
+```
+
+```powershell
+# PowerShell
+$env:ANTHROPIC_BASE_URL = "http://<vm-ip>:4000"
+$env:ANTHROPIC_AUTH_TOKEN = "<your-litellm-key>"
 ```
 
 ---
