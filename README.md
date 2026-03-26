@@ -161,7 +161,7 @@ interaction — all without modifying the Claude API experience.
 ### Container Network Topology
 
 ```
-Docker Bridge Network: claude-internal (172.28.0.0/16)
+Docker Bridge Network: insidellm-internal (172.28.0.0/16)
 ======================================================
 
 +--------------+     +--------------+
@@ -841,8 +841,8 @@ When enabled, Terraform adds two containers to the stack:
 
 | Container | Purpose |
 |-----------|---------|
-| `claude-ollama` | Ollama inference server (port 11434) |
-| `claude-ollama-pull` | One-shot sidecar that pulls the configured models on first boot |
+| `insidellm-ollama` | Ollama inference server (port 11434) |
+| `insidellm-ollama-pull` | One-shot sidecar that pulls the configured models on first boot |
 
 LiteLLM automatically gets routes for each model (e.g., `ollama/qwen2.5-coder:14b`),
 so they appear in the Open WebUI model dropdown and are accessible via the API.
@@ -854,7 +854,7 @@ Users --> Open WebUI --> LiteLLM --> Anthropic API (Claude models)
                                 \-> Ollama :11434  (local models)
 ```
 
-All containers share the `claude-internal` Docker network. LiteLLM reaches
+All containers share the `insidellm-internal` Docker network. LiteLLM reaches
 Ollama at `http://ollama:11434`.
 
 ### GPU Support
