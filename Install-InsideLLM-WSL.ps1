@@ -62,7 +62,8 @@ param(
     [string]$OktaClientSecret    = "",
     [string]$OktaDomain          = "",
 
-    [string]$WslDistroName = "Ubuntu-24.04",
+    [string]$WslDistroName = "InsideLLM",
+    [string]$WslInstallPath = "C:\WSL\InsideLLM",
 
     [switch]$Uninstall,
     [switch]$SkipPortForwarding
@@ -131,7 +132,7 @@ if ($Uninstall) {
     }
 
     # Remove port forwarding
-    foreach ($port in @(80, 443, 4000, 11434)) {
+    foreach ($port in @(80, 443, 4000, 5050, 11434)) {
         netsh interface portproxy delete v4tov4 listenport=$port listenaddress=0.0.0.0 2>$null | Out-Null
     }
     Write-Ok "Removed port forwarding rules"
@@ -188,64 +189,44 @@ $distros = wsl -l -q 2>$null
 $hasDistro = $distros | Where-Object { $_.Trim().Replace("`0","") -eq $WslDistroName }
 
 if (-not $hasDistro) {
-    Write-Warn "Installing $WslDistroName (this may take a few minutes)..."
+    Write-Warn "Creating '$WslDistroName' WSL2 distro (this may take a few minutes)..."
 
-    # Install without launching the interactive user-creation prompt
-    wsl --install -d Ubuntu-24.04 --no-launch 2>$null
+    # Download Ubuntu 24.04 rootfs
+    $rootfsUrl = "https://cloud-images.ubuntu.com/wsl/noble/current/ubuntu-noble-wsl-amd64-wsl.rootfs.tar.gz"
+    $rootfsPath = Join-Path $env:TEMP "ubuntu-noble-wsl-rootfs.tar.gz"
 
-    if ($LASTEXITCODE -ne 0) {
-        # Older Windows: --no-launch not supported, use regular install in background
-        Write-Warn "Using background install method..."
-        $proc = Start-Process -FilePath "wsl" -ArgumentList "--install","-d","Ubuntu-24.04" -PassThru -WindowStyle Hidden
-        Write-Host "  Waiting for distro download to complete..."
-
-        # Wait for the distro to appear in the list (up to 5 minutes)
-        $timeout = 300; $elapsed = 0
-        do {
-            Start-Sleep -Seconds 5; $elapsed += 5
-            $distros = wsl -l -q 2>$null
-            $found = $distros | Where-Object { $_.Trim().Replace("`0","") -eq $WslDistroName }
-        } while (-not $found -and $elapsed -lt $timeout)
-
-        # Kill the interactive prompt that may have spawned
-        Stop-Process -Name "ubuntu*" -Force -ErrorAction SilentlyContinue
-        wsl --terminate $WslDistroName 2>$null | Out-Null
-        Start-Sleep -Seconds 3
-    }
-
-    # Set root as default user (bypasses the interactive user-creation prompt)
-    $ubuntuExe = Get-AppxPackage -Name "*Ubuntu*24.04*" -ErrorAction SilentlyContinue |
-        ForEach-Object { Join-Path $_.InstallLocation "ubuntu2404.exe" }
-
-    if ($ubuntuExe -and (Test-Path $ubuntuExe)) {
-        & $ubuntuExe config --default-user root 2>$null
-        Write-Ok "Default user set to root"
+    if (-not (Test-Path $rootfsPath)) {
+        Write-Host "  Downloading Ubuntu 24.04 rootfs..."
+        $ProgressPreference = 'SilentlyContinue'
+        Invoke-WebRequest -Uri $rootfsUrl -OutFile $rootfsPath -UseBasicParsing
+        $ProgressPreference = 'Continue'
+        Write-Ok "Ubuntu 24.04 rootfs downloaded"
     } else {
-        # Fallback: try the generic launcher name
-        $exeNames = @("ubuntu2404.exe", "ubuntu24.04.exe")
-        foreach ($exe in $exeNames) {
-            $found = Get-Command $exe -ErrorAction SilentlyContinue
-            if ($found) { & $exe config --default-user root 2>$null; break }
-        }
+        Write-Ok "Ubuntu 24.04 rootfs already cached"
     }
 
-    # Verify the distro is ready
-    $testOutput = wsl -d $WslDistroName -- echo ready 2>&1
-    if ($testOutput -notmatch "ready") {
-        Write-Fail "Distro did not start correctly. You may need to reboot and re-run this script."
+    # Create install directory
+    $null = New-Item -Path $WslInstallPath -ItemType Directory -Force
+
+    # Import as custom-named distro (defaults to root user, no interactive prompt)
+    Write-Host "  Importing as '$WslDistroName'..."
+    wsl --import $WslDistroName $WslInstallPath $rootfsPath --version 2
+    if ($LASTEXITCODE -ne 0) {
+        Write-Fail "Failed to import WSL2 distro. Check disk space and WSL2 status."
         exit 1
     }
-}
-Write-Ok "$WslDistroName is installed"
+    Write-Ok "Distro '$WslDistroName' created at $WslInstallPath"
 
-# Ensure WSL2 mode
-wsl --set-version $WslDistroName 2 2>$null | Out-Null
+    # Clean up downloaded rootfs
+    Remove-Item $rootfsPath -Force -ErrorAction SilentlyContinue
+}
+Write-Ok "'$WslDistroName' is installed"
 
 # Ensure systemd is enabled
 $wslConf = Invoke-Wsl "cat /etc/wsl.conf 2>/dev/null || true"
 if (-not ($wslConf -match "systemd\s*=\s*true")) {
     Write-Warn "Enabling systemd in WSL2..."
-    Invoke-Wsl "echo -e '[boot]\nsystemd=true' | sudo tee /etc/wsl.conf > /dev/null"
+    Invoke-Wsl "printf '[boot]\nsystemd=true\n' > /etc/wsl.conf"
     Write-Warn "Restarting WSL2 to enable systemd..."
     wsl --terminate $WslDistroName
     Start-Sleep -Seconds 3

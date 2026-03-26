@@ -1447,7 +1447,7 @@ container deployment, and port forwarding automatically.
 ```
 
 This removes all containers, configs, port forwarding rules, and firewall rules.
-The WSL2 distro itself is preserved (remove it with `wsl --unregister Ubuntu-24.04`).
+The WSL2 distro itself is preserved (remove it with `wsl --unregister InsideLLM`).
 
 ---
 
