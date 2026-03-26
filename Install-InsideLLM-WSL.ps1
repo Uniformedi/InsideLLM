@@ -144,8 +144,14 @@ if ($Uninstall) {
     # Remove scheduled tasks
     Unregister-ScheduledTask -TaskName "InsideLLM-WSL2-PortForward" -Confirm:$false -ErrorAction SilentlyContinue
     Unregister-ScheduledTask -TaskName "InsideLLM-WSL2-Startup" -Confirm:$false -ErrorAction SilentlyContinue
+    schtasks /Delete /TN "InsideLLM-WSL2-Startup" /F 2>$null | Out-Null
     Remove-Item -Path (Join-Path $env:ProgramData "InsideLLM") -Recurse -Force -ErrorAction SilentlyContinue
     Write-Ok "Removed scheduled tasks"
+
+    # Remove Start Menu shortcuts
+    $shortcutFolder = Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Programs\InsideLLM"
+    Remove-Item -Path $shortcutFolder -Recurse -Force -ErrorAction SilentlyContinue
+    Write-Ok "Removed Start Menu shortcuts"
 
     Write-Host ""
     Write-Host "InsideLLM has been removed from WSL2." -ForegroundColor Green
@@ -979,6 +985,66 @@ if (`$wslIp) {
 }
 
 # =============================================================================
+# Step 7: Create Start Menu shortcuts
+# =============================================================================
+
+Write-Step "Creating Start Menu shortcuts"
+
+$shortcutFolder = Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Programs\InsideLLM"
+$null = New-Item -Path $shortcutFolder -ItemType Directory -Force
+
+$shell = New-Object -ComObject WScript.Shell
+
+# Open WebUI
+$lnk = $shell.CreateShortcut("$shortcutFolder\InsideLLM - Chat.lnk")
+$lnk.TargetPath = "https://localhost"
+$lnk.Description = "Open WebUI chat interface"
+$lnk.IconLocation = "shell32.dll,14"
+$lnk.Save()
+
+# LiteLLM Admin
+$lnk = $shell.CreateShortcut("$shortcutFolder\InsideLLM - Admin.lnk")
+$lnk.TargetPath = "https://localhost/litellm/ui/chat"
+$lnk.Description = "LiteLLM admin dashboard"
+$lnk.IconLocation = "shell32.dll,21"
+$lnk.Save()
+
+# pgAdmin
+$lnk = $shell.CreateShortcut("$shortcutFolder\InsideLLM - pgAdmin.lnk")
+$lnk.TargetPath = "http://localhost:5050"
+$lnk.Description = "PostgreSQL database administration"
+$lnk.IconLocation = "shell32.dll,12"
+$lnk.Save()
+
+# Start InsideLLM
+$lnk = $shell.CreateShortcut("$shortcutFolder\InsideLLM - Start.lnk")
+$lnk.TargetPath = "powershell.exe"
+$lnk.Arguments = "-NoProfile -ExecutionPolicy Bypass -Command `"wsl -d $WslDistroName -- bash -c 'cd /opt/InsideLLM && docker compose up -d'; Write-Host 'InsideLLM started.' -ForegroundColor Green; Start-Sleep 3`""
+$lnk.Description = "Start all InsideLLM containers"
+$lnk.IconLocation = "shell32.dll,137"
+$lnk.Save()
+
+# Stop InsideLLM
+$lnk = $shell.CreateShortcut("$shortcutFolder\InsideLLM - Stop.lnk")
+$lnk.TargetPath = "powershell.exe"
+$lnk.Arguments = "-NoProfile -ExecutionPolicy Bypass -Command `"wsl -d $WslDistroName -- bash -c 'cd /opt/InsideLLM && docker compose stop'; Write-Host 'InsideLLM stopped.' -ForegroundColor Yellow; Start-Sleep 3`""
+$lnk.Description = "Stop all InsideLLM containers"
+$lnk.IconLocation = "shell32.dll,131"
+$lnk.Save()
+
+# Uninstall
+$lnk = $shell.CreateShortcut("$shortcutFolder\InsideLLM - Uninstall.lnk")
+$lnk.TargetPath = "powershell.exe"
+$lnk.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$PSScriptRoot\Install-InsideLLM-WSL.ps1`" -Uninstall"
+$lnk.Description = "Remove InsideLLM from this machine"
+$lnk.IconLocation = "shell32.dll,131"
+$lnk.Save()
+
+[System.Runtime.InteropServices.Marshal]::ReleaseComObject($shell) | Out-Null
+
+Write-Ok "Shortcuts added to Start Menu > InsideLLM"
+
+# =============================================================================
 # Summary
 # =============================================================================
 
@@ -1006,6 +1072,9 @@ Write-Host "  pgAdmin login:  admin@insidellm.local / <master key above>"
 Write-Host "  DB connection:  host=postgres, port=5432, db=litellm, user=litellm"
 Write-Host "  DB password:    $PostgresPassword" -ForegroundColor Yellow
 Write-Host ""
+Write-Host "  Start Menu:     Start > InsideLLM (Chat, Admin, pgAdmin, Start/Stop)" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "  Or from command line:"
 Write-Host "  Stop:    wsl -d $WslDistroName -- bash -c 'cd $InstallPath && sudo docker compose stop'"
 Write-Host "  Start:   wsl -d $WslDistroName -- bash -c 'cd $InstallPath && sudo docker compose start'"
 Write-Host "  Remove:  .\Install-InsideLLM-WSL.ps1 -Uninstall"
