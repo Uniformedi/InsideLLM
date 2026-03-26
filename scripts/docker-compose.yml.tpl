@@ -102,7 +102,7 @@ services:
       interval: 15s
       timeout: 10s
       retries: 10
-      start_period: 30s
+      start_period: 300s
     networks:
       - claude-internal
 
@@ -147,7 +147,7 @@ services:
       interval: 15s
       timeout: 10s
       retries: 10
-      start_period: 30s
+      start_period: 300s
     networks:
       - claude-internal
 
@@ -192,11 +192,11 @@ services:
               capabilities: [gpu]
 %{ endif ~}
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:11434/api/tags || exit 1"]
+      test: ["CMD", "ollama", "list"]
       interval: 15s
       timeout: 10s
       retries: 10
-      start_period: 30s
+      start_period: 300s
     logging:
       driver: json-file
       options:
