@@ -44,6 +44,7 @@ $ports = @(
     @{ Port = 443;  Protocol = "TCP"; Description = "InsideLLM HTTPS (Nginx)" }
     @{ Port = 80;   Protocol = "TCP"; Description = "InsideLLM HTTP redirect" }
     @{ Port = 4000;  Protocol = "TCP"; Description = "InsideLLM LiteLLM API" }
+    @{ Port = 5050;  Protocol = "TCP"; Description = "InsideLLM pgAdmin" }
     @{ Port = 11434; Protocol = "TCP"; Description = "InsideLLM Ollama API" }
     @{ Port = 22;    Protocol = "TCP"; Description = "InsideLLM SSH" }
 )

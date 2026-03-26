@@ -179,6 +179,7 @@ runcmd:
   - mkdir -p /opt/InsideLLM/data/postgres
   - mkdir -p /opt/InsideLLM/data/redis
   - mkdir -p /opt/InsideLLM/data/open-webui
+  - mkdir -p /opt/InsideLLM/data/pgadmin
   - mkdir -p /opt/InsideLLM/pipelines
 
   # --- Pull images and start the stack ---

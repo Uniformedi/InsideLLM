@@ -732,6 +732,24 @@ $ollamaDependsOn
         condition: service_healthy
     networks:
       - insidellm-internal
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: insidellm-pgadmin
+    restart: always
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: "admin@insidellm.local"
+      PGADMIN_DEFAULT_PASSWORD: "$LitellmMasterKey"
+      PGADMIN_CONFIG_SERVER_MODE: "True"
+    volumes:
+      - $InstallPath/data/pgadmin:/var/lib/pgadmin
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - insidellm-internal
+
 $ollamaServices
 
 networks:
@@ -881,6 +899,31 @@ Write-Host "  Running post-deployment configuration..."
 Invoke-Wsl "cd $InstallPath && sudo bash post-deploy.sh 2>&1"
 Write-Ok "Post-deploy complete"
 
+# Create PostgreSQL views with lowercase names for easy querying
+Write-Host "  Creating database convenience views..."
+Invoke-Wsl @'
+sudo docker exec insidellm-postgres psql -U litellm -d litellm -c "
+CREATE OR REPLACE VIEW spend_logs AS SELECT
+  request_id, call_type, api_key, spend, total_tokens, prompt_tokens,
+  completion_tokens, \"startTime\" AS start_time, \"endTime\" AS end_time,
+  model, model_group, \"user\" AS username, team_id, end_user,
+  requester_ip_address, messages, response, request_tags, cache_hit,
+  status, request_duration_ms
+FROM \"LiteLLM_SpendLogs\";
+
+CREATE OR REPLACE VIEW audit_log AS SELECT * FROM \"LiteLLM_AuditLog\";
+CREATE OR REPLACE VIEW users AS SELECT * FROM \"LiteLLM_UserTable\";
+CREATE OR REPLACE VIEW teams AS SELECT * FROM \"LiteLLM_TeamTable\";
+CREATE OR REPLACE VIEW api_keys AS SELECT * FROM \"LiteLLM_VerificationToken\";
+CREATE OR REPLACE VIEW daily_user_spend AS SELECT * FROM \"LiteLLM_DailyUserSpend\";
+CREATE OR REPLACE VIEW daily_team_spend AS SELECT * FROM \"LiteLLM_DailyTeamSpend\";
+CREATE OR REPLACE VIEW error_logs AS SELECT * FROM \"LiteLLM_ErrorLogs\";
+CREATE OR REPLACE VIEW models AS SELECT * FROM \"LiteLLM_ModelTable\";
+CREATE OR REPLACE VIEW budgets AS SELECT * FROM \"LiteLLM_BudgetTable\";
+"
+'@ | Out-Null
+Write-Ok "Database views created"
+
 # =============================================================================
 # Step 6: Port forwarding
 # =============================================================================
@@ -891,7 +934,7 @@ if (-not $SkipPortForwarding) {
     $wslIp = (Invoke-Wsl "hostname -I" | ForEach-Object { $_.Trim().Split(" ")[0] })
     Write-Ok "WSL2 IP: $wslIp"
 
-    $ports = @(80, 443, 4000)
+    $ports = @(80, 443, 4000, 5050)
     if ($EnableOllama) { $ports += 11434 }
 
     foreach ($port in $ports) {
@@ -946,6 +989,7 @@ Write-Host ""
 Write-Host "  Open WebUI:     https://localhost"
 Write-Host "  LiteLLM UI:     https://localhost/litellm/ui/chat"
 Write-Host "  LiteLLM API:    http://localhost:4000"
+Write-Host "  pgAdmin:        http://localhost:5050"
 if ($EnableOllama) {
 Write-Host "  Ollama API:     http://localhost:11434"
 }
@@ -956,6 +1000,10 @@ Write-Host '    $env:ANTHROPIC_AUTH_TOKEN = "<your-litellm-key>"'
 Write-Host ""
 Write-Host "  Master Key:     $LitellmMasterKey" -ForegroundColor Yellow
 Write-Host "  (save this -- it is your admin password and API key)"
+Write-Host ""
+Write-Host "  pgAdmin login:  admin@insidellm.local / <master key above>"
+Write-Host "  DB connection:  host=postgres, port=5432, db=litellm, user=litellm"
+Write-Host "  DB password:    $PostgresPassword" -ForegroundColor Yellow
 Write-Host ""
 Write-Host "  Stop:    wsl -d $WslDistroName -- bash -c 'cd $InstallPath && sudo docker compose stop'"
 Write-Host "  Start:   wsl -d $WslDistroName -- bash -c 'cd $InstallPath && sudo docker compose start'"
