@@ -140,9 +140,11 @@ if ($Uninstall) {
     Remove-NetFirewallRule -Group "InsideLLM WSL2" -ErrorAction SilentlyContinue
     Write-Ok "Removed firewall rules"
 
-    # Remove scheduled task
+    # Remove scheduled tasks
     Unregister-ScheduledTask -TaskName "InsideLLM-WSL2-PortForward" -Confirm:$false -ErrorAction SilentlyContinue
-    Write-Ok "Removed scheduled task"
+    Unregister-ScheduledTask -TaskName "InsideLLM-WSL2-Startup" -Confirm:$false -ErrorAction SilentlyContinue
+    Remove-Item -Path (Join-Path $env:ProgramData "InsideLLM") -Recurse -Force -ErrorAction SilentlyContinue
+    Write-Ok "Removed scheduled tasks"
 
     Write-Host ""
     Write-Host "InsideLLM has been removed from WSL2." -ForegroundColor Green
@@ -955,8 +957,28 @@ if (-not $SkipPortForwarding) {
         Write-Ok "Port $port -> ${wslIp}:$port"
     }
 
-    # Create a scheduled task to refresh port forwarding when WSL IP changes
-    $refreshScript = @"
+    # Create a scheduled task that boots WSL2, waits for containers, and refreshes port forwarding
+    $startupScript = @"
+# InsideLLM WSL2 Startup & Port Forwarding
+# Starts WSL2 distro, waits for Docker, and updates port forwarding rules
+
+# Boot WSL2 (starts systemd which auto-starts Docker and InsideLLM containers)
+wsl -d $WslDistroName -- bash -c "echo 'WSL2 booted'" 2>`$null
+
+# Wait for Docker to be ready (up to 60 seconds)
+`$timeout = 60; `$elapsed = 0
+do {
+    Start-Sleep -Seconds 5; `$elapsed += 5
+    `$dockerReady = wsl -d $WslDistroName -- bash -c "docker info 2>/dev/null && echo READY" 2>`$null
+} while (`$dockerReady -notmatch "READY" -and `$elapsed -lt `$timeout)
+
+# Ensure containers are running
+wsl -d $WslDistroName -- bash -c "cd /opt/InsideLLM && docker compose up -d" 2>`$null
+
+# Wait a moment for containers to get IPs
+Start-Sleep -Seconds 5
+
+# Refresh port forwarding with the new WSL2 IP
 `$wslIp = (wsl -d $WslDistroName -- hostname -I).Trim().Split(" ")[0]
 if (`$wslIp) {
     foreach (`$port in @($($ports -join ','))) {
@@ -965,16 +987,17 @@ if (`$wslIp) {
     }
 }
 "@
-    $refreshPath = Join-Path $env:ProgramData "InsideLLM\Refresh-PortForward.ps1"
-    $null = New-Item -Path (Split-Path $refreshPath) -ItemType Directory -Force
-    [System.IO.File]::WriteAllText($refreshPath, $refreshScript)
+    $startupPath = Join-Path $env:ProgramData "InsideLLM\Start-InsideLLM.ps1"
+    $null = New-Item -Path (Split-Path $startupPath) -ItemType Directory -Force
+    [System.IO.File]::WriteAllText($startupPath, $startupScript)
 
-    $action  = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$refreshPath`""
-    $trigger = New-ScheduledTaskTrigger -AtLogOn
-    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+    $action  = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$startupPath`""
+    $trigger = New-ScheduledTaskTrigger -AtStartup
+    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
     Unregister-ScheduledTask -TaskName "InsideLLM-WSL2-PortForward" -Confirm:$false -ErrorAction SilentlyContinue
-    Register-ScheduledTask -TaskName "InsideLLM-WSL2-PortForward" -Action $action -Trigger $trigger -Settings $settings -RunLevel Highest -Description "Refresh InsideLLM WSL2 port forwarding on login" | Out-Null
-    Write-Ok "Scheduled task created to refresh port forwarding on login"
+    Unregister-ScheduledTask -TaskName "InsideLLM-WSL2-Startup" -Confirm:$false -ErrorAction SilentlyContinue
+    Register-ScheduledTask -TaskName "InsideLLM-WSL2-Startup" -Action $action -Trigger $trigger -Settings $settings -RunLevel Highest -User "SYSTEM" -Description "Start InsideLLM WSL2 containers and refresh port forwarding on boot" | Out-Null
+    Write-Ok "Scheduled task created: InsideLLM starts on Windows boot"
 }
 
 # =============================================================================
