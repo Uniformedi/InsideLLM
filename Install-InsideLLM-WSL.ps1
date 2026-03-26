@@ -835,7 +835,7 @@ log "  Inside LLM - READY"
 log "=========================================="
 log ""
 log "  Open WebUI:   https://localhost"
-log "  LiteLLM UI:   https://localhost/litellm/ui"
+log "  LiteLLM UI:   https://localhost/litellm/ui/chat"
 log "  Claude Code:"
 log '    $env:ANTHROPIC_BASE_URL = "http://localhost:4000"'
 log '    $env:ANTHROPIC_AUTH_TOKEN = "<your-litellm-key>"'
@@ -944,7 +944,7 @@ Write-Host "  InsideLLM - Deployed on WSL2" -ForegroundColor Green
 Write-Host "============================================================" -ForegroundColor Green
 Write-Host ""
 Write-Host "  Open WebUI:     https://localhost"
-Write-Host "  LiteLLM UI:     https://localhost/litellm/ui"
+Write-Host "  LiteLLM UI:     https://localhost/litellm/ui/chat"
 Write-Host "  LiteLLM API:    http://localhost:4000"
 if ($EnableOllama) {
 Write-Host "  Ollama API:     http://localhost:11434"

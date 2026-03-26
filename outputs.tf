@@ -19,7 +19,7 @@ output "open_webui_url" {
 
 output "litellm_admin_url" {
   description = "URL for the LiteLLM admin dashboard"
-  value       = "https://${data.external.vm_ip.result.ip}/litellm/ui"
+  value       = "https://${data.external.vm_ip.result.ip}/litellm/ui/chat"
 }
 
 output "ssh_command" {
