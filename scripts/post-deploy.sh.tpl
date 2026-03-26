@@ -172,6 +172,18 @@ if echo "$MODELS" | grep -q "claude-opus"; then
   log "✅ claude-opus model available"
 fi
 
+%{ if ollama_enable ~}
+# ---------------------------------------------------------------------------
+# Pull Ollama models via docker exec (reliable for large downloads)
+# ---------------------------------------------------------------------------
+log "Pulling Ollama models..."
+%{ for model in ollama_models ~}
+log "Pulling ${model}..."
+docker exec insidellm-ollama ollama pull ${model} >> "$LOG" 2>&1 || log "WARNING: Failed to pull ${model}"
+%{ endfor ~}
+log "Ollama model pull complete"
+%{ endif ~}
+
 # ---------------------------------------------------------------------------
 # Create systemd service for auto-start on boot
 # ---------------------------------------------------------------------------

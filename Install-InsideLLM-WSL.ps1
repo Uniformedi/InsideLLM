@@ -410,7 +410,7 @@ Write-WslFile -Path "$InstallPath/litellm-config.yaml" -Content $litellmConfig
 Write-Ok "LiteLLM config"
 
 # --- Nginx config ---
-$nginxConfig = @"
+$nginxConfig = @'
 worker_processes auto;
 error_log /var/log/nginx/error.log warn;
 pid /var/run/nginx.pid;
@@ -423,9 +423,9 @@ http {
     include       /etc/nginx/mime.types;
     default_type  application/octet-stream;
 
-    log_format main '\`$remote_addr - \`$remote_user [\`$time_local] '
-                    '"\`$request" \`$status \`$body_bytes_sent '
-                    '"\`$http_referer" "\`$http_user_agent"';
+    log_format main '$remote_addr - $remote_user [$time_local] '
+                    '"$request" $status $body_bytes_sent '
+                    '"$http_referer" "$http_user_agent"';
     access_log /var/log/nginx/access.log main;
 
     sendfile        on;
@@ -451,7 +451,7 @@ http {
 
     server {
         listen 80;
-        server_name $Fqdn $Hostname _;
+        server_name __FQDN__ __HOSTNAME__ _;
 
         location /health {
             return 200 'OK';
@@ -459,14 +459,14 @@ http {
         }
 
         location / {
-            return 301 https://\`$host\`$request_uri;
+            return 301 https://$host$request_uri;
         }
     }
 
     server {
         listen 443 ssl;
         http2 on;
-        server_name $Fqdn $Hostname _;
+        server_name __FQDN__ __HOSTNAME__ _;
 
         ssl_certificate     /etc/nginx/ssl/server.crt;
         ssl_certificate_key /etc/nginx/ssl/server.key;
@@ -479,12 +479,12 @@ http {
         location / {
             proxy_pass http://open-webui;
             proxy_http_version 1.1;
-            proxy_set_header Upgrade \`$http_upgrade;
+            proxy_set_header Upgrade $http_upgrade;
             proxy_set_header Connection "upgrade";
-            proxy_set_header Host \`$host;
-            proxy_set_header X-Real-IP \`$remote_addr;
-            proxy_set_header X-Forwarded-For \`$proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto \`$scheme;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
             proxy_buffering off;
             proxy_read_timeout 300s;
             proxy_connect_timeout 75s;
@@ -493,10 +493,10 @@ http {
         location /litellm/ {
             proxy_pass http://litellm;
             proxy_http_version 1.1;
-            proxy_set_header Host \`$host;
-            proxy_set_header X-Real-IP \`$remote_addr;
-            proxy_set_header X-Forwarded-For \`$proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto \`$scheme;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
             proxy_buffering off;
             proxy_read_timeout 300s;
         }
@@ -504,19 +504,19 @@ http {
         location /litellm-asset-prefix/ {
             proxy_pass http://litellm/litellm-asset-prefix/;
             proxy_http_version 1.1;
-            proxy_set_header Host \`$host;
-            proxy_set_header X-Real-IP \`$remote_addr;
-            proxy_set_header X-Forwarded-For \`$proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto \`$scheme;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
         }
 
         location /v1/ {
             proxy_pass http://litellm/v1/;
             proxy_http_version 1.1;
-            proxy_set_header Host \`$host;
-            proxy_set_header X-Real-IP \`$remote_addr;
-            proxy_set_header X-Forwarded-For \`$proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto \`$scheme;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
             proxy_buffering off;
             proxy_read_timeout 300s;
         }
@@ -527,7 +527,10 @@ http {
         }
     }
 }
-"@
+'@
+
+$nginxConfig = $nginxConfig.Replace("__FQDN__", $Fqdn)
+$nginxConfig = $nginxConfig.Replace("__HOSTNAME__", $Hostname)
 
 Write-WslFile -Path "$InstallPath/nginx/nginx.conf" -Content $nginxConfig -Permissions "0644"
 Write-Ok "Nginx config"
@@ -576,8 +579,6 @@ if ($EnableOllama) {
 "@
     }
 
-    $pullCommands = ($OllamaModels | ForEach-Object { "        echo 'Pulling $_...' && ollama pull $_" }) -join "`n"
-
     $ollamaServices = @"
 
   ollama:
@@ -600,23 +601,6 @@ $gpuBlock
       options:
         max-size: "50m"
         max-file: "3"
-    networks:
-      - insidellm-internal
-
-  ollama-pull:
-    image: ollama/ollama:latest
-    container_name: insidellm-ollama-pull
-    restart: "no"
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - |
-$pullCommands
-        echo "All models pulled."
-    environment:
-      OLLAMA_HOST: "http://ollama:11434"
-    depends_on:
-      ollama:
-        condition: service_healthy
     networks:
       - insidellm-internal
 "@
@@ -883,6 +867,15 @@ Write-Ok "Containers started"
 
 Write-Host "  Waiting 60 seconds for services to initialize..."
 Start-Sleep -Seconds 60
+
+# Pull Ollama models directly via docker exec (more reliable than sidecar)
+if ($EnableOllama) {
+    foreach ($model in $OllamaModels) {
+        Write-Host "  Pulling Ollama model: $model (this may take several minutes per model)..."
+        Invoke-Wsl "sudo docker exec insidellm-ollama ollama pull '$model' 2>&1"
+        Write-Ok "Model $model pulled"
+    }
+}
 
 Write-Host "  Running post-deployment configuration..."
 Invoke-Wsl "cd $InstallPath && sudo bash post-deploy.sh 2>&1"
