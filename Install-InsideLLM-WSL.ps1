@@ -86,15 +86,20 @@ function Write-Fail  { param([string]$M) Write-Host "  [FAIL] $M" -ForegroundCol
 function New-RandomPassword {
     param([int]$Length = 32)
     $chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-    $bytes = [byte[]]::new($Length)
-    [System.Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
+    $bytes = New-Object byte[] $Length
+    $rng = [System.Security.Cryptography.RNGCryptoServiceProvider]::new()
+    $rng.GetBytes($bytes)
+    $rng.Dispose()
     $result = -join ($bytes | ForEach-Object { $chars[$_ % $chars.Length] })
     return $result
 }
 
 function Invoke-Wsl {
     param([string]$Command)
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
     $output = wsl -d $WslDistroName -- bash -c $Command 2>&1
+    $ErrorActionPreference = $prev
     return $output
 }
 
@@ -167,8 +172,8 @@ $WebuiSecret = New-RandomPassword 32
 
 Write-Step "Checking WSL2"
 
-$wslStatus = wsl --status 2>&1
-if ($LASTEXITCODE -ne 0) {
+$wslStatus = wsl --status 2>&1 | Out-String
+if ($wslStatus -match "not installed" -or $wslStatus -match "not recognized" -or -not (Get-Command wsl -ErrorAction SilentlyContinue)) {
     Write-Warn "WSL is not installed. Installing WSL2..."
     wsl --install --no-distribution
     Write-Fail "WSL2 has been installed. Please REBOOT and re-run this script."
@@ -181,10 +186,53 @@ $distros = wsl -l -q 2>$null
 $hasDistro = $distros | Where-Object { $_.Trim().Replace("`0","") -eq $WslDistroName }
 
 if (-not $hasDistro) {
-    Write-Warn "Installing $WslDistroName..."
-    wsl --install -d Ubuntu-24.04
-    Write-Host "  Waiting for distro to initialize (this may take a minute)..."
-    Start-Sleep -Seconds 10
+    Write-Warn "Installing $WslDistroName (this may take a few minutes)..."
+
+    # Install without launching the interactive user-creation prompt
+    wsl --install -d Ubuntu-24.04 --no-launch 2>$null
+
+    if ($LASTEXITCODE -ne 0) {
+        # Older Windows: --no-launch not supported, use regular install in background
+        Write-Warn "Using background install method..."
+        $proc = Start-Process -FilePath "wsl" -ArgumentList "--install","-d","Ubuntu-24.04" -PassThru -WindowStyle Hidden
+        Write-Host "  Waiting for distro download to complete..."
+
+        # Wait for the distro to appear in the list (up to 5 minutes)
+        $timeout = 300; $elapsed = 0
+        do {
+            Start-Sleep -Seconds 5; $elapsed += 5
+            $distros = wsl -l -q 2>$null
+            $found = $distros | Where-Object { $_.Trim().Replace("`0","") -eq $WslDistroName }
+        } while (-not $found -and $elapsed -lt $timeout)
+
+        # Kill the interactive prompt that may have spawned
+        Stop-Process -Name "ubuntu*" -Force -ErrorAction SilentlyContinue
+        wsl --terminate $WslDistroName 2>$null | Out-Null
+        Start-Sleep -Seconds 3
+    }
+
+    # Set root as default user (bypasses the interactive user-creation prompt)
+    $ubuntuExe = Get-AppxPackage -Name "*Ubuntu*24.04*" -ErrorAction SilentlyContinue |
+        ForEach-Object { Join-Path $_.InstallLocation "ubuntu2404.exe" }
+
+    if ($ubuntuExe -and (Test-Path $ubuntuExe)) {
+        & $ubuntuExe config --default-user root 2>$null
+        Write-Ok "Default user set to root"
+    } else {
+        # Fallback: try the generic launcher name
+        $exeNames = @("ubuntu2404.exe", "ubuntu24.04.exe")
+        foreach ($exe in $exeNames) {
+            $found = Get-Command $exe -ErrorAction SilentlyContinue
+            if ($found) { & $exe config --default-user root 2>$null; break }
+        }
+    }
+
+    # Verify the distro is ready
+    $testOutput = wsl -d $WslDistroName -- echo ready 2>&1
+    if ($testOutput -notmatch "ready") {
+        Write-Fail "Distro did not start correctly. You may need to reboot and re-run this script."
+        exit 1
+    }
 }
 Write-Ok "$WslDistroName is installed"
 
@@ -213,10 +261,11 @@ $dockerCheck = Invoke-Wsl "docker --version 2>/dev/null && echo DOCKER_OK || ech
 if (-not ($dockerCheck -match "DOCKER_OK")) {
     Write-Warn "Installing Docker Engine..."
     Invoke-Wsl @"
+export DEBIAN_FRONTEND=noninteractive
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg 2>/dev/null
 echo 'deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu noble stable' | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-sudo apt-get update -qq
-sudo apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+sudo DEBIAN_FRONTEND=noninteractive apt-get update -qq
+sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 sudo usermod -aG docker `$(whoami)
 "@ | Out-Null
     Write-Ok "Docker Engine installed"
@@ -541,11 +590,11 @@ if ($EnableOllama) {
       - $InstallPath/data/ollama:/root/.ollama
 $gpuBlock
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:11434/api/tags || exit 1"]
+      test: ["CMD", "ollama", "list"]
       interval: 15s
       timeout: 10s
       retries: 10
-      start_period: 30s
+      start_period: 300s
     logging:
       driver: json-file
       options:
@@ -645,7 +694,7 @@ $ollamaDependsOn
       interval: 15s
       timeout: 10s
       retries: 10
-      start_period: 30s
+      start_period: 300s
     networks:
       - claude-internal
 
@@ -680,7 +729,7 @@ $ollamaDependsOn
       interval: 15s
       timeout: 10s
       retries: 10
-      start_period: 30s
+      start_period: 300s
     networks:
       - claude-internal
 
@@ -723,56 +772,56 @@ if (Test-Path $dlpSource) {
 }
 
 # --- Post-deploy script ---
-$postDeploy = @"
+$postDeploy = @'
 #!/bin/bash
 set -euo pipefail
 
 LITELLM_URL="http://localhost:4000"
-LITELLM_KEY="$LitellmMasterKey"
+LITELLM_KEY="__LITELLM_KEY__"
 LOG="/var/log/InsideLLM-deploy.log"
 
-log() { echo "[\$(date '+%Y-%m-%d %H:%M:%S')] \$*" | tee -a "\$LOG"; }
+log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG"; }
 
 wait_for_service() {
-  local url="\$1" name="\$2" max=30 attempt=0
-  while [ \$attempt -lt \$max ]; do
-    if curl -sf "\$url" > /dev/null 2>&1; then
-      log "\$name is healthy"; return 0
+  local url="$1" name="$2" max=30 attempt=0
+  while [ $attempt -lt $max ]; do
+    if curl -sf "$url" > /dev/null 2>&1; then
+      log "$name is healthy"; return 0
     fi
-    attempt=\$((attempt + 1))
-    log "Waiting for \$name... (\$attempt/\$max)"
+    attempt=$((attempt + 1))
+    log "Waiting for $name... ($attempt/$max)"
     sleep 5
   done
-  log "WARNING: \$name did not become healthy within timeout"
+  log "WARNING: $name did not become healthy within timeout"
   return 1
 }
 
 log "=== Starting post-deployment configuration ==="
-wait_for_service "\$LITELLM_URL/health/liveliness" "LiteLLM"
+wait_for_service "$LITELLM_URL/health/liveliness" "LiteLLM"
 wait_for_service "http://localhost:8080/health" "Open WebUI"
 
 log "Creating default teams..."
 
-curl -sf -X POST "\$LITELLM_URL/team/new" \
-  -H "Authorization: Bearer \$LITELLM_KEY" \
+curl -sf -X POST "$LITELLM_URL/team/new" \
+  -H "Authorization: Bearer $LITELLM_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"team_alias":"administrators","max_budget":0,"budget_duration":"30d","tpm_limit":500000,"rpm_limit":100,"models":["claude-sonnet","claude-haiku","claude-opus"]}' >> "\$LOG" 2>&1 || log "Team administrators may already exist"
+  -d '{"team_alias":"administrators","max_budget":0,"budget_duration":"30d","tpm_limit":500000,"rpm_limit":100,"models":["claude-sonnet","claude-haiku","claude-opus"]}' >> "$LOG" 2>&1 || log "Team administrators may already exist"
 
-curl -sf -X POST "\$LITELLM_URL/team/new" \
-  -H "Authorization: Bearer \$LITELLM_KEY" \
+curl -sf -X POST "$LITELLM_URL/team/new" \
+  -H "Authorization: Bearer $LITELLM_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"team_alias":"general-users","max_budget":$DefaultUserBudget,"budget_duration":"1d","tpm_limit":100000,"rpm_limit":30,"models":["claude-sonnet","claude-haiku"]}' >> "\$LOG" 2>&1 || log "Team general-users may already exist"
+  -d '{"team_alias":"general-users","max_budget":__USER_BUDGET__,"budget_duration":"1d","tpm_limit":100000,"rpm_limit":30,"models":["claude-sonnet","claude-haiku"]}' >> "$LOG" 2>&1 || log "Team general-users may already exist"
 
-curl -sf -X POST "\$LITELLM_URL/team/new" \
-  -H "Authorization: Bearer \$LITELLM_KEY" \
+curl -sf -X POST "$LITELLM_URL/team/new" \
+  -H "Authorization: Bearer $LITELLM_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"team_alias":"power-users","max_budget":20,"budget_duration":"1d","tpm_limit":200000,"rpm_limit":60,"models":["claude-sonnet","claude-haiku","claude-opus"]}' >> "\$LOG" 2>&1 || log "Team power-users may already exist"
+  -d '{"team_alias":"power-users","max_budget":20,"budget_duration":"1d","tpm_limit":200000,"rpm_limit":60,"models":["claude-sonnet","claude-haiku","claude-opus"]}' >> "$LOG" 2>&1 || log "Team power-users may already exist"
 
 log "Generating admin API key..."
-curl -sf -X POST "\$LITELLM_URL/key/generate" \
-  -H "Authorization: Bearer \$LITELLM_KEY" \
+curl -sf -X POST "$LITELLM_URL/key/generate" \
+  -H "Authorization: Bearer $LITELLM_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"key_alias":"admin-default-key","max_budget":0,"models":["claude-sonnet","claude-haiku","claude-opus"],"metadata":{"purpose":"admin-api-access"}}' >> "\$LOG" 2>&1 || log "Key generation skipped"
+  -d '{"key_alias":"admin-default-key","max_budget":0,"models":["claude-sonnet","claude-haiku","claude-opus"],"metadata":{"purpose":"admin-api-access"}}' >> "$LOG" 2>&1 || log "Key generation skipped"
 
 log "Creating systemd service..."
 cat > /etc/systemd/system/InsideLLM.service << 'SYSTEMD'
@@ -784,7 +833,7 @@ After=docker.service
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-WorkingDirectory=$InstallPath
+WorkingDirectory=__INSTALL_PATH__
 ExecStart=/usr/bin/docker compose up -d
 ExecStop=/usr/bin/docker compose down
 TimeoutStartSec=300
@@ -804,11 +853,16 @@ log ""
 log "  Open WebUI:   https://localhost"
 log "  LiteLLM UI:   https://localhost/litellm/ui"
 log "  Claude Code:"
-log '    \$env:ANTHROPIC_BASE_URL = "http://localhost:4000"'
-log '    \$env:ANTHROPIC_AUTH_TOKEN = "<your-litellm-key>"'
+log '    $env:ANTHROPIC_BASE_URL = "http://localhost:4000"'
+log '    $env:ANTHROPIC_AUTH_TOKEN = "<your-litellm-key>"'
 log ""
 log "=========================================="
-"@
+'@
+
+# Inject PowerShell variables into the literal bash script
+$postDeploy = $postDeploy.Replace("__LITELLM_KEY__", $LitellmMasterKey)
+$postDeploy = $postDeploy.Replace("__USER_BUDGET__", "$DefaultUserBudget")
+$postDeploy = $postDeploy.Replace("__INSTALL_PATH__", $InstallPath)
 
 Write-WslFile -Path "$InstallPath/post-deploy.sh" -Content $postDeploy -Permissions "0750"
 Write-Ok "Post-deploy script"
