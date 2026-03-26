@@ -1,7 +1,20 @@
 # Inside LLM — Architecture & Product Use Case
 
-**Version:** 1.0 | **Author:** Dan Medina, Uniformedi LLC | **Date:** February 2026
+**Version:** 2.0 | **Author:** Dan Medina, Uniformedi LLC | **Date:** March 2026
 **Source:** [github.com/Uniformedi/InsideLLM](https://github.com/Uniformedi/InsideLLM) | **License:** MIT
+
+> **Ready to deploy?** Open the [Setup Wizard (Setup.html)](Setup.html) for a guided, step-by-step configuration experience.
+
+### What's New in 2.0
+
+- **WSL2 deployment path** -- single PowerShell script, no Terraform or Hyper-V required (`Install-InsideLLM-WSL.ps1`)
+- **Local LLM support (Ollama)** -- run open-source models locally alongside Claude (Qwen 2.5 Coder 14B + Qwen 2.5 14B by default)
+- **GPU acceleration** -- native GPU via WSL2, or GPU-PV/DDA passthrough for Hyper-V (`Setup-GPU-Passthrough.ps1`)
+- **Setup Wizard** -- interactive HTML form that generates your config file (`Setup.html`)
+- **Port forwarding script** -- expose all services to LAN clients (`Port-Forward-InsideLLM.ps1`)
+- **Renamed from claude-wrapper to InsideLLM** -- all paths, services, and defaults updated
+- **VM sizing updated** -- 8 vCPU / 32 GB RAM default (sized for Ollama), with guidance for lighter deployments
+- **Correct Claude Code CLI env vars** -- `ANTHROPIC_AUTH_TOKEN` on port 4000
 
 ---
 
@@ -15,10 +28,12 @@
 6. [Service Architecture](#6-service-architecture)
 7. [Data Loss Prevention (DLP)](#7-data-loss-prevention-dlp)
 7a. [Retrieval-Augmented Generation (RAG)](#7a-retrieval-augmented-generation-rag)
+7b. [Local LLM Support (Ollama)](#7b-local-llm-support-ollama)
 8. [Identity & Access Management](#8-identity--access-management)
 9. [Security Architecture](#9-security-architecture)
 10. [Cost Governance & Rate Limiting](#10-cost-governance--rate-limiting)
 11. [Deployment & Operations](#11-deployment--operations)
+11a. [WSL2 Deployment (Alternative)](#11a-wsl2-deployment-alternative)
 12. [Product Use Case](#12-product-use-case)
 
 ---
@@ -26,7 +41,7 @@
 ## 1. Executive Summary
 
 The Inside LLM is a **self-hosted, on-premises AI gateway** that provides
-enterprise-grade access to Anthropic's Claude models. A single `terraform apply`
+enterprise-grade access to Anthropic's Claude models. A single `terraform apply` (or a PowerShell script for WSL2)
 deploys a fully configured Ubuntu VM on Windows Hyper-V, running five containerized
 services that deliver:
 
@@ -101,7 +116,7 @@ interaction — all without modifying the Claude API experience.
                          |                                              |
                          |  +----------------------------------------+  |
                          |  |         Ubuntu 24.04 LTS VM             |  |
-                         |  |         4 vCPU | 8 GB RAM | 80 GB      |  |
+                         |  |         8 vCPU | 32 GB RAM | 80 GB     |  |
                          |  |                                         |  |
 +----------+ HTTPS 443   |  |  +-----------------------------------+  |  |
 |          |-------------+--+->|          Nginx 1.27                |  |  |
@@ -243,15 +258,17 @@ All components are **free and open-source software (FOSS)**:
 |-----------|---------|---------|---------|---------|
 | **API Gateway** | [LiteLLM](https://github.com/BerriAI/litellm) | MIT | latest | Authentication, model routing, budgets, rate limiting, audit |
 | **Chat Interface** | [Open WebUI](https://github.com/open-webui/open-webui) | MIT | latest | Browser-based chat UI, RAG, document upload, pipeline host |
+| **Local LLM** | [Ollama](https://ollama.com/) | MIT | latest | Local model inference (Qwen 2.5 Coder, Qwen 2.5, etc.) |
 | **Reverse Proxy** | [Nginx](https://nginx.org/) | BSD-2 | 1.27 | TLS termination, HTTPS routing, security headers |
 | **Database** | [PostgreSQL](https://www.postgresql.org/) | PostgreSQL | 16 | User data, spend tracking, team budgets, audit logs |
 | **Cache** | [Redis](https://redis.io/) | BSD-3 | 7 | Rate limit counters, response cache, session data |
 | **Containers** | [Docker](https://www.docker.com/) + [Compose](https://docs.docker.com/compose/) | Apache 2.0 | CE | Container orchestration, networking, health checks |
-| **IaC** | [Terraform](https://www.terraform.io/) | BSL 1.1 | >= 1.5 | Infrastructure provisioning, config templating |
-| **Provisioning** | [cloud-init](https://cloudinit.readthedocs.io/) | Apache 2.0 | default | First-boot VM automation |
-| **Hypervisor** | [Hyper-V](https://learn.microsoft.com/en-us/virtualization/hyper-v-on-windows/) | Windows | Win 11 Pro | Virtual machine hosting (included in Windows Pro/Enterprise) |
+| **IaC** | [Terraform](https://www.terraform.io/) | BSL 1.1 | >= 1.5 | Infrastructure provisioning, config templating (Hyper-V path) |
+| **Provisioning** | [cloud-init](https://cloudinit.readthedocs.io/) | Apache 2.0 | default | First-boot VM automation (Hyper-V path) |
+| **Hypervisor** | [Hyper-V](https://learn.microsoft.com/en-us/virtualization/hyper-v-on-windows/) | Windows | Win 11 Pro | VM hosting (Hyper-V path) |
+| **WSL2** | [Windows Subsystem for Linux](https://learn.microsoft.com/en-us/windows/wsl/) | Windows | Win 11 22H2+ | Lightweight Linux runtime (WSL2 path, native GPU support) |
 | **Audit** | [Langfuse](https://langfuse.com/) | MIT | callback | LLM observability, prompt logging, cost tracking |
-| **Guest OS** | [Ubuntu](https://ubuntu.com/) | FOSS | 24.04 LTS | Server operating system |
+| **Guest OS** | [Ubuntu](https://ubuntu.com/) | FOSS | 24.04 LTS | Server operating system (both paths) |
 
 ### Why These Technologies?
 
@@ -277,8 +294,16 @@ All components are **free and open-source software (FOSS)**:
 | Nginx        - Industry standard for TLS termination             |
 |              - WebSocket support (streaming responses)           |
 |                                                                  |
+| Ollama       - Run open-source LLMs locally (no API costs)       |
+|              - Qwen 2.5 models for coding and general use        |
+|              - Native GPU acceleration via WSL2 or Hyper-V DDA   |
+|                                                                  |
 | Hyper-V      - Built into Windows Pro/Enterprise (no cost)       |
 |              - IT departments already have Hyper-V expertise     |
+|                                                                  |
+| WSL2         - Zero-config deployment (one PowerShell script)    |
+|              - Native GPU passthrough (no DDA setup needed)      |
+|              - Ideal for developers and evaluation               |
 +------------------------------------------------------------------+
 ```
 
@@ -307,7 +332,7 @@ organizations that want AI capabilities without cloud dependencies.
 |  +--------------------------------------------+  |
 |  | Ubuntu 24.04 LTS VM                        |  |
 |  |   - Gen 2 (UEFI + Secure Boot)            |  |
-|  |   - 4 vCPU, 8 GB RAM, 80 GB disk          |  |
+|  |   - 8 vCPU, 32 GB RAM, 80 GB disk         |  |
 |  |   - Internal switch + NAT (isolated)       |  |
 |  |   - SSH key-only access                    |  |
 |  +--------------------------------------------+  |
@@ -358,7 +383,7 @@ organizations that want AI capabilities without cloud dependencies.
 | Team membership | User-to-team assignments |
 | Audit logs | Historical record of API calls |
 
-- **Volume:** `/opt/claude-wrapper/data/postgres` (persistent across restarts)
+- **Volume:** `/opt/InsideLLM/data/postgres` (persistent across restarts)
 - **Health check:** `pg_isready -U litellm` every 10s
 - **Not exposed** to host network -- internal access only
 
@@ -373,7 +398,7 @@ organizations that want AI capabilities without cloud dependencies.
 | Session data | Temporary session state |
 
 - **Memory:** Capped at 256 MB with LRU eviction
-- **Volume:** `/opt/claude-wrapper/data/redis` (persistence for cache warmth)
+- **Volume:** `/opt/InsideLLM/data/redis` (persistence for cache warmth)
 - **Health check:** `redis-cli ping` every 10s
 
 ### LiteLLM Proxy
@@ -778,6 +803,134 @@ entire request before RAG or Claude ever see the file contents.
 
 ---
 
+## 7b. Local LLM Support (Ollama)
+
+InsideLLM can optionally run local open-source models alongside the Anthropic API
+using [Ollama](https://ollama.com). This keeps all inference on-premises with no
+external API calls for the local models.
+
+### Enabled by Default
+
+Ollama is enabled by default with two models (`qwen2.5-coder:14b` and `qwen2.5:14b`).
+The VM defaults (8 vCPU, 32 GB RAM) are sized accordingly.
+
+To customize the models, set `ollama_models` in your `terraform.tfvars`:
+
+```hcl
+ollama_models = ["qwen2.5-coder:14b", "llama3.1:8b", "qwen2.5:14b"]
+```
+
+### Disabling Ollama (lighter deployment)
+
+If you only need the Anthropic API models and want a smaller VM footprint:
+
+```hcl
+# Disable Ollama
+ollama_enable = false
+
+# Reduce VM resources
+vm_processor_count      = 4
+vm_memory_startup_bytes = 8589934592    # 8 GB (down from 32 GB)
+```
+
+This cuts the VM memory requirement from 32 GB to 8 GB and halves the CPU allocation.
+
+### How It Works
+
+When enabled, Terraform adds two containers to the stack:
+
+| Container | Purpose |
+|-----------|---------|
+| `claude-ollama` | Ollama inference server (port 11434) |
+| `claude-ollama-pull` | One-shot sidecar that pulls the configured models on first boot |
+
+LiteLLM automatically gets routes for each model (e.g., `ollama/qwen2.5-coder:14b`),
+so they appear in the Open WebUI model dropdown and are accessible via the API.
+
+### Architecture
+
+```
+Users --> Open WebUI --> LiteLLM --> Anthropic API (Claude models)
+                                \-> Ollama :11434  (local models)
+```
+
+All containers share the `claude-internal` Docker network. LiteLLM reaches
+Ollama at `http://ollama:11434`.
+
+### GPU Support
+
+#### WSL2 (recommended for GPU)
+
+WSL2 provides **native GPU access** via GPU paravirtualization (GPU-PV). CUDA
+and DirectML work out of the box -- just install the standard NVIDIA Windows
+driver on the host. No extra configuration is needed inside WSL2.
+
+To enable GPU in the WSL2 deployment:
+
+```powershell
+.\Install-InsideLLM-WSL.ps1 -AnthropicApiKey "sk-ant-..." -OllamaGpu $true
+```
+
+This is the **recommended path for GPU-accelerated local models**.
+
+#### Hyper-V
+
+GPU passthrough on Hyper-V is handled by a companion script (`Setup-GPU-Passthrough.ps1`)
+that runs **after** `terraform apply`. Two modes are available:
+
+| Mode | Command | Host GPU Access | Complexity |
+|------|---------|----------------|------------|
+| **GPU-PV** (default) | `.\Setup-GPU-Passthrough.ps1` | Shared (host keeps display) | Simple |
+| **DDA** | `.\Setup-GPU-Passthrough.ps1 -Mode DDA` | Exclusive (host loses GPU) | Advanced |
+
+**GPU-PV (recommended)** shares the GPU between Windows and the VM. The host
+keeps using the GPU for display while the VM gets compute access:
+
+```powershell
+# After terraform apply:
+.\Setup-GPU-Passthrough.ps1
+```
+
+**DDA (full passthrough)** exclusively assigns the GPU to the VM. The host
+loses access entirely -- ensure you have integrated graphics or a second GPU:
+
+```powershell
+.\Setup-GPU-Passthrough.ps1 -Mode DDA
+```
+
+The script automatically:
+1. Detects your NVIDIA GPU
+2. Configures the VM for GPU access (stops/starts as needed)
+3. SSHs into the VM to install `nvidia-container-toolkit`
+4. Verifies GPU visibility inside the VM
+
+To remove the GPU assignment:
+
+```powershell
+.\Setup-GPU-Passthrough.ps1 -Remove
+```
+
+After GPU setup, set `ollama_gpu = true` in `terraform.tfvars` and redeploy,
+or edit `/opt/InsideLLM/docker-compose.yml` directly.
+
+**WSL2 is still the simpler path for GPU** -- it requires zero extra setup.
+
+Without GPU, models run on CPU (slower but functional for smaller models like Qwen 2.5 14B).
+
+### VM Sizing Guide
+
+| Deployment | vCPU | RAM | Disk | Notes |
+|------------|------|-----|------|-------|
+| **With Ollama (default)** | 8 | 32 GB | 80 GB | Two local models + Anthropic API |
+| **Without Ollama** | 4 | 8 GB | 80 GB | Anthropic API only |
+| **With Ollama + GPU** | 8 | 16 GB | 80 GB | GPU handles inference; less RAM needed |
+
+Each Ollama model consumes ~2-5 GB of RAM when loaded. The 32 GB default provides
+headroom for two models running concurrently alongside the rest of the stack
+(PostgreSQL, Redis, LiteLLM, Open WebUI, Nginx).
+
+---
+
 ## 8. Identity & Access Management
 
 ### Authentication Layers
@@ -1059,12 +1212,19 @@ automatically via LiteLLM's built-in alerting system.
 
 ## 11. Deployment & Operations
 
+### Setup Wizard (Recommended)
+
+Open **`Setup.html`** in your browser for a guided, step-by-step configuration wizard.
+It walks you through all deployment options and generates the config file
+(`terraform.tfvars` or PowerShell command) ready to download. No command-line
+knowledge needed to configure -- just fill in the form and click Download.
+
 ### Prerequisites
 
 | Requirement | Details |
 |-------------|---------|
 | Windows 11 Pro or Server 2022+ | Hyper-V capable |
-| 16 GB+ host RAM | 8 GB for VM + headroom |
+| 48 GB+ host RAM | 32 GB for VM + headroom (16 GB+ sufficient without Ollama) |
 | 100 GB+ free disk | VM disk + images |
 | Terraform >= 1.5 | IaC tool |
 | WSL2 | For genisoimage (cloud-init ISO creation) |
@@ -1091,7 +1251,7 @@ terraform apply tfplan
 The stack is configured as a **systemd service** on the VM:
 
 ```
- VM Boot -> systemd -> claude-wrapper.service -> docker compose up -d
+ VM Boot -> systemd -> InsideLLM.service -> docker compose up -d
 ```
 
 All containers have `restart: always`, so individual container crashes
@@ -1113,7 +1273,7 @@ so updating to the newest versions is straightforward.
 ssh claude-admin@<vm-ip>
 
 # Pull latest images and recreate containers
-cd /opt/claude-wrapper
+cd /opt/InsideLLM
 sudo docker compose pull
 sudo docker compose up -d
 ```
@@ -1138,7 +1298,7 @@ sudo docker compose up -d open-webui
 **Important notes:**
 
 - **Data is preserved** -- PostgreSQL, Redis, and Open WebUI data live on
-  Docker volumes (`/opt/claude-wrapper/data/`), so container recreation
+  Docker volumes (`/opt/InsideLLM/data/`), so container recreation
   does not lose data
 - **Configuration is preserved** -- config files are bind-mounted from the
   host filesystem, not baked into images
@@ -1147,7 +1307,7 @@ sudo docker compose up -d open-webui
 - **Downtime** -- expect 30-60 seconds of downtime while containers restart.
   Services with health checks will wait for dependencies before starting
 - **Rollback** -- if an update causes issues, you can pin a specific image
-  version in `/opt/claude-wrapper/docker-compose.yml` (e.g.,
+  version in `/opt/InsideLLM/docker-compose.yml` (e.g.,
   `ghcr.io/open-webui/open-webui:v0.5.10`) and recreate
 
 **Verify after update:**
@@ -1201,6 +1361,93 @@ InternalClaude/
     +-- docker-compose.yml.tpl          # All 5 services definition
     +-- post-deploy.sh.tpl              # Team creation, systemd setup
 ```
+
+---
+
+## 11a. WSL2 Deployment (Alternative)
+
+For a lighter-weight deployment without Terraform or Hyper-V, InsideLLM can run
+entirely inside WSL2 on Windows 11. This deploys the same Docker containers and
+configuration as the Hyper-V path.
+
+### When to Use WSL2 vs Hyper-V
+
+| | WSL2 | Hyper-V (Terraform) |
+|--|------|---------------------|
+| **Best for** | Developer workstations, evaluation, small teams | Production, shared servers, multi-VM hosts |
+| **Prerequisites** | Windows 11 22H2+, no Terraform needed | Windows Pro/Server, Terraform, Hyper-V |
+| **Setup time** | ~5 minutes (one script) | ~15 minutes (Terraform plan/apply) |
+| **Isolation** | Shared kernel with Windows | Full VM isolation |
+| **GPU support** | Native GPU-PV (just install Windows NVIDIA driver) | Requires manual DDA setup (advanced) |
+| **Networking** | WSL2 dynamic IP (refreshed via scheduled task) | Static IP on Hyper-V internal switch |
+| **Resource control** | `.wslconfig` limits | Terraform variables (CPU, RAM, disk) |
+
+### Prerequisites
+
+| Requirement | Notes |
+|-------------|-------|
+| Windows 11 22H2+ | WSL2 with systemd support |
+| 16 GB+ RAM (without Ollama) or 48 GB+ (with Ollama) | Same as Hyper-V path |
+| Anthropic API key | From https://console.anthropic.com |
+
+### Quick Start
+
+```powershell
+# Run as Administrator
+.\Install-InsideLLM-WSL.ps1 -AnthropicApiKey "sk-ant-api03-..."
+```
+
+That's it. The script handles WSL2 installation, Docker setup, config generation,
+container deployment, and port forwarding automatically.
+
+### Disabling Ollama for a lighter deployment
+
+```powershell
+.\Install-InsideLLM-WSL.ps1 -AnthropicApiKey "sk-ant-..." -EnableOllama $false
+```
+
+### All Parameters
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `AnthropicApiKey` | *(required)* | Anthropic API key |
+| `EnableOllama` | `$true` | Enable local Ollama models |
+| `OllamaModels` | `qwen2.5-coder:14b, qwen2.5:14b` | Models to pull |
+| `EnableHaiku` | `$true` | Include Claude Haiku |
+| `EnableOpus` | `$true` | Include Claude Opus |
+| `GlobalMaxBudget` | `100` | Monthly budget (USD) |
+| `DefaultUserBudget` | `5.0` | Daily per-user budget (USD) |
+| `SsoProvider` | `none` | SSO: `none`, `azure_ad`, or `okta` |
+| `Hostname` | `InsideLLM` | Hostname for TLS cert |
+| `Domain` | `local` | Domain for FQDN |
+| `Uninstall` | *(switch)* | Remove everything |
+| `SkipPortForwarding` | *(switch)* | Skip netsh/firewall rules |
+
+### Known Limitations
+
+- **WSL2 IP changes on restart** -- a scheduled task automatically refreshes port
+  forwarding rules on login. If LAN access breaks after a reboot, run
+  `.\Install-InsideLLM-WSL.ps1 -AnthropicApiKey "..." -SkipPortForwarding:$false`
+  to refresh manually.
+- **Shared kernel** -- WSL2 shares the Windows kernel, so it is less isolated
+  than a full Hyper-V VM. For production or compliance-sensitive environments,
+  use the Hyper-V path.
+- **Memory** -- WSL2 can consume more host memory than expected. Add a
+  `C:\Users\<you>\.wslconfig` to set limits:
+  ```ini
+  [wsl2]
+  memory=8GB        # Without Ollama
+  # memory=32GB     # With Ollama
+  ```
+
+### Uninstall
+
+```powershell
+.\Install-InsideLLM-WSL.ps1 -Uninstall
+```
+
+This removes all containers, configs, port forwarding rules, and firewall rules.
+The WSL2 distro itself is preserved (remove it with `wsl --unregister Ubuntu-24.04`).
 
 ---
 

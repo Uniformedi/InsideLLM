@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>InsideLLM &mdash; Deployment Setup Wizard</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #eef1f5; color: #1a202c; line-height: 1.7; font-size: 16px;
+    }
+
+    .hero {
+      background: linear-gradient(135deg, #1e3a5f, #2c5282, #2b6cb0);
+      padding: 40px 40px; text-align: center; border-bottom: 3px solid #2b6cb0;
+    }
+    .hero h1 { font-size: 2.4em; font-weight: 700; color: #fff; margin-bottom: 6px; }
+    .hero .subtitle { font-size: 1.1em; color: #cbd5e0; }
+
+    .container { max-width: 820px; margin: 0 auto; padding: 30px 40px 60px; }
+
+    /* Progress bar */
+    .progress { display: flex; gap: 4px; margin-bottom: 36px; }
+    .progress-step {
+      flex: 1; height: 6px; background: #cbd5e0; border-radius: 3px; transition: background 0.3s;
+    }
+    .progress-step.active { background: #2b6cb0; }
+    .progress-step.done { background: #38a169; }
+
+    /* Steps */
+    .step { display: none; }
+    .step.active { display: block; }
+    .step h2 {
+      font-size: 1.5em; color: #1a202c; margin-bottom: 4px;
+      padding-bottom: 10px; border-bottom: 2px solid #cbd5e0;
+    }
+    .step h2 .step-num {
+      background: #2b6cb0; color: #fff; width: 32px; height: 32px; border-radius: 50%;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 0.65em; margin-right: 8px; vertical-align: middle;
+    }
+    .step p.desc { color: #4a5568; margin: 8px 0 20px; font-size: 0.95em; }
+
+    /* Form elements */
+    .field { margin-bottom: 18px; }
+    .field label {
+      display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.92em;
+    }
+    .field label .required { color: #e53e3e; }
+    .field .hint { font-size: 0.82em; color: #718096; margin-bottom: 4px; }
+    .field input[type="text"], .field input[type="number"], .field select {
+      width: 100%; padding: 10px 14px; border: 1px solid #cbd5e0; border-radius: 6px;
+      font-size: 0.95em; background: #fff; transition: border-color 0.2s;
+    }
+    .field input:focus, .field select:focus { outline: none; border-color: #2b6cb0; box-shadow: 0 0 0 2px rgba(43,108,176,0.15); }
+    .field input.error { border-color: #e53e3e; }
+    .field .error-msg { color: #e53e3e; font-size: 0.82em; margin-top: 2px; display: none; }
+
+    .row { display: flex; gap: 16px; }
+    .row .field { flex: 1; }
+
+    .toggle-group { display: flex; gap: 0; margin-bottom: 18px; }
+    .toggle-group label {
+      flex: 1; text-align: center; padding: 12px 16px; border: 1px solid #cbd5e0;
+      cursor: pointer; font-weight: 600; font-size: 0.92em; background: #fff;
+      transition: all 0.2s;
+    }
+    .toggle-group label:first-child { border-radius: 6px 0 0 6px; }
+    .toggle-group label:last-child { border-radius: 0 6px 6px 0; }
+    .toggle-group input { display: none; }
+    .toggle-group input:checked + span { color: #fff; }
+    .toggle-group label.selected { background: #2b6cb0; color: #fff; border-color: #2b6cb0; }
+
+    .switch-row { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+    .switch { position: relative; width: 44px; height: 24px; flex-shrink: 0; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .switch .slider {
+      position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+      background: #cbd5e0; border-radius: 24px; transition: 0.3s;
+    }
+    .switch .slider::before {
+      content: ""; position: absolute; height: 18px; width: 18px; left: 3px; bottom: 3px;
+      background: #fff; border-radius: 50%; transition: 0.3s;
+    }
+    .switch input:checked + .slider { background: #38a169; }
+    .switch input:checked + .slider::before { transform: translateX(20px); }
+    .switch-label { font-weight: 600; font-size: 0.92em; }
+    .switch-hint { font-size: 0.82em; color: #718096; }
+
+    .conditional { margin-left: 54px; margin-bottom: 18px; display: none; }
+    .conditional.visible { display: block; }
+
+    /* Buttons */
+    .btn-row { display: flex; justify-content: space-between; margin-top: 30px; }
+    .btn {
+      padding: 12px 28px; border: none; border-radius: 6px; font-size: 0.95em;
+      font-weight: 600; cursor: pointer; transition: all 0.2s;
+    }
+    .btn-primary { background: #2b6cb0; color: #fff; }
+    .btn-primary:hover { background: #2c5282; }
+    .btn-secondary { background: #e2e8f0; color: #2d3748; }
+    .btn-secondary:hover { background: #cbd5e0; }
+    .btn-success { background: #38a169; color: #fff; font-size: 1.05em; padding: 14px 32px; }
+    .btn-success:hover { background: #2f855a; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Output */
+    .output-box {
+      background: #1a202c; color: #a0aec0; border-radius: 8px; padding: 20px;
+      font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+      font-size: 0.85em; white-space: pre-wrap; overflow-x: auto;
+      max-height: 400px; overflow-y: auto; margin: 16px 0;
+      border: 1px solid #2d3748;
+    }
+    .output-box .comment { color: #718096; }
+    .output-box .key { color: #63b3ed; }
+    .output-box .value { color: #68d391; }
+    .output-box .string { color: #fc8181; }
+
+    .next-steps { background: #dce8f7; border-left: 4px solid #2b6cb0; border-radius: 0 8px 8px 0; padding: 20px 24px; margin: 20px 0; }
+    .next-steps h3 { color: #2b6cb0; margin-bottom: 10px; }
+    .next-steps ol { margin-left: 20px; }
+    .next-steps li { margin: 8px 0; }
+    .next-steps code { background: #bee3f8; padding: 2px 6px; border-radius: 3px; font-size: 0.9em; }
+    .next-steps .warn { background: #fefcbf; border-left-color: #d69e2e; }
+
+    .info-box { background: #ebf8ff; border: 1px solid #90cdf4; border-radius: 6px; padding: 14px 18px; margin: 12px 0; font-size: 0.9em; }
+    .warn-box { background: #fffff0; border: 1px solid #ecc94b; border-radius: 6px; padding: 14px 18px; margin: 12px 0; font-size: 0.9em; }
+  </style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>InsideLLM Setup Wizard</h1>
+  <div class="subtitle">Configure your deployment in a few steps, then download the config file.</div>
+</div>
+
+<div class="container">
+  <div class="progress" id="progress"></div>
+
+  <!-- ============================================================ -->
+  <!-- STEP 1: Deployment Path                                       -->
+  <!-- ============================================================ -->
+  <div class="step active" data-step="1">
+    <h2><span class="step-num">1</span> Deployment Path</h2>
+    <p class="desc">Choose how you want to run InsideLLM.</p>
+
+    <div class="toggle-group" id="deployToggle">
+      <label class="selected" onclick="selectDeploy('wsl2')">
+        <input type="radio" name="deployPath" value="wsl2" checked><span>WSL2</span>
+        <div style="font-weight:400;font-size:0.82em;margin-top:4px;color:inherit;opacity:0.85">
+          One script, no Terraform<br>Native GPU support<br>Best for developers
+        </div>
+      </label>
+      <label onclick="selectDeploy('hyperv')">
+        <input type="radio" name="deployPath" value="hyperv"><span>Hyper-V (Terraform)</span>
+        <div style="font-weight:400;font-size:0.82em;margin-top:4px;color:inherit;opacity:0.85">
+          Full VM isolation<br>Static networking<br>Best for production
+        </div>
+      </label>
+    </div>
+
+    <div class="info-box" id="deployInfo">
+      <strong>WSL2</strong> is the fastest way to get started. It runs Ubuntu 24.04 inside Windows
+      with native GPU support. No Terraform, Hyper-V, or separate VM needed.
+    </div>
+
+    <div class="btn-row"><div></div><button class="btn btn-primary" onclick="nextStep()">Next</button></div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- STEP 2: API Key & Secrets                                     -->
+  <!-- ============================================================ -->
+  <div class="step" data-step="2">
+    <h2><span class="step-num">2</span> API Key &amp; Secrets</h2>
+    <p class="desc">Your Anthropic API key is required. Other secrets are auto-generated if left blank.</p>
+
+    <div class="field">
+      <label>Anthropic API Key <span class="required">*</span></label>
+      <div class="hint">From <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a></div>
+      <input type="text" id="anthropicApiKey" placeholder="sk-ant-api03-..." required>
+      <div class="error-msg" id="apiKeyError">API key is required</div>
+    </div>
+
+    <div class="field">
+      <label>LiteLLM Master Key</label>
+      <div class="hint">Leave blank to auto-generate. Used for admin access and API authentication.</div>
+      <input type="text" id="litellmMasterKey" placeholder="Auto-generated if empty">
+    </div>
+
+    <div class="field" id="postgresField">
+      <label>PostgreSQL Password</label>
+      <div class="hint">Leave blank to auto-generate.</div>
+      <input type="text" id="postgresPassword" placeholder="Auto-generated if empty">
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="prevStep()">Back</button>
+      <button class="btn btn-primary" onclick="validateStep2() && nextStep()">Next</button>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- STEP 3: Models & Ollama                                       -->
+  <!-- ============================================================ -->
+  <div class="step" data-step="3">
+    <h2><span class="step-num">3</span> Models &amp; Local LLM</h2>
+    <p class="desc">Configure which Claude models to enable and whether to run local models via Ollama.</p>
+
+    <h3 style="font-size:1.1em;color:#2b6cb0;margin:16px 0 10px">Anthropic Models</h3>
+
+    <div class="switch-row">
+      <label class="switch"><input type="checkbox" id="enableSonnet" checked disabled><span class="slider"></span></label>
+      <div><span class="switch-label">Claude Sonnet</span><div class="switch-hint">Default model (always enabled)</div></div>
+    </div>
+    <div class="switch-row">
+      <label class="switch"><input type="checkbox" id="enableHaiku" checked><span class="slider"></span></label>
+      <div><span class="switch-label">Claude Haiku</span><div class="switch-hint">Cheapest tier, fast responses</div></div>
+    </div>
+    <div class="switch-row">
+      <label class="switch"><input type="checkbox" id="enableOpus" checked><span class="slider"></span></label>
+      <div><span class="switch-label">Claude Opus</span><div class="switch-hint">Most capable, complex reasoning</div></div>
+    </div>
+
+    <h3 style="font-size:1.1em;color:#2b6cb0;margin:24px 0 10px">Local Models (Ollama)</h3>
+
+    <div class="switch-row">
+      <label class="switch"><input type="checkbox" id="enableOllama" checked onchange="toggleOllama()"><span class="slider"></span></label>
+      <div><span class="switch-label">Enable Ollama</span><div class="switch-hint">Run open-source LLMs locally (requires 32 GB RAM)</div></div>
+    </div>
+
+    <div class="conditional visible" id="ollamaOptions">
+      <div class="field">
+        <label>Models to Pull</label>
+        <div class="hint">Comma-separated Ollama model tags</div>
+        <input type="text" id="ollamaModels" value="qwen2.5-coder:14b, qwen2.5:14b">
+      </div>
+      <div class="switch-row">
+        <label class="switch"><input type="checkbox" id="ollamaGpu" onchange="toggleGpuInfo()"><span class="slider"></span></label>
+        <div><span class="switch-label">GPU Acceleration</span><div class="switch-hint" id="gpuHint">Uses NVIDIA GPU for faster inference</div></div>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="prevStep()">Back</button>
+      <button class="btn btn-primary" onclick="nextStep()">Next</button>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- STEP 4: Budget & Rate Limiting                                -->
+  <!-- ============================================================ -->
+  <div class="step" data-step="4">
+    <h2><span class="step-num">4</span> Budget &amp; Rate Limits</h2>
+    <p class="desc">Control API spending and usage limits.</p>
+
+    <div class="field">
+      <label>Global Monthly Budget (USD)</label>
+      <div class="hint">Maximum total spend across all users per month. 0 = unlimited.</div>
+      <input type="number" id="globalMaxBudget" value="100" min="0">
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label>Per-User Daily Budget (USD)</label>
+        <input type="number" id="defaultUserBudget" value="5" min="0" step="0.5">
+      </div>
+      <div class="field">
+        <label>Per-User RPM</label>
+        <div class="hint">Requests per minute</div>
+        <input type="number" id="defaultUserRpm" value="30" min="1">
+      </div>
+      <div class="field">
+        <label>Per-User TPM</label>
+        <div class="hint">Tokens per minute</div>
+        <input type="number" id="defaultUserTpm" value="100000" min="1000" step="1000">
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="prevStep()">Back</button>
+      <button class="btn btn-primary" onclick="nextStep()">Next</button>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- STEP 5: Network & Identity                                    -->
+  <!-- ============================================================ -->
+  <div class="step" data-step="5">
+    <h2><span class="step-num">5</span> Network &amp; Identity</h2>
+    <p class="desc">Configure hostname, TLS, and SSO.</p>
+
+    <div class="row">
+      <div class="field">
+        <label>Hostname</label>
+        <input type="text" id="hostname" value="InsideLLM">
+      </div>
+      <div class="field">
+        <label>Domain</label>
+        <input type="text" id="domain" value="local">
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Owner / Organization</label>
+      <input type="text" id="owner" value="Your Company Name">
+    </div>
+
+    <!-- Hyper-V specific fields -->
+    <div id="hypervNetworkFields" style="display:none">
+      <h3 style="font-size:1.1em;color:#2b6cb0;margin:20px 0 10px">Hyper-V Network</h3>
+      <div class="row">
+        <div class="field">
+          <label>VM Static IP</label>
+          <input type="text" id="vmStaticIp" value="192.168.100.10/24">
+        </div>
+        <div class="field">
+          <label>Gateway</label>
+          <input type="text" id="vmGateway" value="192.168.100.1">
+        </div>
+      </div>
+      <div class="field">
+        <label>DNS Servers</label>
+        <div class="hint">Comma-separated</div>
+        <input type="text" id="vmDns" value="8.8.8.8, 1.1.1.1">
+      </div>
+      <div class="row">
+        <div class="field">
+          <label>SSH Admin User</label>
+          <input type="text" id="sshAdminUser" value="claude-admin">
+        </div>
+        <div class="field">
+          <label>SSH Public Key Path</label>
+          <input type="text" id="sshPublicKeyPath" value="~/.ssh/id_rsa.pub">
+        </div>
+      </div>
+    </div>
+
+    <h3 style="font-size:1.1em;color:#2b6cb0;margin:20px 0 10px">SSO Provider</h3>
+    <div class="field">
+      <select id="ssoProvider" onchange="toggleSso()">
+        <option value="none">None (local authentication only)</option>
+        <option value="azure_ad">Azure AD (Entra ID)</option>
+        <option value="okta">Okta</option>
+      </select>
+    </div>
+
+    <div id="azureFields" style="display:none">
+      <div class="field"><label>Azure AD Client ID</label><input type="text" id="azureClientId"></div>
+      <div class="field"><label>Azure AD Client Secret</label><input type="text" id="azureClientSecret"></div>
+      <div class="field"><label>Azure AD Tenant ID</label><input type="text" id="azureTenantId"></div>
+    </div>
+    <div id="oktaFields" style="display:none">
+      <div class="field"><label>Okta Client ID</label><input type="text" id="oktaClientId"></div>
+      <div class="field"><label>Okta Client Secret</label><input type="text" id="oktaClientSecret"></div>
+      <div class="field"><label>Okta Domain</label><input type="text" id="oktaDomain" placeholder="your-org.okta.com"></div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="prevStep()">Back</button>
+      <button class="btn btn-primary" onclick="nextStep()">Next</button>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- STEP 6: Hyper-V VM Settings (conditional)                     -->
+  <!-- ============================================================ -->
+  <div class="step" data-step="6" id="stepHypervVm">
+    <h2><span class="step-num">6</span> VM Configuration</h2>
+    <p class="desc">Hyper-V virtual machine sizing and paths.</p>
+
+    <div class="row">
+      <div class="field">
+        <label>vCPUs</label>
+        <input type="number" id="vmCpus" value="8" min="2">
+      </div>
+      <div class="field">
+        <label>RAM (GB)</label>
+        <input type="number" id="vmRamGb" value="32" min="4">
+      </div>
+      <div class="field">
+        <label>Disk (GB)</label>
+        <input type="number" id="vmDiskGb" value="80" min="40">
+      </div>
+    </div>
+
+    <div class="info-box" id="vmSizeHint">
+      <strong>With Ollama (default):</strong> 8 vCPU, 32 GB RAM recommended.<br>
+      <strong>Without Ollama:</strong> 4 vCPU, 8 GB RAM is sufficient.
+    </div>
+
+    <div class="field">
+      <label>VM Path</label>
+      <input type="text" id="vmPath" value="C:\HyperV\VMs">
+    </div>
+    <div class="field">
+      <label>VHD Path</label>
+      <input type="text" id="vhdPath" value="C:\HyperV\VHDs">
+    </div>
+    <div class="field">
+      <label>Ubuntu VHDX Source</label>
+      <input type="text" id="ubuntuVhdx" value="C:\HyperV\Images\ubuntu-24.04-cloudimg-amd64.vhdx">
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label>Hyper-V Admin User</label>
+        <input type="text" id="hypervUser" value=".\Administrator">
+      </div>
+      <div class="field">
+        <label>Hyper-V Admin Password</label>
+        <input type="text" id="hypervPassword" placeholder="Your Windows admin password">
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="prevStep()">Back</button>
+      <button class="btn btn-primary" onclick="nextStep()">Next</button>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- STEP 7: Review & Download                                     -->
+  <!-- ============================================================ -->
+  <div class="step" data-step="7">
+    <h2><span class="step-num" id="reviewStepNum">7</span> Review &amp; Download</h2>
+    <p class="desc">Review your configuration, download the file, then follow the remaining steps.</p>
+
+    <div id="outputContainer">
+      <h3 style="font-size:1.1em;color:#2b6cb0;margin:16px 0 8px" id="outputLabel">Generated Configuration</h3>
+      <div class="output-box" id="outputBox"></div>
+      <div style="display:flex;gap:12px;margin-top:12px">
+        <button class="btn btn-success" id="downloadBtn" onclick="downloadConfig()">Download Config File</button>
+        <button class="btn btn-secondary" onclick="copyConfig()">Copy to Clipboard</button>
+      </div>
+    </div>
+
+    <div class="next-steps" id="nextSteps"></div>
+
+    <div class="warn-box" id="adminWarn" style="display:none">
+      <strong>Important:</strong> Several steps require running PowerShell as Administrator.
+      Right-click PowerShell and select "Run as administrator".
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="prevStep()">Back</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ================================================================
+// State
+// ================================================================
+let currentStep = 1;
+let deployPath = 'wsl2';
+const totalStepsHyperv = 7;
+const totalStepsWsl2 = 6; // skip VM config step
+
+function getTotalSteps() { return deployPath === 'hyperv' ? totalStepsHyperv : totalStepsWsl2; }
+
+// ================================================================
+// Navigation
+// ================================================================
+function updateProgress() {
+  const total = getTotalSteps();
+  const bar = document.getElementById('progress');
+  bar.innerHTML = '';
+  for (let i = 1; i <= total; i++) {
+    const div = document.createElement('div');
+    div.className = 'progress-step' + (i < currentStep ? ' done' : '') + (i === currentStep ? ' active' : '');
+    bar.appendChild(div);
+  }
+}
+
+function showStep(n) {
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+
+  // Map logical step to actual step element
+  let targetStep = n;
+  if (deployPath === 'wsl2' && n >= 6) {
+    targetStep = 7; // skip step 6 (VM config), go to review
+  }
+
+  const el = document.querySelector(`.step[data-step="${targetStep}"]`);
+  if (el) el.classList.add('active');
+
+  // Update review step number display
+  if (targetStep === 7) {
+    document.getElementById('reviewStepNum').textContent = getTotalSteps();
+    generateOutput();
+  }
+
+  updateProgress();
+}
+
+function nextStep() {
+  const total = getTotalSteps();
+  if (currentStep < total) {
+    currentStep++;
+    showStep(currentStep);
+  }
+}
+
+function prevStep() {
+  if (currentStep > 1) {
+    currentStep--;
+    showStep(currentStep);
+  }
+}
+
+// ================================================================
+// Deployment path toggle
+// ================================================================
+function selectDeploy(path) {
+  deployPath = path;
+  document.querySelectorAll('#deployToggle label').forEach(l => l.classList.remove('selected'));
+  event.currentTarget.classList.add('selected');
+
+  const info = document.getElementById('deployInfo');
+  const hvFields = document.getElementById('hypervNetworkFields');
+
+  if (path === 'wsl2') {
+    info.innerHTML = '<strong>WSL2</strong> is the fastest way to get started. It runs Ubuntu 24.04 inside Windows with native GPU support. No Terraform, Hyper-V, or separate VM needed.';
+    hvFields.style.display = 'none';
+  } else {
+    info.innerHTML = '<strong>Hyper-V</strong> provides full VM isolation with a static IP. Ideal for production deployments and shared servers. Requires Terraform and Windows Pro/Server.';
+    hvFields.style.display = 'block';
+  }
+  updateProgress();
+}
+
+// ================================================================
+// Toggles
+// ================================================================
+function toggleOllama() {
+  const on = document.getElementById('enableOllama').checked;
+  document.getElementById('ollamaOptions').classList.toggle('visible', on);
+  // Update VM RAM hint
+  if (document.getElementById('vmRamGb')) {
+    document.getElementById('vmRamGb').value = on ? 32 : 8;
+    document.getElementById('vmCpus').value = on ? 8 : 4;
+  }
+}
+
+function toggleGpuInfo() {
+  const on = document.getElementById('ollamaGpu').checked;
+  const hint = document.getElementById('gpuHint');
+  if (deployPath === 'wsl2') {
+    hint.textContent = on ? 'WSL2 has native GPU support - just install the Windows NVIDIA driver' : 'Uses NVIDIA GPU for faster inference';
+  } else {
+    hint.textContent = on ? 'Requires Setup-GPU-Passthrough.ps1 after deployment' : 'Uses NVIDIA GPU for faster inference';
+  }
+}
+
+function toggleSso() {
+  const val = document.getElementById('ssoProvider').value;
+  document.getElementById('azureFields').style.display = val === 'azure_ad' ? 'block' : 'none';
+  document.getElementById('oktaFields').style.display = val === 'okta' ? 'block' : 'none';
+}
+
+// ================================================================
+// Validation
+// ================================================================
+function validateStep2() {
+  const key = document.getElementById('anthropicApiKey').value.trim();
+  const input = document.getElementById('anthropicApiKey');
+  const err = document.getElementById('apiKeyError');
+  if (!key) {
+    input.classList.add('error');
+    err.style.display = 'block';
+    return false;
+  }
+  input.classList.remove('error');
+  err.style.display = 'none';
+  return true;
+}
+
+// ================================================================
+// Value helpers
+// ================================================================
+function v(id) { return document.getElementById(id).value.trim(); }
+function checked(id) { return document.getElementById(id).checked; }
+
+function getOllamaModels() {
+  return v('ollamaModels').split(',').map(s => s.trim()).filter(s => s);
+}
+
+// ================================================================
+// Generate output
+// ================================================================
+function generateOutput() {
+  if (deployPath === 'hyperv') {
+    generateTfvars();
+  } else {
+    generateWsl2Command();
+  }
+  generateNextSteps();
+}
+
+function generateTfvars() {
+  const sso = v('ssoProvider');
+  const models = getOllamaModels();
+  const ollamaEnabled = checked('enableOllama');
+  const ramBytes = parseInt(v('vmRamGb')) * 1073741824;
+  const diskBytes = parseInt(v('vmDiskGb')) * 1073741824;
+
+  let out = `# =========================================================================
+# InsideLLM - terraform.tfvars
+# Generated by Setup Wizard on ${new Date().toISOString().split('T')[0]}
+# =========================================================================
+
+# Hyper-V Host
+hyperv_user     = "${v('hypervUser')}"
+hyperv_password = "${v('hypervPassword')}"
+hyperv_host     = "127.0.0.1"
+hyperv_port     = 5985
+hyperv_https    = false
+hyperv_insecure = true
+
+# Anthropic API
+anthropic_api_key = "${v('anthropicApiKey')}"
+
+# VM Configuration
+vm_name              = "InsideLLM"
+vm_processor_count   = ${v('vmCpus')}
+vm_memory_startup_bytes = ${ramBytes}
+vm_disk_size_bytes      = ${diskBytes}
+vm_path              = "${v('vmPath').replace(/\\/g, '\\\\')}"
+vm_vhd_path          = "${v('vhdPath').replace(/\\/g, '\\\\')}"
+vm_hostname          = "${v('hostname')}"
+vm_domain            = "${v('domain')}"
+ubuntu_vhdx_source   = "${v('ubuntuVhdx').replace(/\\/g, '\\\\')}"
+
+# Network
+vm_switch_name = "InsideLLM"
+vm_switch_type = "Internal"
+vm_static_ip   = "${v('vmStaticIp')}"
+vm_gateway     = "${v('vmGateway')}"
+vm_dns_servers = [${v('vmDns').split(',').map(s => `"${s.trim()}"`).join(', ')}]
+
+# SSH
+ssh_admin_user      = "${v('sshAdminUser')}"
+ssh_public_key_path = "${v('sshPublicKeyPath').replace(/\\/g, '\\\\')}"
+
+# LiteLLM
+${v('litellmMasterKey') ? `litellm_master_key = "${v('litellmMasterKey')}"` : '# litellm_master_key = ""   # Auto-generated'}
+litellm_default_model      = "claude-sonnet"
+litellm_enable_haiku       = ${checked('enableHaiku')}
+litellm_enable_opus        = ${checked('enableOpus')}
+litellm_global_max_budget  = ${v('globalMaxBudget')}
+litellm_default_user_budget = ${v('defaultUserBudget')}
+litellm_default_user_rpm   = ${v('defaultUserRpm')}
+litellm_default_user_tpm   = ${v('defaultUserTpm')}
+
+# Database
+${v('postgresPassword') ? `postgres_password = "${v('postgresPassword')}"` : '# postgres_password = ""    # Auto-generated'}
+
+# Ollama
+ollama_enable = ${ollamaEnabled}`;
+
+  if (ollamaEnabled) {
+    out += `\nollama_models = [${models.map(m => `"${m}"`).join(', ')}]`;
+    out += `\nollama_gpu    = ${checked('ollamaGpu')}`;
+  }
+
+  // SSO
+  if (sso === 'azure_ad') {
+    out += `\n\n# SSO - Azure AD
+sso_provider          = "azure_ad"
+azure_ad_client_id    = "${v('azureClientId')}"
+azure_ad_client_secret = "${v('azureClientSecret')}"
+azure_ad_tenant_id    = "${v('azureTenantId')}"`;
+  } else if (sso === 'okta') {
+    out += `\n\n# SSO - Okta
+sso_provider       = "okta"
+okta_client_id     = "${v('oktaClientId')}"
+okta_client_secret = "${v('oktaClientSecret')}"
+okta_domain        = "${v('oktaDomain')}"`;
+  }
+
+  out += `\n\n# DLP
+dlp_enable           = true
+dlp_block_ssn        = true
+dlp_block_credit_cards = true
+dlp_block_phi        = true
+dlp_block_credentials = true
+
+environment = "production"
+owner       = "${v('owner')}"
+`;
+
+  document.getElementById('outputBox').textContent = out;
+  document.getElementById('outputLabel').textContent = 'terraform.tfvars';
+  document.getElementById('downloadBtn').textContent = 'Download terraform.tfvars';
+}
+
+function generateWsl2Command() {
+  const sso = v('ssoProvider');
+  const models = getOllamaModels();
+  const ollamaEnabled = checked('enableOllama');
+
+  let args = [];
+  args.push(`-AnthropicApiKey "${v('anthropicApiKey')}"`);
+
+  if (v('litellmMasterKey')) args.push(`-LitellmMasterKey "${v('litellmMasterKey')}"`);
+
+  if (!checked('enableHaiku')) args.push('-EnableHaiku $false');
+  if (!checked('enableOpus')) args.push('-EnableOpus $false');
+  if (!ollamaEnabled) args.push('-EnableOllama $false');
+
+  if (ollamaEnabled) {
+    const defaultModels = 'qwen2.5-coder:14b, qwen2.5:14b';
+    if (v('ollamaModels') !== defaultModels) {
+      args.push(`-OllamaModels @(${models.map(m => `"${m}"`).join(',')})`);
+    }
+    if (checked('ollamaGpu')) args.push('-OllamaGpu $true');
+  }
+
+  if (v('globalMaxBudget') !== '100') args.push(`-GlobalMaxBudget ${v('globalMaxBudget')}`);
+  if (v('defaultUserBudget') !== '5') args.push(`-DefaultUserBudget ${v('defaultUserBudget')}`);
+  if (v('defaultUserRpm') !== '30') args.push(`-DefaultUserRpm ${v('defaultUserRpm')}`);
+  if (v('defaultUserTpm') !== '100000') args.push(`-DefaultUserTpm ${v('defaultUserTpm')}`);
+
+  if (v('hostname') !== 'InsideLLM') args.push(`-Hostname "${v('hostname')}"`);
+  if (v('domain') !== 'local') args.push(`-Domain "${v('domain')}"`);
+  if (v('owner') !== 'Your Company Name') args.push(`-Owner "${v('owner')}"`);
+
+  if (sso === 'azure_ad') {
+    args.push(`-SsoProvider "azure_ad"`);
+    args.push(`-AzureAdClientId "${v('azureClientId')}"`);
+    args.push(`-AzureAdClientSecret "${v('azureClientSecret')}"`);
+    args.push(`-AzureAdTenantId "${v('azureTenantId')}"`);
+  } else if (sso === 'okta') {
+    args.push(`-SsoProvider "okta"`);
+    args.push(`-OktaClientId "${v('oktaClientId')}"`);
+    args.push(`-OktaClientSecret "${v('oktaClientSecret')}"`);
+    args.push(`-OktaDomain "${v('oktaDomain')}"`);
+  }
+
+  const cmd = `.\\Install-InsideLLM-WSL.ps1 \`\n    ${args.join(' `\n    ')}`;
+
+  let out = `# =========================================================================
+# InsideLLM - WSL2 Deployment Command
+# Generated by Setup Wizard on ${new Date().toISOString().split('T')[0]}
+#
+# Run this in PowerShell as Administrator
+# =========================================================================
+
+${cmd}
+`;
+
+  document.getElementById('outputBox').textContent = out;
+  document.getElementById('outputLabel').textContent = 'PowerShell Command';
+  document.getElementById('downloadBtn').textContent = 'Download as .ps1 Script';
+}
+
+function generateNextSteps() {
+  const el = document.getElementById('nextSteps');
+  const gpu = checked('ollamaGpu');
+  const ollama = checked('enableOllama');
+
+  if (deployPath === 'wsl2') {
+    el.innerHTML = `<h3>Next Steps</h3><ol>
+      <li>Open <strong>PowerShell as Administrator</strong></li>
+      <li>Navigate to the InsideLLM project directory:<br><code>cd ${window.location.pathname.replace(/\/[^/]*$/, '').replace(/^\/([A-Z]):/, '$1:')}</code></li>
+      <li>Run the command above (or the downloaded .ps1 file)</li>
+      <li>Wait for deployment to complete (~5 minutes, longer on first run)</li>
+      <li>Open <code>https://localhost</code> in your browser</li>
+      <li>Register your admin account (first user becomes admin)</li>
+      ${gpu ? '<li>GPU is native in WSL2 - just ensure the <strong>NVIDIA Windows driver</strong> is installed</li>' : ''}
+    </ol>`;
+  } else {
+    el.innerHTML = `<h3>Next Steps</h3><ol>
+      <li>Save the downloaded <code>terraform.tfvars</code> to the project directory</li>
+      <li>Open <strong>PowerShell as Administrator</strong> and run:<br>
+        <code>.\\Setup-Prerequisites.ps1</code><br>
+        <em>(one-time setup: enables Hyper-V, downloads Ubuntu image, configures WinRM)</em></li>
+      <li>If prompted, <strong>reboot</strong> and re-run Setup-Prerequisites.ps1</li>
+      <li>Deploy with Terraform:<br>
+        <code>terraform init</code><br>
+        <code>terraform plan -out tfplan</code><br>
+        <code>terraform apply tfplan</code></li>
+      <li>Set up port forwarding:<br>
+        <code>.\\Port-Forward-InsideLLM.ps1</code></li>
+      ${gpu ? `<li>Configure GPU passthrough:<br><code>.\\Setup-GPU-Passthrough.ps1</code></li>` : ''}
+      <li>Open <code>https://&lt;vm-ip&gt;</code> in your browser</li>
+      <li>Register your admin account (first user becomes admin)</li>
+    </ol>`;
+  }
+
+  document.getElementById('adminWarn').style.display = 'block';
+}
+
+// ================================================================
+// Download / Copy
+// ================================================================
+function downloadConfig() {
+  const content = document.getElementById('outputBox').textContent;
+  let filename, type;
+
+  if (deployPath === 'hyperv') {
+    filename = 'terraform.tfvars';
+    type = 'text/plain';
+  } else {
+    filename = 'Install-InsideLLM.ps1';
+    type = 'text/plain';
+  }
+
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function copyConfig() {
+  const content = document.getElementById('outputBox').textContent;
+  navigator.clipboard.writeText(content).then(() => {
+    const btn = event.currentTarget;
+    const orig = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = orig, 2000);
+  });
+}
+
+// ================================================================
+// Init
+// ================================================================
+updateProgress();
+</script>
+
+</body>
+</html>

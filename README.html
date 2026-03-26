@@ -235,14 +235,19 @@
     <li><a href="#s7">Service Architecture</a></li>
     <li><a href="#s8">Data Loss Prevention</a></li>
     <li><a href="#s8a">RAG (Document Q&amp;A)</a></li>
+    <li><a href="#s8b">Local LLM (Ollama)</a></li>
     <li><a href="#s9">Identity &amp; Access Mgmt</a></li>
     <li><a href="#s10">Security Architecture</a></li>
     <li><a href="#s11">Cost &amp; Rate Limiting</a></li>
     <li><a href="#s12">Deployment &amp; Ops</a></li>
+    <li><a href="#s12a">WSL2 Deployment</a></li>
     <li><a href="#s13">Product Use Case</a></li>
     <li><a href="#appendix">Quick Reference</a></li>
   </ol>
-  <div class="sidebar-footer">Dan Medina, Uniformedi LLC<br>Version 1.0 &mdash; Feb 2026</div>
+  <div style="margin-top:20px;text-align:center">
+    <a href="Setup.html" style="display:block;background:#38a169;color:#fff;padding:10px 16px;border-radius:6px;font-size:0.88em;font-weight:700;text-decoration:none;transition:background 0.2s;" onmouseover="this.style.background='#2f855a'" onmouseout="this.style.background='#38a169'">Launch Setup Wizard</a>
+  </div>
+  <div class="sidebar-footer">Dan Medina, Uniformedi LLC<br>Version 2.0 &mdash; Mar 2026</div>
 </nav>
 
 <!-- ================================================================ -->
@@ -252,12 +257,33 @@
 <header class="hero">
   <h1>Inside LLM</h1>
   <p class="subtitle">Architecture &amp; Product Use Case</p>
-  <span class="version-badge">Version 1.0 &mdash; February 2026 &mdash; Dan Medina, Uniformedi LLC</span>
+  <span class="version-badge">Version 2.0 &mdash; March 2026 &mdash; Dan Medina, Uniformedi LLC</span>
   <br>
   <span class="version-badge"><a href="https://github.com/Uniformedi/InsideLLM" style="color: inherit; text-decoration: underline;">GitHub</a> &mdash; MIT License</span>
+  <br><br>
+  <a href="Setup.html" style="display:inline-block;background:#38a169;color:#fff;padding:12px 32px;border-radius:6px;font-size:1.05em;font-weight:700;text-decoration:none;letter-spacing:0.3px;transition:background 0.2s;" onmouseover="this.style.background='#2f855a'" onmouseout="this.style.background='#38a169'">Launch Setup Wizard</a>
 </header>
 
 <div class="container">
+
+<!-- ================================================================ -->
+<!-- WHAT'S NEW IN 2.0                                                -->
+<!-- ================================================================ -->
+<section style="margin-top:30px">
+  <div class="highlight-box" style="background:#ebf8ff;border-left-color:#38a169">
+    <h3 style="color:#38a169;margin-bottom:8px">What's New in 2.0</h3>
+    <ul style="list-style:none;margin:0">
+      <li><strong>WSL2 deployment path</strong> &mdash; single PowerShell script, no Terraform or Hyper-V required</li>
+      <li><strong>Local LLM support (Ollama)</strong> &mdash; run open-source models locally alongside Claude</li>
+      <li><strong>GPU acceleration</strong> &mdash; native GPU via WSL2, or GPU-PV/DDA for Hyper-V</li>
+      <li><strong>Setup Wizard</strong> &mdash; interactive HTML form that generates your config file</li>
+      <li><strong>Port forwarding script</strong> &mdash; expose all services to LAN clients</li>
+      <li><strong>Renamed to InsideLLM</strong> &mdash; all paths, services, and defaults updated</li>
+      <li><strong>VM sizing updated</strong> &mdash; 8 vCPU / 32 GB RAM default, with lighter deployment guidance</li>
+      <li><strong>Correct Claude Code CLI env vars</strong> &mdash; ANTHROPIC_AUTH_TOKEN on port 4000</li>
+    </ul>
+  </div>
+</section>
 
 <!-- ================================================================ -->
 <!-- 1. EXECUTIVE SUMMARY                                             -->
@@ -442,7 +468,7 @@
                       |                                                   |
                       |  +---------------------------------------------+  |
                       |  |            Ubuntu 24.04 LTS VM              |  |
-                      |  |            4 vCPU | 8 GB RAM | 80 GB       |  |
+                      |  |            8 vCPU | 32 GB RAM | 80 GB      |  |
                       |  |                                             |  |
 +----------+  HTTPS   |  |  +---------------------------------------+  |  |
 |          |--  443 --+--+--&gt;|            Nginx 1.27                |  |  |
@@ -587,15 +613,17 @@ Exposed Host Ports:
     <tbody>
       <tr><td><strong>API Gateway</strong></td><td>LiteLLM</td><td>MIT</td><td>latest</td><td>Authentication, model routing, budgets, rate limiting, audit</td></tr>
       <tr><td><strong>Chat Interface</strong></td><td>Open WebUI</td><td>MIT</td><td>latest</td><td>Browser-based chat UI, RAG, document upload, pipeline host</td></tr>
+      <tr><td><strong>Local LLM</strong></td><td>Ollama</td><td>MIT</td><td>latest</td><td>Local model inference (Qwen 2.5 Coder, Qwen 2.5, etc.)</td></tr>
       <tr><td><strong>Reverse Proxy</strong></td><td>Nginx</td><td>BSD-2</td><td>1.27</td><td>TLS termination, HTTPS routing, security headers</td></tr>
       <tr><td><strong>Database</strong></td><td>PostgreSQL</td><td>PostgreSQL</td><td>16</td><td>User data, spend tracking, team budgets, audit logs</td></tr>
       <tr><td><strong>Cache</strong></td><td>Redis</td><td>BSD-3</td><td>7</td><td>Rate limit counters, response cache, session data</td></tr>
       <tr><td><strong>Containers</strong></td><td>Docker + Compose</td><td>Apache 2.0</td><td>CE</td><td>Container orchestration, networking, health checks</td></tr>
-      <tr><td><strong>IaC</strong></td><td>Terraform</td><td>BSL 1.1</td><td>&ge; 1.5</td><td>Infrastructure provisioning, config templating</td></tr>
-      <tr><td><strong>Provisioning</strong></td><td>cloud-init</td><td>Apache 2.0</td><td>default</td><td>First-boot VM automation</td></tr>
-      <tr><td><strong>Hypervisor</strong></td><td>Hyper-V</td><td>Windows</td><td>Win 11 Pro</td><td>Virtual machine hosting (included in Windows Pro/Enterprise)</td></tr>
+      <tr><td><strong>IaC</strong></td><td>Terraform</td><td>BSL 1.1</td><td>&ge; 1.5</td><td>Infrastructure provisioning, config templating (Hyper-V path)</td></tr>
+      <tr><td><strong>Provisioning</strong></td><td>cloud-init</td><td>Apache 2.0</td><td>default</td><td>First-boot VM automation (Hyper-V path)</td></tr>
+      <tr><td><strong>Hypervisor</strong></td><td>Hyper-V</td><td>Windows</td><td>Win 11 Pro</td><td>VM hosting (Hyper-V path)</td></tr>
+      <tr><td><strong>WSL2</strong></td><td>Windows Subsystem for Linux</td><td>Windows</td><td>Win 11 22H2+</td><td>Lightweight Linux runtime (WSL2 path, native GPU)</td></tr>
       <tr><td><strong>Audit</strong></td><td>Langfuse</td><td>MIT</td><td>callback</td><td>LLM observability, prompt logging, cost tracking</td></tr>
-      <tr><td><strong>Guest OS</strong></td><td>Ubuntu</td><td>FOSS</td><td>24.04 LTS</td><td>Server operating system</td></tr>
+      <tr><td><strong>Guest OS</strong></td><td>Ubuntu</td><td>FOSS</td><td>24.04 LTS</td><td>Server operating system (both paths)</td></tr>
     </tbody>
   </table>
 
@@ -606,7 +634,9 @@ Exposed Host Ports:
     <div class="card"><h4>PostgreSQL</h4><p>Enterprise-proven, ACID-compliant. Perfect for financial data (spend tracking).</p></div>
     <div class="card"><h4>Redis</h4><p>Sub-millisecond rate limit enforcement. Response caching reduces API costs.</p></div>
     <div class="card"><h4>Nginx</h4><p>Industry standard for TLS termination. WebSocket support for streaming responses.</p></div>
+    <div class="card"><h4>Ollama</h4><p>Run open-source LLMs locally (no API costs). Qwen 2.5 models for coding and general use. Native GPU acceleration via WSL2 or Hyper-V DDA.</p></div>
     <div class="card"><h4>Hyper-V</h4><p>Built into Windows Pro/Enterprise (no cost). IT departments already have Hyper-V expertise.</p></div>
+    <div class="card"><h4>WSL2</h4><p>Zero-config deployment (one PowerShell script). Native GPU passthrough. Ideal for developers and evaluation.</p></div>
   </div>
 </section>
 
@@ -638,7 +668,7 @@ Exposed Host Ports:
 |  +------------------------------------------------+  |
 |  |  Ubuntu 24.04 LTS VM                           |  |
 |  |    - Gen 2 (UEFI + Secure Boot)                |  |
-|  |    - 4 vCPU, 8 GB RAM, 80 GB disk              |  |
+|  |    - 8 vCPU, 32 GB RAM, 80 GB disk              |  |
 |  |    - Internal switch + NAT (isolated)           |  |
 |  |    - SSH key-only access                        |  |
 |  +------------------------------------------------+  |
@@ -696,7 +726,7 @@ All 5 containers running. Stack operational.</pre>
     </tbody>
   </table>
   <ul>
-    <li><strong>Volume:</strong> <code>/opt/claude-wrapper/data/postgres</code> (persistent across restarts)</li>
+    <li><strong>Volume:</strong> <code>/opt/InsideLLM/data/postgres</code> (persistent across restarts)</li>
     <li><strong>Health check:</strong> <code>pg_isready -U litellm</code> every 10s</li>
     <li><strong>Not exposed</strong> to host network &mdash; internal access only</li>
   </ul>
@@ -713,7 +743,7 @@ All 5 containers running. Stack operational.</pre>
   </table>
   <ul>
     <li><strong>Memory:</strong> Capped at 256 MB with LRU eviction</li>
-    <li><strong>Volume:</strong> <code>/opt/claude-wrapper/data/redis</code> (persistence for cache warmth)</li>
+    <li><strong>Volume:</strong> <code>/opt/InsideLLM/data/redis</code> (persistence for cache warmth)</li>
     <li><strong>Health check:</strong> <code>redis-cli ping</code> every 10s</li>
   </ul>
 
@@ -1124,6 +1154,98 @@ What is NOT logged: The actual sensitive values</pre>
 </section>
 
 <!-- ================================================================ -->
+<!-- 8b. LOCAL LLM SUPPORT (OLLAMA)                                   -->
+<!-- ================================================================ -->
+<section id="s8b">
+  <h2><span class="section-num">8b</span> Local LLM Support (Ollama)</h2>
+
+  <p>InsideLLM can optionally run local open-source models alongside the Anthropic API
+  using <a href="https://ollama.com">Ollama</a>. This keeps all inference on-premises with no
+  external API calls for the local models.</p>
+
+  <h3>Enabled by Default</h3>
+  <p>Ollama is enabled by default with two models (<code>qwen2.5-coder:14b</code> and <code>qwen2.5:14b</code>).
+  The VM defaults (8 vCPU, 32 GB RAM) are sized accordingly.</p>
+
+  <p>To customize the models, set <code>ollama_models</code> in your <code>terraform.tfvars</code>:</p>
+  <div class="code-block">
+    <span class="lang-label">HCL</span>
+    <pre>ollama_models = ["qwen2.5-coder:14b", "llama3.1:8b", "qwen2.5:14b"]</pre>
+  </div>
+
+  <h3>Disabling Ollama (lighter deployment)</h3>
+  <p>If you only need the Anthropic API models and want a smaller VM footprint:</p>
+  <div class="code-block">
+    <span class="lang-label">HCL</span>
+    <pre># Disable Ollama
+ollama_enable = false
+
+# Reduce VM resources
+vm_processor_count      = 4
+vm_memory_startup_bytes = 8589934592    # 8 GB (down from 32 GB)</pre>
+  </div>
+  <p>This cuts the VM memory requirement from 32 GB to 8 GB and halves the CPU allocation.</p>
+
+  <h3>How It Works</h3>
+  <table>
+    <thead><tr><th>Container</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td><code>claude-ollama</code></td><td>Ollama inference server (port 11434)</td></tr>
+      <tr><td><code>claude-ollama-pull</code></td><td>One-shot sidecar that pulls configured models on first boot</td></tr>
+    </tbody>
+  </table>
+  <p>LiteLLM automatically gets routes for each model (e.g., <code>ollama/qwen2.5-coder:14b</code>),
+  so they appear in the Open WebUI model dropdown and are accessible via the API.</p>
+
+  <h3>Architecture</h3>
+  <div class="code-block">
+    <pre>Users --&gt; Open WebUI --&gt; LiteLLM --&gt; Anthropic API (Claude models)
+                                \--&gt; Ollama :11434  (local models)</pre>
+  </div>
+
+  <h3>GPU Support</h3>
+
+  <h4>WSL2 (recommended for GPU)</h4>
+  <p>WSL2 provides <strong>native GPU access</strong> via GPU paravirtualization (GPU-PV).
+  CUDA and DirectML work out of the box &mdash; just install the standard NVIDIA Windows
+  driver on the host. No extra configuration is needed inside WSL2.</p>
+  <div class="code-block">
+    <span class="lang-label">PowerShell</span>
+    <pre>.\Install-InsideLLM-WSL.ps1 -AnthropicApiKey "sk-ant-..." -OllamaGpu $true</pre>
+  </div>
+  <p>This is the <strong>recommended path for GPU-accelerated local models</strong>.</p>
+
+  <h4>Hyper-V</h4>
+  <p>GPU passthrough on Hyper-V is handled by a companion script (<code>Setup-GPU-Passthrough.ps1</code>)
+  that runs <strong>after</strong> <code>terraform apply</code>. Two modes are available:</p>
+  <table>
+    <thead><tr><th>Mode</th><th>Command</th><th>Host GPU Access</th><th>Complexity</th></tr></thead>
+    <tbody>
+      <tr><td><strong>GPU-PV</strong> (default)</td><td><code>.\Setup-GPU-Passthrough.ps1</code></td><td>Shared (host keeps display)</td><td>Simple</td></tr>
+      <tr><td><strong>DDA</strong></td><td><code>.\Setup-GPU-Passthrough.ps1 -Mode DDA</code></td><td>Exclusive (host loses GPU)</td><td>Advanced</td></tr>
+    </tbody>
+  </table>
+  <p>The script detects your NVIDIA GPU, configures the VM, and SSHs in to install
+  <code>nvidia-container-toolkit</code>. To remove: <code>.\Setup-GPU-Passthrough.ps1 -Remove</code></p>
+  <p><strong>WSL2 is still the simpler path for GPU</strong> &mdash; it requires zero extra setup.</p>
+
+  <p>Without GPU, models run on CPU (slower but functional for smaller models like Qwen 2.5 14B).</p>
+
+  <h3>VM Sizing Guide</h3>
+  <table>
+    <thead><tr><th>Deployment</th><th>vCPU</th><th>RAM</th><th>Disk</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><strong>With Ollama (default)</strong></td><td>8</td><td>32 GB</td><td>80 GB</td><td>Two local models + Anthropic API</td></tr>
+      <tr><td><strong>Without Ollama</strong></td><td>4</td><td>8 GB</td><td>80 GB</td><td>Anthropic API only</td></tr>
+      <tr><td><strong>With Ollama + GPU</strong></td><td>8</td><td>16 GB</td><td>80 GB</td><td>GPU handles inference; less RAM needed</td></tr>
+    </tbody>
+  </table>
+  <p>Each Ollama model consumes ~2-5 GB of RAM when loaded. The 32 GB default provides
+  headroom for two models running concurrently alongside the rest of the stack
+  (PostgreSQL, Redis, LiteLLM, Open WebUI, Nginx).</p>
+</section>
+
+<!-- ================================================================ -->
 <!-- 9. IDENTITY & ACCESS MANAGEMENT                                  -->
 <!-- ================================================================ -->
 <section id="s9">
@@ -1334,12 +1456,17 @@ okta_domain        = "your-org.okta.com"</pre>
 <section id="s12">
   <h2><span class="section-num">12</span> Deployment &amp; Operations</h2>
 
+  <h3>Setup Wizard (Recommended)</h3>
+  <p>Open <strong><a href="Setup.html">Setup.html</a></strong> in your browser for a guided, step-by-step
+  configuration wizard. It walks you through all deployment options and generates the config file
+  (<code>terraform.tfvars</code> or PowerShell command) ready to download.</p>
+
   <h3>Prerequisites</h3>
   <table>
     <thead><tr><th>Requirement</th><th>Details</th></tr></thead>
     <tbody>
       <tr><td>Windows 11 Pro or Server 2022+</td><td>Hyper-V capable</td></tr>
-      <tr><td>16 GB+ host RAM</td><td>8 GB for VM + headroom</td></tr>
+      <tr><td>48 GB+ host RAM</td><td>32 GB for VM + headroom (16 GB+ sufficient without Ollama)</td></tr>
       <tr><td>100 GB+ free disk</td><td>VM disk + images</td></tr>
       <tr><td>Terraform &ge; 1.5</td><td>IaC tool</td></tr>
       <tr><td>WSL2</td><td>For genisoimage (cloud-init ISO creation)</td></tr>
@@ -1366,7 +1493,7 @@ terraform apply tfplan</pre>
   <h3>Auto-Start on Boot</h3>
   <p>The stack is configured as a <strong>systemd service</strong> on the VM:</p>
   <div class="code-block">
-    <pre>VM Boot -&gt; systemd -&gt; claude-wrapper.service -&gt; docker compose up -d</pre>
+    <pre>VM Boot -&gt; systemd -&gt; InsideLLM.service -&gt; docker compose up -d</pre>
   </div>
   <p>All containers have <code>restart: always</code>, so individual container crashes are automatically recovered.</p>
   <p><strong>Log rotation:</strong> The LiteLLM container uses Docker's <code>json-file</code> logging driver with a 50 MB per-file limit and 3-file rotation (150 MB max). This prevents debug-level logging from filling the disk.</p>
@@ -1381,7 +1508,7 @@ terraform apply tfplan</pre>
 ssh claude-admin@&lt;vm-ip&gt;
 
 # Pull latest images and recreate containers
-cd /opt/claude-wrapper
+cd /opt/InsideLLM
 sudo docker compose pull
 sudo docker compose up -d</pre>
   </div>
@@ -1407,11 +1534,11 @@ sudo docker compose up -d open-webui</pre>
 
   <p><strong>Important notes:</strong></p>
   <ul>
-    <li><strong>Data is preserved</strong> &mdash; PostgreSQL, Redis, and Open WebUI data live on Docker volumes (<code>/opt/claude-wrapper/data/</code>), so container recreation does not lose data</li>
+    <li><strong>Data is preserved</strong> &mdash; PostgreSQL, Redis, and Open WebUI data live on Docker volumes (<code>/opt/InsideLLM/data/</code>), so container recreation does not lose data</li>
     <li><strong>Configuration is preserved</strong> &mdash; config files are bind-mounted from the host filesystem, not baked into images</li>
     <li><strong>DLP pipeline persists</strong> &mdash; the pipeline is stored in Open WebUI's database and survives container updates</li>
     <li><strong>Downtime</strong> &mdash; expect 30&ndash;60 seconds of downtime while containers restart. Services with health checks will wait for dependencies before starting</li>
-    <li><strong>Rollback</strong> &mdash; if an update causes issues, you can pin a specific image version in <code>/opt/claude-wrapper/docker-compose.yml</code> (e.g., <code>ghcr.io/open-webui/open-webui:v0.5.10</code>) and recreate</li>
+    <li><strong>Rollback</strong> &mdash; if an update causes issues, you can pin a specific image version in <code>/opt/InsideLLM/docker-compose.yml</code> (e.g., <code>ghcr.io/open-webui/open-webui:v0.5.10</code>) and recreate</li>
   </ul>
 
   <p><strong>Verify after update:</strong></p>
@@ -1467,6 +1594,69 @@ curl -sk https://localhost/health                     # Open WebUI (via Nginx)</
 &#9492;&#9472;&#9472; scripts/
     &#9500;&#9472;&#9472; docker-compose.yml.tpl          # All 5 services definition
     &#9492;&#9472;&#9472; post-deploy.sh.tpl              # Team creation, systemd setup</pre>
+  </div>
+</section>
+
+<!-- ================================================================ -->
+<!-- 12a. WSL2 DEPLOYMENT (ALTERNATIVE)                               -->
+<!-- ================================================================ -->
+<section id="s12a">
+  <h2><span class="section-num">12a</span> WSL2 Deployment (Alternative)</h2>
+
+  <p>For a lighter-weight deployment without Terraform or Hyper-V, InsideLLM can run
+  entirely inside WSL2 on Windows 11. This deploys the same Docker containers and
+  configuration as the Hyper-V path.</p>
+
+  <h3>WSL2 vs Hyper-V</h3>
+  <table>
+    <thead><tr><th></th><th>WSL2</th><th>Hyper-V (Terraform)</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Best for</strong></td><td>Developer workstations, evaluation, small teams</td><td>Production, shared servers, multi-VM hosts</td></tr>
+      <tr><td><strong>Prerequisites</strong></td><td>Windows 11 22H2+, no Terraform needed</td><td>Windows Pro/Server, Terraform, Hyper-V</td></tr>
+      <tr><td><strong>Setup time</strong></td><td>~5 minutes (one script)</td><td>~15 minutes (Terraform plan/apply)</td></tr>
+      <tr><td><strong>Isolation</strong></td><td>Shared kernel with Windows</td><td>Full VM isolation</td></tr>
+      <tr><td><strong>GPU support</strong></td><td>Native GPU-PV (just install Windows NVIDIA driver)</td><td>Requires manual DDA setup (advanced)</td></tr>
+      <tr><td><strong>Networking</strong></td><td>WSL2 dynamic IP (refreshed via scheduled task)</td><td>Static IP on Hyper-V internal switch</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Quick Start</h3>
+  <div class="code-block">
+    <span class="lang-label">PowerShell (Admin)</span>
+    <pre>.\Install-InsideLLM-WSL.ps1 -AnthropicApiKey "sk-ant-api03-..."</pre>
+  </div>
+  <p>The script handles WSL2 installation, Docker setup, config generation,
+  container deployment, and port forwarding automatically.</p>
+
+  <h3>Disabling Ollama (lighter deployment)</h3>
+  <div class="code-block">
+    <span class="lang-label">PowerShell</span>
+    <pre>.\Install-InsideLLM-WSL.ps1 -AnthropicApiKey "sk-ant-..." -EnableOllama $false</pre>
+  </div>
+
+  <h3>Key Parameters</h3>
+  <table>
+    <thead><tr><th>Parameter</th><th>Default</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>AnthropicApiKey</code></td><td><em>required</em></td><td>Anthropic API key</td></tr>
+      <tr><td><code>EnableOllama</code></td><td><code>$true</code></td><td>Enable local Ollama models</td></tr>
+      <tr><td><code>OllamaModels</code></td><td><code>qwen2.5-coder:14b, qwen2.5:14b</code></td><td>Models to pull</td></tr>
+      <tr><td><code>SsoProvider</code></td><td><code>none</code></td><td>SSO: none, azure_ad, or okta</td></tr>
+      <tr><td><code>Uninstall</code></td><td><em>switch</em></td><td>Remove everything</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Known Limitations</h3>
+  <ul>
+    <li><strong>WSL2 IP changes on restart</strong> &mdash; a scheduled task automatically refreshes port forwarding rules on login</li>
+    <li><strong>Shared kernel</strong> &mdash; less isolated than a full Hyper-V VM; use the Terraform path for production/compliance</li>
+    <li><strong>Memory</strong> &mdash; configure <code>.wslconfig</code> to set WSL2 memory limits</li>
+  </ul>
+
+  <h3>Uninstall</h3>
+  <div class="code-block">
+    <span class="lang-label">PowerShell</span>
+    <pre>.\Install-InsideLLM-WSL.ps1 -Uninstall</pre>
   </div>
 </section>
 
@@ -1556,7 +1746,7 @@ $env:ANTHROPIC_AUTH_TOKEN = "&lt;your-litellm-key&gt;"</pre>
 </div><!-- /.main -->
 
 <footer>
-  <p><strong>Inside LLM</strong> &mdash; Version 1.0 &mdash; Dan Medina, Uniformedi LLC &mdash; February 2026</p>
+  <p><strong>Inside LLM</strong> &mdash; Version 2.0 &mdash; Dan Medina, Uniformedi LLC &mdash; March 2026</p>
   <p>Source: <a href="https://github.com/Uniformedi/InsideLLM">github.com/Uniformedi/InsideLLM</a> &mdash; Licensed under the <a href="https://github.com/Uniformedi/InsideLLM/blob/master/LICENSE">MIT License</a></p>
   <p>All components are free and open-source software. Anthropic API usage subject to Anthropic's terms of service.</p>
 </footer>

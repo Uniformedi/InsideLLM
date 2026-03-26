@@ -26,6 +26,16 @@ model_list:
       api_key: os.environ/ANTHROPIC_API_KEY
 %{ endif ~}
 
+%{ if ollama_enable ~}
+%{ for model in ollama_models ~}
+  # --- Local Ollama: ${model} ---
+  - model_name: "ollama/${model}"
+    litellm_params:
+      model: "ollama/${model}"
+      api_base: http://ollama:11434
+%{ endfor ~}
+%{ endif ~}
+
 # =============================================================================
 # LiteLLM Settings
 # =============================================================================

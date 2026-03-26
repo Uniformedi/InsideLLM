@@ -9,7 +9,7 @@ set -euo pipefail
 
 LITELLM_URL="http://localhost:4000"
 LITELLM_KEY="${litellm_master_key}"
-LOG="/var/log/claude-wrapper-deploy.log"
+LOG="/var/log/InsideLLM-deploy.log"
 
 log() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG"
@@ -177,7 +177,7 @@ fi
 # ---------------------------------------------------------------------------
 log "Creating systemd service for auto-start..."
 
-cat > /etc/systemd/system/claude-wrapper.service << 'SYSTEMD'
+cat > /etc/systemd/system/InsideLLM.service << 'SYSTEMD'
 [Unit]
 Description=Inside LLM (Docker Compose)
 Requires=docker.service
@@ -186,7 +186,7 @@ After=docker.service
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-WorkingDirectory=/opt/claude-wrapper
+WorkingDirectory=/opt/InsideLLM
 ExecStart=/usr/bin/docker compose up -d
 ExecStop=/usr/bin/docker compose down
 TimeoutStartSec=300
@@ -196,7 +196,7 @@ WantedBy=multi-user.target
 SYSTEMD
 
 systemctl daemon-reload
-systemctl enable claude-wrapper.service
+systemctl enable InsideLLM.service
 log "Systemd service created and enabled"
 
 # ---------------------------------------------------------------------------
@@ -217,7 +217,7 @@ log "  First user to register on Open WebUI"
 log "  becomes the admin."
 log ""
 log "  Claude Code CLI config:"
-log "    export ANTHROPIC_BASE_URL=https://${vm_fqdn}/v1"
-log "    export ANTHROPIC_API_KEY=<your-litellm-key>"
+log "    export ANTHROPIC_BASE_URL=http://${vm_fqdn}:4000"
+log "    export ANTHROPIC_AUTH_TOKEN=<your-litellm-key>"
 log ""
 log "=========================================="
