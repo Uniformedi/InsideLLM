@@ -205,25 +205,6 @@ services:
     networks:
       - insidellm-internal
 
-  # Ollama model puller — runs once to download configured models
-  ollama-pull:
-    image: ollama/ollama:latest
-    container_name: insidellm-ollama-pull
-    restart: "no"
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - |
-%{ for model in ollama_models ~}
-        echo "Pulling ${model}..." && ollama pull ${model}
-%{ endfor ~}
-        echo "All models pulled."
-    environment:
-      OLLAMA_HOST: "http://ollama:11434"
-    depends_on:
-      ollama:
-        condition: service_healthy
-    networks:
-      - insidellm-internal
 %{ endif ~}
 
 networks:
