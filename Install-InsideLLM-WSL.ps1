@@ -120,43 +120,102 @@ function Write-WslFile {
 # =============================================================================
 
 if ($Uninstall) {
-    Write-Step "Uninstalling InsideLLM from WSL2"
+    # Override error preference so every step runs regardless of prior failures
+    $ErrorActionPreference = "Continue"
 
-    # Stop containers
-    $wslExists = wsl -l -q 2>$null | Where-Object { $_.Trim() -eq $WslDistroName }
-    if ($wslExists) {
-        Write-Ok "Stopping containers..."
-        Invoke-Wsl "cd $InstallPath && sudo docker compose down -v 2>/dev/null; true" | Out-Null
-        Invoke-Wsl "sudo rm -rf $InstallPath" | Out-Null
-        Write-Ok "Removed $InstallPath"
+    Write-Step "Uninstalling InsideLLM"
+
+    # Step 1: Stop and remove containers (safe even if WSL/distro is missing)
+    try {
+        $distroList = (wsl -l -q 2>$null | Out-String) -replace "`0", ""
+        if ($distroList -match $WslDistroName) {
+            Write-Host "  Stopping containers..."
+            wsl -d $WslDistroName -- bash -c "cd $InstallPath && docker compose down -v 2>/dev/null; true" 2>$null | Out-Null
+            wsl -d $WslDistroName -- bash -c "rm -rf $InstallPath 2>/dev/null; true" 2>$null | Out-Null
+            Write-Ok "Containers stopped and config removed"
+        } else {
+            Write-Warn "WSL2 distro '$WslDistroName' not found - skipping container cleanup"
+        }
+    } catch {
+        Write-Warn "Could not reach WSL2 - skipping container cleanup ($_)"
     }
 
-    # Remove port forwarding
-    foreach ($port in @(80, 443, 4000, 5050, 11434)) {
-        netsh interface portproxy delete v4tov4 listenport=$port listenaddress=0.0.0.0 2>$null | Out-Null
+    # Step 2: Remove port forwarding rules
+    try {
+        foreach ($port in @(80, 443, 4000, 5050, 11434)) {
+            netsh interface portproxy delete v4tov4 listenport=$port listenaddress=0.0.0.0 2>$null | Out-Null
+        }
+        Write-Ok "Removed port forwarding rules"
+    } catch {
+        Write-Warn "Could not remove some port forwarding rules ($_)"
     }
-    Write-Ok "Removed port forwarding rules"
 
-    # Remove firewall rules
-    Remove-NetFirewallRule -Group "InsideLLM WSL2" -ErrorAction SilentlyContinue
-    Write-Ok "Removed firewall rules"
+    # Step 3: Remove firewall rules
+    try {
+        Remove-NetFirewallRule -Group "InsideLLM WSL2" -ErrorAction SilentlyContinue
+        Write-Ok "Removed firewall rules"
+    } catch {
+        Write-Warn "Could not remove firewall rules ($_)"
+    }
 
-    # Remove scheduled tasks
-    Unregister-ScheduledTask -TaskName "InsideLLM-WSL2-PortForward" -Confirm:$false -ErrorAction SilentlyContinue
-    Unregister-ScheduledTask -TaskName "InsideLLM-WSL2-Startup" -Confirm:$false -ErrorAction SilentlyContinue
-    schtasks /Delete /TN "InsideLLM-WSL2-Startup" /F 2>$null | Out-Null
-    Remove-Item -Path (Join-Path $env:ProgramData "InsideLLM") -Recurse -Force -ErrorAction SilentlyContinue
-    Write-Ok "Removed scheduled tasks"
+    # Step 4: Remove scheduled tasks (try both methods)
+    try {
+        Unregister-ScheduledTask -TaskName "InsideLLM-WSL2-PortForward" -Confirm:$false -ErrorAction SilentlyContinue
+        Unregister-ScheduledTask -TaskName "InsideLLM-WSL2-Startup" -Confirm:$false -ErrorAction SilentlyContinue
+        schtasks /Delete /TN "InsideLLM-WSL2-Startup" /F 2>$null | Out-Null
+        schtasks /Delete /TN "InsideLLM-WSL2-PortForward" /F 2>$null | Out-Null
+        Write-Ok "Removed scheduled tasks"
+    } catch {
+        Write-Warn "Could not remove some scheduled tasks ($_)"
+    }
 
-    # Remove Start Menu shortcuts
-    $shortcutFolder = Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Programs\InsideLLM"
-    Remove-Item -Path $shortcutFolder -Recurse -Force -ErrorAction SilentlyContinue
-    Write-Ok "Removed Start Menu shortcuts"
+    # Step 5: Remove ProgramData files (startup script, etc.)
+    try {
+        $progDataPath = Join-Path $env:ProgramData "InsideLLM"
+        if (Test-Path $progDataPath) {
+            Remove-Item -Path $progDataPath -Recurse -Force -ErrorAction SilentlyContinue
+        }
+        Write-Ok "Removed ProgramData files"
+    } catch {
+        Write-Warn "Could not remove ProgramData files ($_)"
+    }
+
+    # Step 6: Remove Start Menu shortcuts
+    try {
+        $shortcutFolder = Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Programs\InsideLLM"
+        if (Test-Path $shortcutFolder) {
+            Remove-Item -Path $shortcutFolder -Recurse -Force -ErrorAction SilentlyContinue
+        }
+        Write-Ok "Removed Start Menu shortcuts"
+    } catch {
+        Write-Warn "Could not remove Start Menu shortcuts ($_)"
+    }
+
+    # Step 7: Remove WSL install directory on Windows side (if it exists)
+    try {
+        if (Test-Path $WslInstallPath) {
+            Write-Warn "WSL2 distro disk found at $WslInstallPath"
+            Write-Warn "NOT removing automatically -- this contains all container data."
+            Write-Host "  To fully remove the distro and its disk:"
+            Write-Host "    wsl --unregister $WslDistroName"
+            Write-Host "    Remove-Item -Recurse -Force '$WslInstallPath'"
+        }
+    } catch {
+        Write-Warn "Could not check WSL install path ($_)"
+    }
 
     Write-Host ""
-    Write-Host "InsideLLM has been removed from WSL2." -ForegroundColor Green
-    Write-Host "The WSL2 distro ($WslDistroName) was NOT removed."
-    Write-Host "To also remove it: wsl --unregister $WslDistroName"
+    Write-Host "============================================================" -ForegroundColor Green
+    Write-Host "  InsideLLM uninstall complete" -ForegroundColor Green
+    Write-Host "============================================================" -ForegroundColor Green
+    Write-Host ""
+    Write-Host "  Removed: port forwarding, firewall rules, scheduled tasks,"
+    Write-Host "           Start Menu shortcuts, and ProgramData files."
+    Write-Host ""
+    Write-Host "  The WSL2 distro '$WslDistroName' was NOT removed."
+    Write-Host "  To also remove it (deletes all data):"
+    Write-Host "    wsl --unregister $WslDistroName" -ForegroundColor Yellow
+    Write-Host ""
     exit 0
 }
 
