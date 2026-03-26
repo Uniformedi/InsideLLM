@@ -991,12 +991,9 @@ if (`$wslIp) {
     $null = New-Item -Path (Split-Path $startupPath) -ItemType Directory -Force
     [System.IO.File]::WriteAllText($startupPath, $startupScript)
 
-    $action  = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$startupPath`""
-    $trigger = New-ScheduledTaskTrigger -AtStartup
-    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
     Unregister-ScheduledTask -TaskName "InsideLLM-WSL2-PortForward" -Confirm:$false -ErrorAction SilentlyContinue
     Unregister-ScheduledTask -TaskName "InsideLLM-WSL2-Startup" -Confirm:$false -ErrorAction SilentlyContinue
-    Register-ScheduledTask -TaskName "InsideLLM-WSL2-Startup" -Action $action -Trigger $trigger -Settings $settings -RunLevel Highest -User "SYSTEM" -Description "Start InsideLLM WSL2 containers and refresh port forwarding on boot" | Out-Null
+    schtasks /Create /TN "InsideLLM-WSL2-Startup" /TR "powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$startupPath`"" /SC ONSTART /RU SYSTEM /RL HIGHEST /F | Out-Null
     Write-Ok "Scheduled task created: InsideLLM starts on Windows boot"
 }
 
