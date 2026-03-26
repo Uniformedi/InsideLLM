@@ -170,6 +170,27 @@ services:
     networks:
       - insidellm-internal
 
+  # -------------------------------------------------------------------------
+  # pgAdmin — Database Administration UI
+  # -------------------------------------------------------------------------
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: insidellm-pgadmin
+    restart: always
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: "admin@insidellm.local"
+      PGADMIN_DEFAULT_PASSWORD: "${litellm_master_key}"
+      PGADMIN_CONFIG_SERVER_MODE: "True"
+    volumes:
+      - /opt/InsideLLM/data/pgadmin:/var/lib/pgadmin
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - insidellm-internal
+
 %{ if ollama_enable ~}
   # -------------------------------------------------------------------------
   # Ollama — Local LLM Inference Engine

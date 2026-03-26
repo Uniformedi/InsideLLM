@@ -172,6 +172,31 @@ if echo "$MODELS" | grep -q "claude-opus"; then
   log "✅ claude-opus model available"
 fi
 
+# ---------------------------------------------------------------------------
+# Create PostgreSQL convenience views (lowercase, no quoting needed)
+# ---------------------------------------------------------------------------
+log "Creating database convenience views..."
+docker exec insidellm-postgres psql -U litellm -d litellm -c "
+CREATE OR REPLACE VIEW spend_logs AS SELECT
+  request_id, call_type, api_key, spend, total_tokens, prompt_tokens,
+  completion_tokens, \"startTime\" AS start_time, \"endTime\" AS end_time,
+  model, model_group, \"user\" AS username, team_id, end_user,
+  requester_ip_address, messages, response, request_tags, cache_hit,
+  status, request_duration_ms
+FROM \"LiteLLM_SpendLogs\";
+
+CREATE OR REPLACE VIEW audit_log AS SELECT * FROM \"LiteLLM_AuditLog\";
+CREATE OR REPLACE VIEW users AS SELECT * FROM \"LiteLLM_UserTable\";
+CREATE OR REPLACE VIEW teams AS SELECT * FROM \"LiteLLM_TeamTable\";
+CREATE OR REPLACE VIEW api_keys AS SELECT * FROM \"LiteLLM_VerificationToken\";
+CREATE OR REPLACE VIEW daily_user_spend AS SELECT * FROM \"LiteLLM_DailyUserSpend\";
+CREATE OR REPLACE VIEW daily_team_spend AS SELECT * FROM \"LiteLLM_DailyTeamSpend\";
+CREATE OR REPLACE VIEW error_logs AS SELECT * FROM \"LiteLLM_ErrorLogs\";
+CREATE OR REPLACE VIEW models AS SELECT * FROM \"LiteLLM_ModelTable\";
+CREATE OR REPLACE VIEW budgets AS SELECT * FROM \"LiteLLM_BudgetTable\";
+" >> "$LOG" 2>&1 || log "WARNING: Failed to create views"
+log "Database views created"
+
 %{ if ollama_enable ~}
 # ---------------------------------------------------------------------------
 # Pull Ollama models via docker exec (reliable for large downloads)
