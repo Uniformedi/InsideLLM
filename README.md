@@ -1559,7 +1559,7 @@ COST SAVINGS
 | Service | URL | Purpose |
 |---------|-----|---------|
 | Chat Interface | `https://<vm-ip>/` | End-user chat with Claude |
-| LiteLLM Admin | `https://<vm-ip>/litellm/ui` | Admin dashboard |
+| LiteLLM Admin | `https://<vm-ip>/litellm/ui/chat` | Admin dashboard |
 | LiteLLM API | `https://<vm-ip>/v1/` | OpenAI-compatible endpoint |
 | SSH | `ssh claude-admin@<vm-ip>` | VM administration |
 

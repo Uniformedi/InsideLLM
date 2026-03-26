@@ -172,7 +172,7 @@ Write-Host "  InsideLLM Port Forwarding - Active" -ForegroundColor Green
 Write-Host "============================================================" -ForegroundColor Green
 Write-Host ""
 Write-Host "  Open WebUI:    https://<host-ip>"
-Write-Host "  LiteLLM UI:    https://<host-ip>/litellm/ui"
+Write-Host "  LiteLLM UI:    https://<host-ip>/litellm/ui/chat"
 Write-Host "  LiteLLM API:   https://<host-ip>/v1/   (or http://<host-ip>:4000)"
 Write-Host "  SSH:           ssh claude-admin@<host-ip>"
 Write-Host ""
