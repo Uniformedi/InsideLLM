@@ -48,7 +48,7 @@ wait_for_service "http://localhost:8080/health" "Open WebUI"
 # ---------------------------------------------------------------------------
 log "Registering DLP pipeline as a global filter..."
 
-docker exec claude-open-webui python3 -c "
+docker exec insidellm-open-webui python3 -c "
 import sys
 sys.path.insert(0, '/app/backend')
 

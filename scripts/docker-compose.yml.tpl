@@ -9,7 +9,7 @@ services:
   # -------------------------------------------------------------------------
   postgres:
     image: postgres:16-alpine
-    container_name: claude-postgres
+    container_name: insidellm-postgres
     restart: always
     environment:
       POSTGRES_DB: litellm
@@ -23,14 +23,14 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - claude-internal
+      - insidellm-internal
 
   # -------------------------------------------------------------------------
   # Redis — Rate limit counters, session cache
   # -------------------------------------------------------------------------
   redis:
     image: redis:7-alpine
-    container_name: claude-redis
+    container_name: insidellm-redis
     restart: always
     command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
@@ -41,14 +41,14 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - claude-internal
+      - insidellm-internal
 
   # -------------------------------------------------------------------------
   # LiteLLM Proxy — API Gateway, SSO, Budgets, Rate Limiting
   # -------------------------------------------------------------------------
   litellm:
     image: ghcr.io/berriai/litellm:main-latest
-    container_name: claude-litellm
+    container_name: insidellm-litellm
     restart: always
     ports:
       - "4000:4000"
@@ -104,14 +104,14 @@ services:
       retries: 10
       start_period: 300s
     networks:
-      - claude-internal
+      - insidellm-internal
 
   # -------------------------------------------------------------------------
   # Open WebUI — Chat Interface, RAG, DLP Pipelines
   # -------------------------------------------------------------------------
   open-webui:
     image: ghcr.io/open-webui/open-webui:latest
-    container_name: claude-open-webui
+    container_name: insidellm-open-webui
     restart: always
     ports:
       - "8080:8080"
@@ -149,14 +149,14 @@ services:
       retries: 10
       start_period: 300s
     networks:
-      - claude-internal
+      - insidellm-internal
 
   # -------------------------------------------------------------------------
   # Nginx — Reverse Proxy + TLS Termination
   # -------------------------------------------------------------------------
   nginx:
     image: nginx:1.27-alpine
-    container_name: claude-nginx
+    container_name: insidellm-nginx
     restart: always
     ports:
       - "80:80"
@@ -168,7 +168,7 @@ services:
       open-webui:
         condition: service_healthy
     networks:
-      - claude-internal
+      - insidellm-internal
 
 %{ if ollama_enable ~}
   # -------------------------------------------------------------------------
@@ -176,7 +176,7 @@ services:
   # -------------------------------------------------------------------------
   ollama:
     image: ollama/ollama:latest
-    container_name: claude-ollama
+    container_name: insidellm-ollama
     restart: always
     ports:
       - "11434:11434"
@@ -203,12 +203,12 @@ services:
         max-size: "50m"
         max-file: "3"
     networks:
-      - claude-internal
+      - insidellm-internal
 
   # Ollama model puller — runs once to download configured models
   ollama-pull:
     image: ollama/ollama:latest
-    container_name: claude-ollama-pull
+    container_name: insidellm-ollama-pull
     restart: "no"
     entrypoint: ["/bin/sh", "-c"]
     command:
@@ -223,11 +223,11 @@ services:
       ollama:
         condition: service_healthy
     networks:
-      - claude-internal
+      - insidellm-internal
 %{ endif ~}
 
 networks:
-  claude-internal:
+  insidellm-internal:
     driver: bridge
     ipam:
       config:
