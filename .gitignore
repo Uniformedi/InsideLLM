@@ -48,5 +48,5 @@ test-ssh.ps1
 test-winrm.ps1
 
 # Build artifacts
-terraform-claude-wrapper.tar.gz
+terraform-InsideLLM.tar.gz
 tfplan

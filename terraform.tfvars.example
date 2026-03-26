@@ -22,13 +22,13 @@ anthropic_api_key = "sk-ant-api03-YOUR_KEY_HERE"
 # =============================================================================
 # VM Configuration (adjust as needed)
 # =============================================================================
-vm_name              = "claude-wrapper"
-vm_processor_count   = 4
-# vm_memory_startup_bytes = 8589934592    # 8 GB (default)
+vm_name              = "InsideLLM"
+vm_processor_count   = 8                   # 8 CPUs (default, for Ollama); use 4 without Ollama
+# vm_memory_startup_bytes = 34359738368   # 32 GB (default, for Ollama); use 8589934592 (8 GB) without Ollama
 # vm_disk_size_bytes      = 85899345920   # 80 GB (default)
 vm_path              = "C:\\HyperV\\VMs"
 vm_vhd_path          = "C:\\HyperV\\VHDs"
-vm_hostname          = "claude-wrapper"
+vm_hostname          = "InsideLLM"
 vm_domain            = "uniformedi.local"
 ubuntu_vhdx_source   = "C:\\HyperV\\Images\\ubuntu-24.04-cloudimg-amd64.vhdx"
 
@@ -42,7 +42,7 @@ ubuntu_vhdx_source   = "C:\\HyperV\\Images\\ubuntu-24.04-cloudimg-amd64.vhdx"
 # vm_switch_adapter = "Ethernet"     # Your physical NIC name
 
 # Option B: Internal switch with static IP (default — NAT from host)
-vm_switch_name = "claude-internal"
+vm_switch_name = "InsideLLM"
 vm_switch_type = "Internal"
 vm_static_ip   = "192.168.100.10/24"
 vm_gateway     = "192.168.100.1"
@@ -83,6 +83,15 @@ litellm_default_user_tpm   = 100000
 # okta_domain        = "your-org.okta.com"
 
 # =============================================================================
+# Local LLM (Ollama) — uncomment to enable
+# =============================================================================
+# Ollama is enabled by default with two models. To disable:
+# ollama_enable = false
+# Then reduce VM resources: vm_processor_count = 4, vm_memory_startup_bytes = 8589934592
+ollama_models = ["qwen2.5-coder:14b", "qwen2.5:14b"]   # Models to pull on startup
+ollama_gpu    = false                              # Set true if VM has NVIDIA GPU + nvidia-container-toolkit
+
+# =============================================================================
 # DLP (Data Loss Prevention)
 # =============================================================================
 dlp_enable           = true
@@ -98,8 +107,8 @@ dlp_block_credentials = true
 # =============================================================================
 # TLS — leave empty for auto-generated self-signed cert
 # =============================================================================
-# tls_cert_path = "C:\\certs\\claude-wrapper.crt"
-# tls_key_path  = "C:\\certs\\claude-wrapper.key"
+# tls_cert_path = "C:\\certs\\InsideLLM.crt"
+# tls_key_path  = "C:\\certs\\InsideLLM.key"
 
 environment = "production"
 owner       = "[YOUR ORG]"

@@ -108,6 +108,8 @@ locals {
     default_user_rpm        = var.litellm_default_user_rpm
     default_user_tpm        = var.litellm_default_user_tpm
     global_max_budget       = var.litellm_global_max_budget
+    ollama_enable           = var.ollama_enable
+    ollama_models           = var.ollama_models
   })
 }
 
@@ -120,6 +122,9 @@ locals {
     webui_secret       = local.webui_secret
     sso_provider       = var.sso_provider
     sso_env            = local.sso_env
+    ollama_enable      = var.ollama_enable
+    ollama_models      = var.ollama_models
+    ollama_gpu         = var.ollama_gpu
   })
 }
 

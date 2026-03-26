@@ -45,42 +45,42 @@ packages:
 # ---------------------------------------------------------------------------
 write_files:
   # --- Docker Compose ---
-  - path: /opt/claude-wrapper/docker-compose.yml
+  - path: /opt/InsideLLM/docker-compose.yml
     permissions: "0640"
     owner: root:root
     content: |
       ${indent(6, docker_compose_yml)}
 
   # --- LiteLLM Config ---
-  - path: /opt/claude-wrapper/litellm-config.yaml
+  - path: /opt/InsideLLM/litellm-config.yaml
     permissions: "0640"
     owner: root:root
     content: |
       ${indent(6, litellm_config)}
 
   # --- Nginx Config ---
-  - path: /opt/claude-wrapper/nginx/nginx.conf
+  - path: /opt/InsideLLM/nginx/nginx.conf
     permissions: "0644"
     owner: root:root
     content: |
       ${indent(6, nginx_conf)}
 
   # --- TLS Certificate ---
-  - path: /opt/claude-wrapper/nginx/ssl/server.crt
+  - path: /opt/InsideLLM/nginx/ssl/server.crt
     permissions: "0644"
     owner: root:root
     content: |
       ${indent(6, tls_cert)}
 
   # --- TLS Private Key ---
-  - path: /opt/claude-wrapper/nginx/ssl/server.key
+  - path: /opt/InsideLLM/nginx/ssl/server.key
     permissions: "0600"
     owner: root:root
     content: |
       ${indent(6, tls_key)}
 
   # --- DLP Pipeline ---
-  - path: /opt/claude-wrapper/pipelines/dlp-pipeline.py
+  - path: /opt/InsideLLM/pipelines/dlp-pipeline.py
     permissions: "0644"
     owner: root:root
     content: |
@@ -139,7 +139,7 @@ write_files:
       fi
 
   # --- Post-deploy script ---
-  - path: /opt/claude-wrapper/post-deploy.sh
+  - path: /opt/InsideLLM/post-deploy.sh
     permissions: "0750"
     owner: root:root
     content: |
@@ -176,14 +176,14 @@ runcmd:
     ufw --force enable
 
   # --- Create required directories ---
-  - mkdir -p /opt/claude-wrapper/data/postgres
-  - mkdir -p /opt/claude-wrapper/data/redis
-  - mkdir -p /opt/claude-wrapper/data/open-webui
-  - mkdir -p /opt/claude-wrapper/pipelines
+  - mkdir -p /opt/InsideLLM/data/postgres
+  - mkdir -p /opt/InsideLLM/data/redis
+  - mkdir -p /opt/InsideLLM/data/open-webui
+  - mkdir -p /opt/InsideLLM/pipelines
 
   # --- Pull images and start the stack ---
   - |
-    cd /opt/claude-wrapper
+    cd /opt/InsideLLM
     docker compose pull
     docker compose up -d
 
@@ -191,11 +191,11 @@ runcmd:
   - |
     echo "Waiting 60 seconds for containers to initialize..."
     sleep 60
-    cd /opt/claude-wrapper
+    cd /opt/InsideLLM
     bash post-deploy.sh
 
   # --- Log completion ---
-  - echo "Cloud-init provisioning complete at $(date)" >> /var/log/claude-wrapper-deploy.log
+  - echo "Cloud-init provisioning complete at $(date)" >> /var/log/InsideLLM-deploy.log
 
 # ---------------------------------------------------------------------------
 # Final message

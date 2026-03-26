@@ -16,7 +16,7 @@ services:
       POSTGRES_USER: litellm
       POSTGRES_PASSWORD: "${postgres_password}"
     volumes:
-      - /opt/claude-wrapper/data/postgres:/var/lib/postgresql/data
+      - /opt/InsideLLM/data/postgres:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U litellm"]
       interval: 10s
@@ -34,7 +34,7 @@ services:
     restart: always
     command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
-      - /opt/claude-wrapper/data/redis:/data
+      - /opt/InsideLLM/data/redis:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -81,7 +81,7 @@ services:
       GENERIC_USER_DISPLAY_NAME_ATTRIBUTE: "name"
 %{ endif ~}
     volumes:
-      - /opt/claude-wrapper/litellm-config.yaml:/app/config.yaml
+      - /opt/InsideLLM/litellm-config.yaml:/app/config.yaml
     command: ["--config", "/app/config.yaml", "--port", "4000"]
     logging:
       driver: json-file
@@ -93,6 +93,10 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+%{ if ollama_enable ~}
+      ollama:
+        condition: service_healthy
+%{ endif ~}
     healthcheck:
       test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:4000/health/liveliness')\""]
       interval: 15s
@@ -133,8 +137,8 @@ services:
       # Security
       WEBUI_AUTH: "true"
     volumes:
-      - /opt/claude-wrapper/data/open-webui:/app/backend/data
-      - /opt/claude-wrapper/pipelines:/app/backend/pipelines
+      - /opt/InsideLLM/data/open-webui:/app/backend/data
+      - /opt/InsideLLM/pipelines:/app/backend/pipelines
     depends_on:
       litellm:
         condition: service_healthy
@@ -158,13 +162,69 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - /opt/claude-wrapper/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - /opt/claude-wrapper/nginx/ssl:/etc/nginx/ssl:ro
+      - /opt/InsideLLM/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - /opt/InsideLLM/nginx/ssl:/etc/nginx/ssl:ro
     depends_on:
       open-webui:
         condition: service_healthy
     networks:
       - claude-internal
+
+%{ if ollama_enable ~}
+  # -------------------------------------------------------------------------
+  # Ollama — Local LLM Inference Engine
+  # -------------------------------------------------------------------------
+  ollama:
+    image: ollama/ollama:latest
+    container_name: claude-ollama
+    restart: always
+    ports:
+      - "11434:11434"
+    volumes:
+      - /opt/InsideLLM/data/ollama:/root/.ollama
+%{ if ollama_gpu ~}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+%{ endif ~}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:11434/api/tags || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+    networks:
+      - claude-internal
+
+  # Ollama model puller — runs once to download configured models
+  ollama-pull:
+    image: ollama/ollama:latest
+    container_name: claude-ollama-pull
+    restart: "no"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+%{ for model in ollama_models ~}
+        echo "Pulling ${model}..." && ollama pull ${model}
+%{ endfor ~}
+        echo "All models pulled."
+    environment:
+      OLLAMA_HOST: "http://ollama:11434"
+    depends_on:
+      ollama:
+        condition: service_healthy
+    networks:
+      - claude-internal
+%{ endif ~}
 
 networks:
   claude-internal:

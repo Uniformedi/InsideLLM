@@ -49,19 +49,19 @@ variable "hyperv_insecure" {
 variable "vm_name" {
   description = "Name for the Hyper-V virtual machine"
   type        = string
-  default     = "claude-wrapper"
+  default     = "InsideLLM"
 }
 
 variable "vm_processor_count" {
-  description = "Number of virtual CPUs for the VM"
+  description = "Number of virtual CPUs for the VM (8 recommended with Ollama, 4 sufficient without)"
   type        = number
-  default     = 4
+  default     = 8
 }
 
 variable "vm_memory_startup_bytes" {
-  description = "VM startup memory in bytes (8GB = 8589934592)"
+  description = "VM startup memory in bytes (32GB default for Ollama; 8GB sufficient without: 8589934592)"
   type        = number
-  default     = 8589934592 # 8 GB
+  default     = 34359738368 # 32 GB
 }
 
 variable "vm_memory_dynamic" {
@@ -91,7 +91,7 @@ variable "vm_vhd_path" {
 variable "vm_switch_name" {
   description = "Name of the Hyper-V virtual switch to use (must have external/internal network access)"
   type        = string
-  default     = "claude-internal"
+  default     = "InsideLLM"
 }
 
 variable "vm_switch_type" {
@@ -142,7 +142,7 @@ variable "vm_dns_servers" {
 variable "vm_hostname" {
   description = "Hostname for the Ubuntu VM"
   type        = string
-  default     = "claude-wrapper"
+  default     = "InsideLLM"
 }
 
 variable "vm_domain" {
@@ -228,6 +228,28 @@ variable "litellm_default_user_tpm" {
   description = "Default tokens per minute per user"
   type        = number
   default     = 100000
+}
+
+# =============================================================================
+# LOCAL LLM (OLLAMA)
+# =============================================================================
+
+variable "ollama_enable" {
+  description = "Enable a local Ollama instance for self-hosted LLM models"
+  type        = bool
+  default     = true
+}
+
+variable "ollama_models" {
+  description = "List of Ollama model tags to pull on startup (e.g., [\"qwen2.5-coder:14b\", \"qwen2.5:14b\"])"
+  type        = list(string)
+  default     = ["qwen2.5-coder:14b", "qwen2.5:14b"]
+}
+
+variable "ollama_gpu" {
+  description = "Enable NVIDIA GPU passthrough for the Ollama container"
+  type        = bool
+  default     = false
 }
 
 # =============================================================================
@@ -365,5 +387,5 @@ variable "environment" {
 variable "owner" {
   description = "Owner of this deployment"
   type        = string
-  default     = "Uniformedi LLC"
+  default     = "Your Company Name"
 }
