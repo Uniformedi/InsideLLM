@@ -149,6 +149,7 @@ locals {
     tls_cert           = local.tls_cert
     tls_key            = local.tls_key
     dlp_pipeline_py    = file("${path.module}/configs/open-webui/dlp-pipeline.py")
+    admin_html         = file("${path.module}/admin.html")
     post_deploy_sh     = templatefile("${path.module}/scripts/post-deploy.sh.tpl", {
       litellm_master_key  = local.litellm_master_key
       default_user_budget = var.litellm_default_user_budget

@@ -22,6 +22,11 @@ output "litellm_admin_url" {
   value       = "https://${data.external.vm_ip.result.ip}/litellm/ui/chat"
 }
 
+output "admin_portal_url" {
+  description = "URL for the InsideLLM admin portal"
+  value       = "https://${data.external.vm_ip.result.ip}/admin"
+}
+
 output "netdata_url" {
   description = "URL for the Netdata monitoring dashboard"
   value       = "https://${data.external.vm_ip.result.ip}/netdata/"
@@ -58,6 +63,7 @@ output "deployment_notes" {
     ║           Inside LLM — Deployed                   ║
     ╠══════════════════════════════════════════════════════════════╣
     ║                                                              ║
+    ║  Admin Portal: https://${data.external.vm_ip.result.ip}/admin                 ║
     ║  Open WebUI:   https://${data.external.vm_ip.result.ip}                      ║
     ║  LiteLLM:      https://${data.external.vm_ip.result.ip}/litellm/ui           ║
     ║  Netdata:      https://${data.external.vm_ip.result.ip}/netdata/             ║

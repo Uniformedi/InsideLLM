@@ -86,6 +86,13 @@ write_files:
     content: |
       ${indent(6, dlp_pipeline_py)}
 
+  # --- Admin Portal ---
+  - path: /opt/InsideLLM/admin.html
+    permissions: "0644"
+    owner: root:root
+    content: |
+      ${indent(6, admin_html)}
+
   # --- Docker daemon config (log rotation) ---
   - path: /etc/docker/daemon.json
     permissions: "0644"
