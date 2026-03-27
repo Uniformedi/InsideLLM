@@ -22,6 +22,11 @@ output "litellm_admin_url" {
   value       = "https://${data.external.vm_ip.result.ip}/litellm/ui/chat"
 }
 
+output "netdata_url" {
+  description = "URL for the Netdata monitoring dashboard"
+  value       = "https://${data.external.vm_ip.result.ip}/netdata/"
+}
+
 output "ssh_command" {
   description = "SSH command to connect to the VM"
   value       = "ssh ${var.ssh_admin_user}@${data.external.vm_ip.result.ip}"
@@ -55,6 +60,8 @@ output "deployment_notes" {
     ║                                                              ║
     ║  Open WebUI:   https://${data.external.vm_ip.result.ip}                      ║
     ║  LiteLLM:      https://${data.external.vm_ip.result.ip}/litellm/ui           ║
+    ║  Netdata:      https://${data.external.vm_ip.result.ip}/netdata/             ║
+    ║  pgAdmin:      http://${data.external.vm_ip.result.ip}:5050                  ║
     ║  SSH:          ssh ${var.ssh_admin_user}@${data.external.vm_ip.result.ip}     ║
     ║                                                              ║
     ║  First Login:                                                ║

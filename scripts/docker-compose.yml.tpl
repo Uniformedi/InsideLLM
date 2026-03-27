@@ -26,7 +26,7 @@ services:
       - insidellm-internal
 
   # -------------------------------------------------------------------------
-  # Redis — Rate limit counters, session cache
+  # Redis — Rate limit counters, budget enforcement, LiteLLM state
   # -------------------------------------------------------------------------
   redis:
     image: redis:7-alpine
@@ -188,6 +188,45 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    networks:
+      - insidellm-internal
+
+  # -------------------------------------------------------------------------
+  # Netdata — Real-time System Monitoring
+  # -------------------------------------------------------------------------
+  netdata:
+    image: netdata/netdata:stable
+    container_name: insidellm-netdata
+    restart: always
+    pid: host
+    cap_add:
+      - SYS_PTRACE
+      - SYS_ADMIN
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - /etc/passwd:/host/etc/passwd:ro
+      - /etc/group:/host/etc/group:ro
+      - /etc/localtime:/etc/localtime:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /opt/InsideLLM/data/netdata:/var/lib/netdata
+    environment:
+      NETDATA_CLAIM_TOKEN: ""
+      NETDATA_EXTRA_DEB_PACKAGES: ""
+      DOCKER_HOST: "unix:///var/run/docker.sock"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:19999/api/v1/info"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - insidellm-internal
 

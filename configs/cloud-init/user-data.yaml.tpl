@@ -159,6 +159,11 @@ runcmd:
     systemctl start docker
     usermod -aG docker ${ssh_admin_user}
 
+  # --- Install Supply Chain Firewall (SCFW) as pip wrapper ---
+  - |
+    apt-get install -y pipx python3-pip
+    sudo -u ${ssh_admin_user} bash -c 'pipx ensurepath && export PATH="$HOME/.local/bin:$PATH" && pipx install scfw && scfw configure --alias-pip'
+
   # --- Configure log rotation and disk monitoring ---
   - |
     mkdir -p /etc/systemd/journald.conf.d
@@ -180,6 +185,7 @@ runcmd:
   - mkdir -p /opt/InsideLLM/data/redis
   - mkdir -p /opt/InsideLLM/data/open-webui
   - mkdir -p /opt/InsideLLM/data/pgadmin
+  - mkdir -p /opt/InsideLLM/data/netdata
   - mkdir -p /opt/InsideLLM/pipelines
 
   # --- Pull images and start the stack ---

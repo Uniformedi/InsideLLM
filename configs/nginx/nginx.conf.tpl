@@ -45,6 +45,10 @@ http {
         server litellm:4000;
     }
 
+    upstream netdata {
+        server netdata:19999;
+    }
+
     # --- HTTP -> HTTPS redirect ---
     server {
         listen 80;
@@ -125,6 +129,19 @@ http {
             proxy_set_header X-Forwarded-Proto $scheme;
             proxy_buffering off;
             proxy_read_timeout 300s;
+        }
+
+        # --- Netdata Monitoring Dashboard ---
+        location /netdata/ {
+            proxy_pass http://netdata/;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_buffering off;
         }
 
         # --- Health check ---
