@@ -144,6 +144,12 @@ http {
             proxy_buffering off;
         }
 
+        # --- Admin Portal ---
+        location /admin {
+            alias /opt/InsideLLM/admin.html;
+            default_type text/html;
+        }
+
         # --- Health check ---
         location /nginx-health {
             return 200 'OK';

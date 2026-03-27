@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>InsideLLM &mdash; Admin Portal</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #eef1f5; color: #1a202c; line-height: 1.7; font-size: 15px;
+    }
+
+    .hero {
+      background: linear-gradient(135deg, #1e3a5f, #2c5282, #2b6cb0);
+      padding: 36px 40px; text-align: center; border-bottom: 3px solid #2b6cb0;
+    }
+    .hero h1 { font-size: 2.2em; font-weight: 700; color: #fff; margin-bottom: 4px; }
+    .hero .subtitle { font-size: 1em; color: #cbd5e0; }
+
+    .container { max-width: 1100px; margin: 0 auto; padding: 24px 40px 60px; }
+
+    /* Status bar */
+    .status-bar {
+      display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 28px;
+      background: #fff; border: 1px solid #cbd5e0; border-radius: 8px; padding: 14px 18px;
+    }
+    .status-pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 4px 12px; border-radius: 16px; font-size: 0.82em; font-weight: 600;
+      background: #e2e8f0; color: #4a5568;
+    }
+    .status-pill .dot {
+      width: 8px; height: 8px; border-radius: 50%; display: inline-block;
+    }
+    .status-pill .dot.green { background: #38a169; }
+    .status-pill .dot.gray { background: #a0aec0; }
+    .status-pill .dot.spin {
+      background: #ecc94b;
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
+
+    /* Cards grid */
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; margin-bottom: 32px; }
+
+    .card {
+      background: #fff; border: 1px solid #cbd5e0; border-radius: 8px;
+      overflow: hidden; transition: box-shadow 0.2s;
+    }
+    .card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+    .card-header {
+      padding: 14px 18px; display: flex; align-items: center; gap: 10px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .card-header .icon {
+      width: 36px; height: 36px; border-radius: 8px; display: flex;
+      align-items: center; justify-content: center; font-size: 1.1em;
+      font-weight: 700; color: #fff; flex-shrink: 0;
+    }
+    .card-header h3 { font-size: 1.05em; color: #1a202c; }
+    .card-header .tag {
+      margin-left: auto; font-size: 0.72em; padding: 2px 8px; border-radius: 10px;
+      background: #ebf8ff; color: #2b6cb0; font-weight: 600;
+    }
+    .card-body { padding: 14px 18px; }
+    .card-body .desc { font-size: 0.88em; color: #718096; margin-bottom: 10px; }
+
+    .link-list { list-style: none; margin: 0; }
+    .link-list li {
+      display: flex; align-items: center; gap: 8px; padding: 5px 0;
+      border-bottom: 1px solid #f7fafc; font-size: 0.88em;
+    }
+    .link-list li:last-child { border-bottom: none; }
+    .link-list a { color: #2b6cb0; text-decoration: none; font-weight: 500; }
+    .link-list a:hover { text-decoration: underline; }
+    .link-list .label { color: #718096; min-width: 110px; flex-shrink: 0; }
+    .link-list .badge {
+      font-size: 0.72em; padding: 1px 6px; border-radius: 8px; font-weight: 600;
+      margin-left: auto; flex-shrink: 0;
+    }
+    .badge-get { background: #c6f6d5; color: #276749; }
+    .badge-post { background: #bee3f8; color: #2a4365; }
+    .badge-internal { background: #fefcbf; color: #744210; }
+
+    /* Section headers */
+    .section-title {
+      font-size: 1.3em; font-weight: 700; color: #1a202c; margin: 32px 0 14px;
+      padding-bottom: 8px; border-bottom: 2px solid #cbd5e0;
+    }
+
+    /* Endpoint tables */
+    .endpoint-table { width: 100%; border-collapse: collapse; margin: 12px 0 20px; font-size: 0.88em; }
+    .endpoint-table th {
+      text-align: left; padding: 8px 12px; background: #f7fafc; border-bottom: 2px solid #cbd5e0;
+      font-size: 0.85em; color: #4a5568; text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .endpoint-table td { padding: 7px 12px; border-bottom: 1px solid #e2e8f0; }
+    .endpoint-table tr:hover td { background: #f7fafc; }
+    .endpoint-table code {
+      background: #edf2f7; padding: 1px 5px; border-radius: 3px; font-size: 0.95em;
+      font-family: 'Cascadia Code','Fira Code','Consolas', monospace;
+    }
+    .method {
+      display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 0.78em;
+      font-weight: 700; min-width: 38px; text-align: center;
+    }
+    .method-get { background: #c6f6d5; color: #276749; }
+    .method-post { background: #bee3f8; color: #2a4365; }
+    .method-del { background: #fed7d7; color: #9b2c2c; }
+
+    /* Docs section */
+    .docs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+    .doc-link {
+      display: flex; align-items: center; gap: 10px; padding: 12px 16px;
+      background: #fff; border: 1px solid #e2e8f0; border-radius: 6px;
+      text-decoration: none; color: #1a202c; transition: border-color 0.2s;
+    }
+    .doc-link:hover { border-color: #2b6cb0; }
+    .doc-link .doc-icon {
+      width: 32px; height: 32px; border-radius: 6px; display: flex;
+      align-items: center; justify-content: center; font-size: 0.9em;
+      font-weight: 700; color: #fff; flex-shrink: 0;
+    }
+    .doc-link .doc-text { font-size: 0.88em; }
+    .doc-link .doc-text strong { display: block; font-size: 0.95em; }
+    .doc-link .doc-text span { color: #718096; font-size: 0.9em; }
+
+    /* Connection info */
+    .conn-box {
+      background: #1a202c; color: #a0aec0; border-radius: 8px; padding: 16px 20px;
+      font-family: 'Cascadia Code','Fira Code','Consolas', monospace;
+      font-size: 0.82em; margin: 10px 0; white-space: pre-wrap;
+    }
+    .conn-box .key { color: #63b3ed; }
+    .conn-box .val { color: #68d391; }
+    .conn-box .comment { color: #718096; }
+
+    /* Footer */
+    .footer { text-align: center; padding: 24px; color: #a0aec0; font-size: 0.82em; }
+
+    /* Host input */
+    .host-bar {
+      display: flex; align-items: center; gap: 10px; margin-bottom: 20px;
+      background: #fff; border: 1px solid #cbd5e0; border-radius: 8px; padding: 10px 16px;
+    }
+    .host-bar label { font-weight: 600; font-size: 0.88em; white-space: nowrap; }
+    .host-bar input {
+      flex: 1; padding: 6px 10px; border: 1px solid #cbd5e0; border-radius: 4px;
+      font-size: 0.9em; font-family: 'Cascadia Code','Consolas', monospace;
+    }
+    .host-bar input:focus { outline: none; border-color: #2b6cb0; }
+    .host-bar .hint { font-size: 0.78em; color: #a0aec0; }
+  </style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>InsideLLM Admin Portal</h1>
+  <div class="subtitle">Service dashboard, endpoints, and documentation for system administrators</div>
+</div>
+
+<div class="container">
+
+  <!-- Host configuration -->
+  <div class="host-bar">
+    <label>Host:</label>
+    <input type="text" id="hostInput" value="localhost" oninput="updateLinks()">
+    <span class="hint">Change to your VM IP or hostname to update all links below</span>
+  </div>
+
+  <!-- Live status bar -->
+  <div class="status-bar" id="statusBar">
+    <span class="status-pill"><span class="dot spin"></span>Checking services...</span>
+  </div>
+
+  <!-- Quick access cards -->
+  <div class="grid">
+    <div class="card">
+      <div class="card-header">
+        <div class="icon" style="background:#2b6cb0">OW</div>
+        <h3>Open WebUI</h3>
+        <span class="tag">Chat Interface</span>
+      </div>
+      <div class="card-body">
+        <p class="desc">Browser-based chat UI with RAG document Q&A, DLP scanning, and pipeline support.</p>
+        <ul class="link-list">
+          <li><span class="label">Chat</span><a class="svc-link" data-tpl="https://{host}">https://<span class="host-val">localhost</span></a></li>
+          <li><span class="label">Health</span><a class="svc-link" data-tpl="https://{host}/health">https://<span class="host-val">localhost</span>/health</a></li>
+          <li><span class="label">Admin Panel</span><span style="color:#718096;font-size:0.9em">Login &rarr; top-right avatar &rarr; Admin</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="icon" style="background:#38a169">LL</div>
+        <h3>LiteLLM</h3>
+        <span class="tag">API Gateway</span>
+      </div>
+      <div class="card-body">
+        <p class="desc">Authentication, model routing, per-user budgets, rate limiting, and audit logging.</p>
+        <ul class="link-list">
+          <li><span class="label">Dashboard</span><a class="svc-link" data-tpl="https://{host}/litellm/ui/chat">https://<span class="host-val">localhost</span>/litellm/ui/chat</a></li>
+          <li><span class="label">Swagger API</span><a class="svc-link" data-tpl="http://{host}:4000/">http://<span class="host-val">localhost</span>:4000/</a></li>
+          <li><span class="label">Health</span><a class="svc-link" data-tpl="https://{host}/litellm/health/liveliness">https://<span class="host-val">localhost</span>/litellm/health/liveliness</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="icon" style="background:#e53e3e">ND</div>
+        <h3>Netdata</h3>
+        <span class="tag">Monitoring</span>
+      </div>
+      <div class="card-body">
+        <p class="desc">Real-time monitoring of containers, host CPU/memory/disk, PostgreSQL, and Redis.</p>
+        <ul class="link-list">
+          <li><span class="label">Dashboard</span><a class="svc-link" data-tpl="https://{host}/netdata/">https://<span class="host-val">localhost</span>/netdata/</a></li>
+          <li><span class="label">API Info</span><a class="svc-link" data-tpl="https://{host}/netdata/api/v1/info">https://<span class="host-val">localhost</span>/netdata/api/v1/info</a></li>
+          <li><span class="label">All Charts</span><a class="svc-link" data-tpl="https://{host}/netdata/api/v1/charts">https://<span class="host-val">localhost</span>/netdata/api/v1/charts</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="icon" style="background:#d69e2e">PA</div>
+        <h3>pgAdmin</h3>
+        <span class="tag">Database UI</span>
+      </div>
+      <div class="card-body">
+        <p class="desc">PostgreSQL database administration. Manage users, spend logs, audit data, and teams.</p>
+        <ul class="link-list">
+          <li><span class="label">pgAdmin</span><a class="svc-link" data-tpl="http://{host}:5050">http://<span class="host-val">localhost</span>:5050</a></li>
+          <li><span class="label">Login</span><span style="color:#718096;font-size:0.9em">admin@insidellm.local / &lt;master key&gt;</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="icon" style="background:#805ad5">OL</div>
+        <h3>Ollama</h3>
+        <span class="tag">Local LLM</span>
+      </div>
+      <div class="card-body">
+        <p class="desc">Local open-source model inference. Only available if Ollama was enabled during setup.</p>
+        <ul class="link-list">
+          <li><span class="label">API</span><a class="svc-link" data-tpl="http://{host}:11434">http://<span class="host-val">localhost</span>:11434</a></li>
+          <li><span class="label">Models</span><a class="svc-link" data-tpl="http://{host}:11434/api/tags">http://<span class="host-val">localhost</span>:11434/api/tags</a></li>
+          <li><span class="label">Running</span><a class="svc-link" data-tpl="http://{host}:11434/api/ps">http://<span class="host-val">localhost</span>:11434/api/ps</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="icon" style="background:#4a5568">NX</div>
+        <h3>Nginx</h3>
+        <span class="tag">Reverse Proxy</span>
+      </div>
+      <div class="card-body">
+        <p class="desc">TLS termination, HTTPS routing, security headers. All traffic flows through Nginx.</p>
+        <ul class="link-list">
+          <li><span class="label">HTTP Health</span><a class="svc-link" data-tpl="http://{host}/health">http://<span class="host-val">localhost</span>/health</a></li>
+          <li><span class="label">HTTPS Health</span><a class="svc-link" data-tpl="https://{host}/nginx-health">https://<span class="host-val">localhost</span>/nginx-health</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Nginx routing table -->
+  <h2 class="section-title">Nginx Routing</h2>
+  <p style="font-size:0.9em;color:#718096;margin-bottom:10px">All external traffic enters through Nginx on ports 80 (HTTP redirect) and 443 (HTTPS).</p>
+  <table class="endpoint-table">
+    <thead><tr><th>Path</th><th>Upstream</th><th>Port</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td><code>/</code></td><td>Open WebUI</td><td>8080</td><td>Chat interface (default route). WebSocket enabled for streaming.</td></tr>
+      <tr><td><code>/v1/</code></td><td>LiteLLM</td><td>4000</td><td>OpenAI-compatible API. Use for Claude Code CLI.</td></tr>
+      <tr><td><code>/litellm/</code></td><td>LiteLLM</td><td>4000</td><td>Admin API, dashboard UI, team/key management.</td></tr>
+      <tr><td><code>/litellm-asset-prefix/</code></td><td>LiteLLM</td><td>4000</td><td>Next.js static assets for the LiteLLM dashboard.</td></tr>
+      <tr><td><code>/netdata/</code></td><td>Netdata</td><td>19999</td><td>Real-time monitoring dashboard.</td></tr>
+      <tr><td><code>/health</code></td><td>Nginx</td><td>&mdash;</td><td>HTTP health probe (port 80, no redirect).</td></tr>
+      <tr><td><code>/nginx-health</code></td><td>Nginx</td><td>&mdash;</td><td>HTTPS health probe (port 443).</td></tr>
+    </tbody>
+  </table>
+
+  <!-- LiteLLM API Endpoints -->
+  <h2 class="section-title">LiteLLM API Endpoints</h2>
+  <p style="font-size:0.9em;color:#718096;margin-bottom:4px">
+    All endpoints require a Bearer token (<code>Authorization: Bearer &lt;key&gt;</code>).<br>
+    Access via <code>https://&lt;host&gt;/litellm/</code> (through Nginx) or <code>http://&lt;host&gt;:4000/</code> (direct).
+  </p>
+
+  <h3 style="font-size:1.05em;color:#2b6cb0;margin:18px 0 6px">OpenAI-Compatible (via <code>/v1/</code>)</h3>
+  <table class="endpoint-table">
+    <thead><tr><th>Method</th><th>Endpoint</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td><span class="method method-get">GET</span></td><td><code>/v1/models</code></td><td>List available models</td></tr>
+      <tr><td><span class="method method-post">POST</span></td><td><code>/v1/chat/completions</code></td><td>Chat completions (primary API for Claude)</td></tr>
+      <tr><td><span class="method method-post">POST</span></td><td><code>/v1/completions</code></td><td>Text completions</td></tr>
+      <tr><td><span class="method method-post">POST</span></td><td><code>/v1/embeddings</code></td><td>Text embeddings</td></tr>
+    </tbody>
+  </table>
+
+  <h3 style="font-size:1.05em;color:#2b6cb0;margin:18px 0 6px">Team Management</h3>
+  <table class="endpoint-table">
+    <thead><tr><th>Method</th><th>Endpoint</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td><span class="method method-post">POST</span></td><td><code>/team/new</code></td><td>Create a new team</td></tr>
+      <tr><td><span class="method method-post">POST</span></td><td><code>/team/update</code></td><td>Update team settings/budget</td></tr>
+      <tr><td><span class="method method-post">POST</span></td><td><code>/team/member_add</code></td><td>Add member to a team</td></tr>
+      <tr><td><span class="method method-get">GET</span></td><td><code>/team/list</code></td><td>List all teams</td></tr>
+    </tbody>
+  </table>
+
+  <h3 style="font-size:1.05em;color:#2b6cb0;margin:18px 0 6px">API Key Management</h3>
+  <table class="endpoint-table">
+    <thead><tr><th>Method</th><th>Endpoint</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td><span class="method method-post">POST</span></td><td><code>/key/generate</code></td><td>Generate a new API key</td></tr>
+      <tr><td><span class="method method-get">GET</span></td><td><code>/key/info</code></td><td>Get key metadata</td></tr>
+      <tr><td><span class="method method-get">GET</span></td><td><code>/key/list</code></td><td>List all keys</td></tr>
+      <tr><td><span class="method method-post">POST</span></td><td><code>/key/update</code></td><td>Update key settings</td></tr>
+      <tr><td><span class="method method-post">POST</span></td><td><code>/key/delete</code></td><td>Delete a key</td></tr>
+      <tr><td><span class="method method-post">POST</span></td><td><code>/key/block</code></td><td>Block a key</td></tr>
+      <tr><td><span class="method method-post">POST</span></td><td><code>/key/unblock</code></td><td>Unblock a key</td></tr>
+    </tbody>
+  </table>
+
+  <h3 style="font-size:1.05em;color:#2b6cb0;margin:18px 0 6px">User &amp; Spend</h3>
+  <table class="endpoint-table">
+    <thead><tr><th>Method</th><th>Endpoint</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td><span class="method method-post">POST</span></td><td><code>/user/new</code></td><td>Create a user</td></tr>
+      <tr><td><span class="method method-get">GET</span></td><td><code>/user/info</code></td><td>Get user info and spend</td></tr>
+      <tr><td><span class="method method-post">POST</span></td><td><code>/user/update</code></td><td>Update user settings</td></tr>
+      <tr><td><span class="method method-get">GET</span></td><td><code>/spend/logs</code></td><td>Spend tracking logs</td></tr>
+      <tr><td><span class="method method-get">GET</span></td><td><code>/model/info</code></td><td>Get model configuration</td></tr>
+      <tr><td><span class="method method-post">POST</span></td><td><code>/model/new</code></td><td>Add a model at runtime</td></tr>
+    </tbody>
+  </table>
+
+  <h3 style="font-size:1.05em;color:#2b6cb0;margin:18px 0 6px">Health Checks</h3>
+  <table class="endpoint-table">
+    <thead><tr><th>Method</th><th>Endpoint</th><th>Auth</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td><span class="method method-get">GET</span></td><td><code>/health/liveliness</code></td><td>No</td><td>Liveness probe (used in Docker healthcheck)</td></tr>
+      <tr><td><span class="method method-get">GET</span></td><td><code>/health</code></td><td>Yes</td><td>Full proxy + backend health</td></tr>
+      <tr><td><span class="method method-get">GET</span></td><td><code>/health/services</code></td><td>Admin</td><td>Connected services status (Langfuse, Slack)</td></tr>
+    </tbody>
+  </table>
+
+  <!-- Ollama API -->
+  <h2 class="section-title">Ollama API Endpoints</h2>
+  <p style="font-size:0.9em;color:#718096;margin-bottom:10px">Direct access at <code>http://&lt;host&gt;:11434</code>. Only available if Ollama was enabled.</p>
+  <table class="endpoint-table">
+    <thead><tr><th>Method</th><th>Endpoint</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td><span class="method method-post">POST</span></td><td><code>/api/chat</code></td><td>Chat completion</td></tr>
+      <tr><td><span class="method method-post">POST</span></td><td><code>/api/generate</code></td><td>Text generation</td></tr>
+      <tr><td><span class="method method-post">POST</span></td><td><code>/api/embeddings</code></td><td>Generate embeddings</td></tr>
+      <tr><td><span class="method method-get">GET</span></td><td><code>/api/tags</code></td><td>List installed models</td></tr>
+      <tr><td><span class="method method-get">GET</span></td><td><code>/api/ps</code></td><td>List running models</td></tr>
+      <tr><td><span class="method method-post">POST</span></td><td><code>/api/pull</code></td><td>Pull a model from registry</td></tr>
+      <tr><td><span class="method method-post">POST</span></td><td><code>/api/show</code></td><td>Show model details</td></tr>
+      <tr><td><span class="method method-del">DEL</span></td><td><code>/api/delete</code></td><td>Delete a model</td></tr>
+    </tbody>
+  </table>
+
+  <!-- Connection details -->
+  <h2 class="section-title">Internal Connection Details</h2>
+  <p style="font-size:0.9em;color:#718096;margin-bottom:10px">These services are internal to the Docker network. Access them via pgAdmin or SSH into the VM/WSL.</p>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div>
+      <h3 style="font-size:1em;color:#2b6cb0;margin-bottom:6px">PostgreSQL</h3>
+      <div class="conn-box"><span class="key">Host:</span>     <span class="val">postgres</span>  <span class="comment">(Docker network)</span>
+<span class="key">Port:</span>     <span class="val">5432</span>
+<span class="key">Database:</span> <span class="val">litellm</span>
+<span class="key">User:</span>     <span class="val">litellm</span>
+<span class="key">Password:</span> <span class="val">&lt;postgres_password&gt;</span>
+
+<span class="comment"># Convenience views (created by post-deploy):</span>
+<span class="val">spend_logs, audit_log, users, teams,
+api_keys, daily_user_spend, daily_team_spend,
+error_logs, models, budgets</span></div>
+    </div>
+    <div>
+      <h3 style="font-size:1em;color:#2b6cb0;margin-bottom:6px">Redis</h3>
+      <div class="conn-box"><span class="key">Host:</span>       <span class="val">redis</span>  <span class="comment">(Docker network)</span>
+<span class="key">Port:</span>       <span class="val">6379</span>
+<span class="key">Max Memory:</span> <span class="val">256 MB</span>
+<span class="key">Eviction:</span>   <span class="val">allkeys-lru</span>
+
+<span class="comment"># Stores:</span>
+<span class="val">Rate limit counters (RPM/TPM per user)
+Budget enforcement (daily/monthly)
+LiteLLM operational state</span></div>
+    </div>
+  </div>
+
+  <!-- Claude Code CLI -->
+  <h2 class="section-title">Claude Code CLI Setup</h2>
+  <div class="conn-box"><span class="comment"># PowerShell</span>
+<span class="key">$env:ANTHROPIC_BASE_URL</span> = <span class="val">"http://<span class="host-val">localhost</span>:4000"</span>
+<span class="key">$env:ANTHROPIC_AUTH_TOKEN</span> = <span class="val">"&lt;your-litellm-api-key&gt;"</span>
+
+<span class="comment"># Bash / Linux</span>
+<span class="key">export ANTHROPIC_BASE_URL</span>=<span class="val">"http://<span class="host-val">localhost</span>:4000"</span>
+<span class="key">export ANTHROPIC_AUTH_TOKEN</span>=<span class="val">"&lt;your-litellm-api-key&gt;"</span></div>
+
+  <!-- Documentation links -->
+  <h2 class="section-title">Documentation &amp; References</h2>
+
+  <div class="docs-grid">
+    <a class="doc-link" href="https://docs.litellm.ai/docs/" target="_blank">
+      <div class="doc-icon" style="background:#38a169">LL</div>
+      <div class="doc-text"><strong>LiteLLM Docs</strong><span>Proxy config, model management, RBAC</span></div>
+    </a>
+    <a class="doc-link" href="https://docs.litellm.ai/docs/proxy/configs" target="_blank">
+      <div class="doc-icon" style="background:#38a169">LL</div>
+      <div class="doc-text"><strong>LiteLLM Proxy Config</strong><span>YAML configuration reference</span></div>
+    </a>
+    <a class="doc-link" href="https://docs.litellm.ai/docs/proxy/cost_tracking" target="_blank">
+      <div class="doc-icon" style="background:#38a169">LL</div>
+      <div class="doc-text"><strong>LiteLLM Spend Tracking</strong><span>Budgets, cost alerts, spend logs</span></div>
+    </a>
+    <a class="doc-link" href="https://docs.litellm.ai/docs/proxy/access_control" target="_blank">
+      <div class="doc-icon" style="background:#38a169">LL</div>
+      <div class="doc-text"><strong>LiteLLM RBAC</strong><span>Teams, keys, roles, SSO</span></div>
+    </a>
+    <a class="doc-link" href="https://docs.openwebui.com/" target="_blank">
+      <div class="doc-icon" style="background:#2b6cb0">OW</div>
+      <div class="doc-text"><strong>Open WebUI Docs</strong><span>Configuration, pipelines, RAG</span></div>
+    </a>
+    <a class="doc-link" href="https://docs.openwebui.com/reference/api-endpoints/" target="_blank">
+      <div class="doc-icon" style="background:#2b6cb0">OW</div>
+      <div class="doc-text"><strong>Open WebUI API</strong><span>REST API endpoint reference</span></div>
+    </a>
+    <a class="doc-link" href="https://github.com/ollama/ollama/blob/main/docs/api.md" target="_blank">
+      <div class="doc-icon" style="background:#805ad5">OL</div>
+      <div class="doc-text"><strong>Ollama API Reference</strong><span>Generate, chat, embeddings, models</span></div>
+    </a>
+    <a class="doc-link" href="https://learn.netdata.cloud/docs/developer-and-contributor-corner/rest-api" target="_blank">
+      <div class="doc-icon" style="background:#e53e3e">ND</div>
+      <div class="doc-text"><strong>Netdata REST API</strong><span>Charts, data queries, alarms</span></div>
+    </a>
+    <a class="doc-link" href="https://www.pgadmin.org/docs/pgadmin4/latest/" target="_blank">
+      <div class="doc-icon" style="background:#d69e2e">PA</div>
+      <div class="doc-text"><strong>pgAdmin Documentation</strong><span>Database admin UI guide</span></div>
+    </a>
+    <a class="doc-link" href="https://www.postgresql.org/docs/16/" target="_blank">
+      <div class="doc-icon" style="background:#336791">PG</div>
+      <div class="doc-text"><strong>PostgreSQL 16 Docs</strong><span>SQL reference, administration</span></div>
+    </a>
+    <a class="doc-link" href="https://redis.io/docs/latest/" target="_blank">
+      <div class="doc-icon" style="background:#dc382d">RD</div>
+      <div class="doc-text"><strong>Redis Docs</strong><span>Commands, configuration, data types</span></div>
+    </a>
+    <a class="doc-link" href="https://nginx.org/en/docs/" target="_blank">
+      <div class="doc-icon" style="background:#4a5568">NX</div>
+      <div class="doc-text"><strong>Nginx Documentation</strong><span>Reverse proxy, TLS, configuration</span></div>
+    </a>
+    <a class="doc-link" href="https://github.com/DataDog/supply-chain-firewall" target="_blank">
+      <div class="doc-icon" style="background:#632ca6">SC</div>
+      <div class="doc-text"><strong>SCFW (Supply Chain Firewall)</strong><span>pip wrapper, malicious package blocking</span></div>
+    </a>
+    <a class="doc-link" href="https://github.com/BerriAI/litellm" target="_blank">
+      <div class="doc-icon" style="background:#24292e">GH</div>
+      <div class="doc-text"><strong>LiteLLM GitHub</strong><span>Source code, issues, releases</span></div>
+    </a>
+    <a class="doc-link" href="https://github.com/open-webui/open-webui" target="_blank">
+      <div class="doc-icon" style="background:#24292e">GH</div>
+      <div class="doc-text"><strong>Open WebUI GitHub</strong><span>Source code, issues, releases</span></div>
+    </a>
+    <a class="doc-link" href="https://github.com/netdata/netdata" target="_blank">
+      <div class="doc-icon" style="background:#24292e">GH</div>
+      <div class="doc-text"><strong>Netdata GitHub</strong><span>Source code, issues, releases</span></div>
+    </a>
+  </div>
+
+  <!-- Port summary -->
+  <h2 class="section-title">Port Summary</h2>
+  <table class="endpoint-table">
+    <thead><tr><th>Port</th><th>Service</th><th>Protocol</th><th>Access</th></tr></thead>
+    <tbody>
+      <tr><td><code>80</code></td><td>Nginx</td><td>HTTP</td><td>Redirects to HTTPS</td></tr>
+      <tr><td><code>443</code></td><td>Nginx</td><td>HTTPS</td><td>Primary entry point (Open WebUI, LiteLLM, Netdata)</td></tr>
+      <tr><td><code>4000</code></td><td>LiteLLM</td><td>HTTP</td><td>Direct API access + Swagger UI</td></tr>
+      <tr><td><code>5050</code></td><td>pgAdmin</td><td>HTTP</td><td>Database administration</td></tr>
+      <tr><td><code>11434</code></td><td>Ollama</td><td>HTTP</td><td>Local LLM API (if enabled)</td></tr>
+      <tr><td><code>5432</code></td><td>PostgreSQL</td><td>TCP</td><td>Internal only (Docker network)</td></tr>
+      <tr><td><code>6379</code></td><td>Redis</td><td>TCP</td><td>Internal only (Docker network)</td></tr>
+      <tr><td><code>19999</code></td><td>Netdata</td><td>HTTP</td><td>Internal only (via Nginx at /netdata/)</td></tr>
+    </tbody>
+  </table>
+
+  <div class="footer">
+    InsideLLM &mdash; Admin Portal &mdash; <a href="https://github.com/Uniformedi/InsideLLM" target="_blank" style="color:#2b6cb0">github.com/Uniformedi/InsideLLM</a>
+  </div>
+</div>
+
+<script>
+// Update all links when host changes
+function updateLinks() {
+  const host = document.getElementById('hostInput').value.trim() || 'localhost';
+
+  // Update inline host text
+  document.querySelectorAll('.host-val').forEach(el => { el.textContent = host; });
+
+  // Update anchor hrefs
+  document.querySelectorAll('.svc-link').forEach(a => {
+    const tpl = a.getAttribute('data-tpl');
+    if (tpl) a.href = tpl.replace('{host}', host);
+  });
+
+  // Re-check health
+  checkHealth();
+}
+
+// Health check with status pills
+const services = [
+  { name: 'Nginx',    url: (h) => `https://${h}/nginx-health`,              ok: [200] },
+  { name: 'Open WebUI', url: (h) => `https://${h}/health`,                  ok: [200] },
+  { name: 'LiteLLM',  url: (h) => `https://${h}/litellm/health/liveliness`, ok: [200] },
+  { name: 'Netdata',  url: (h) => `https://${h}/netdata/api/v1/info`,       ok: [200] },
+  { name: 'pgAdmin',  url: (h) => `http://${h}:5050`,                       ok: [200, 302] },
+  { name: 'Ollama',   url: (h) => `http://${h}:11434`,                      ok: [200] },
+];
+
+let checkTimeout = null;
+function checkHealth() {
+  clearTimeout(checkTimeout);
+  const host = document.getElementById('hostInput').value.trim() || 'localhost';
+  const bar = document.getElementById('statusBar');
+
+  bar.innerHTML = services.map(s =>
+    `<span class="status-pill" id="status-${s.name}"><span class="dot spin"></span>${s.name}</span>`
+  ).join('');
+
+  services.forEach(s => {
+    const pill = document.getElementById(`status-${s.name}`);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 4000);
+
+    fetch(s.url(host), { mode: 'no-cors', signal: controller.signal, cache: 'no-store' })
+      .then(() => {
+        clearTimeout(timer);
+        pill.querySelector('.dot').className = 'dot green';
+      })
+      .catch(() => {
+        clearTimeout(timer);
+        pill.querySelector('.dot').className = 'dot gray';
+      });
+  });
+
+  // Re-check every 30 seconds
+  checkTimeout = setTimeout(checkHealth, 30000);
+}
+
+// Init
+updateLinks();
+</script>
+
+</body>
+</html>

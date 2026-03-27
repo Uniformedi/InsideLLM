@@ -608,6 +608,11 @@ http {
             proxy_buffering off;
         }
 
+        location /admin {
+            alias /opt/InsideLLM/admin.html;
+            default_type text/html;
+        }
+
         location /nginx-health {
             return 200 'OK';
             add_header Content-Type text/plain;
@@ -896,6 +901,16 @@ if (Test-Path $dlpSource) {
     Write-Warn "DLP pipeline not found at $dlpSource - skipping (deploy manually later)"
 }
 
+# --- Admin Portal ---
+$adminSource = Join-Path $PSScriptRoot "admin.html"
+if (Test-Path $adminSource) {
+    $adminContent = Get-Content $adminSource -Raw
+    Write-WslFile -Path "$InstallPath/admin.html" -Content $adminContent -Permissions "0644"
+    Write-Ok "Admin portal"
+} else {
+    Write-Warn "admin.html not found at $adminSource - skipping"
+}
+
 # --- Post-deploy script ---
 $postDeploy = @'
 #!/bin/bash
@@ -1150,6 +1165,13 @@ $lnk.Description = "PostgreSQL database administration"
 $lnk.IconLocation = "shell32.dll,12"
 $lnk.Save()
 
+# Admin Portal
+$lnk = $shell.CreateShortcut("$shortcutFolder\InsideLLM - Admin Portal.lnk")
+$lnk.TargetPath = "https://localhost/admin"
+$lnk.Description = "InsideLLM admin portal - all services, endpoints, and docs"
+$lnk.IconLocation = "shell32.dll,22"
+$lnk.Save()
+
 # Netdata Monitoring
 $lnk = $shell.CreateShortcut("$shortcutFolder\InsideLLM - Monitoring.lnk")
 $lnk.TargetPath = "https://localhost/netdata/"
@@ -1194,6 +1216,7 @@ Write-Host "============================================================" -Foreg
 Write-Host "  InsideLLM - Deployed on WSL2" -ForegroundColor Green
 Write-Host "============================================================" -ForegroundColor Green
 Write-Host ""
+Write-Host "  Admin Portal:   https://localhost/admin"
 Write-Host "  Open WebUI:     https://localhost"
 Write-Host "  LiteLLM UI:     https://localhost/litellm/ui/chat"
 Write-Host "  LiteLLM API:    http://localhost:4000"
