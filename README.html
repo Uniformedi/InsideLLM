@@ -274,6 +274,8 @@
     <h3 style="color:#38a169;margin-bottom:8px">What's New in 2.0</h3>
     <ul style="list-style:none;margin:0">
       <li><strong>WSL2 deployment path</strong> &mdash; single PowerShell script, no Terraform or Hyper-V required</li>
+      <li><strong>Standalone initialization script</strong> &mdash; provision WSL2, Docker, SCFW, and TLS separately (<code>Initialize-InsideLLM.ps1</code>)</li>
+      <li><strong>Supply Chain Firewall (SCFW)</strong> &mdash; Datadog's supply-chain-firewall wraps <code>pip</code> to block known-malicious PyPI packages</li>
       <li><strong>Local LLM support (Ollama)</strong> &mdash; run open-source models locally alongside Claude</li>
       <li><strong>GPU acceleration</strong> &mdash; native GPU via WSL2, or GPU-PV/DDA for Hyper-V</li>
       <li><strong>Setup Wizard</strong> &mdash; interactive HTML form that generates your config file</li>
@@ -304,6 +306,7 @@
       <li><strong>Document Q&amp;A (RAG)</strong> with local embeddings &mdash; upload files and ask questions against them</li>
       <li><strong>SSO integration</strong> with Azure AD or Okta (OIDC)</li>
       <li><strong>Per-user budgets and rate limits</strong> with real-time enforcement</li>
+      <li><strong>Real-time monitoring</strong> of containers, host resources, and database metrics (Netdata)</li>
       <li><strong>Full audit trail</strong> of every API call</li>
     </ul>
   </div>
@@ -617,6 +620,8 @@ Exposed Host Ports:
       <tr><td><strong>Reverse Proxy</strong></td><td>Nginx</td><td>BSD-2</td><td>1.27</td><td>TLS termination, HTTPS routing, security headers</td></tr>
       <tr><td><strong>Database</strong></td><td>PostgreSQL</td><td>PostgreSQL</td><td>16</td><td>User data, spend tracking, team budgets, audit logs</td></tr>
       <tr><td><strong>Cache</strong></td><td>Redis</td><td>BSD-3</td><td>7</td><td>Rate limit counters, response cache, session data</td></tr>
+      <tr><td><strong>Monitoring</strong></td><td>Netdata</td><td>GPL-3</td><td>stable</td><td>Real-time monitoring of containers, host, PostgreSQL, Redis</td></tr>
+      <tr><td><strong>Supply Chain</strong></td><td>SCFW</td><td>Apache 2.0</td><td>latest</td><td>Blocks malicious PyPI packages before pip install</td></tr>
       <tr><td><strong>Containers</strong></td><td>Docker + Compose</td><td>Apache 2.0</td><td>CE</td><td>Container orchestration, networking, health checks</td></tr>
       <tr><td><strong>IaC</strong></td><td>Terraform</td><td>BSL 1.1</td><td>&ge; 1.5</td><td>Infrastructure provisioning, config templating (Hyper-V path)</td></tr>
       <tr><td><strong>Provisioning</strong></td><td>cloud-init</td><td>Apache 2.0</td><td>default</td><td>First-boot VM automation (Hyper-V path)</td></tr>
@@ -1380,9 +1385,10 @@ okta_domain        = "your-org.okta.com"</pre>
     <div class="layer"><span class="layer-num">Layer 3</span><span class="layer-name">Application</span><span class="layer-desc">Security headers (X-Frame-Options, X-Content-Type-Options, X-XSS-Protection, Referrer-Policy, HSTS). WebSocket support. 50 MB body limit.</span></div>
     <div class="layer"><span class="layer-num">Layer 4</span><span class="layer-name">Authentication</span><span class="layer-desc">Azure AD / Okta SSO (OIDC). Per-user API keys (team-scoped). Master key for admin. SSH key-only access.</span></div>
     <div class="layer"><span class="layer-num">Layer 5</span><span class="layer-name">Authorization</span><span class="layer-desc">Team-based model access (not all users get Opus). Role-based UI access (admin / user). Community sharing disabled.</span></div>
-    <div class="layer"><span class="layer-num">Layer 6</span><span class="layer-name">Data Protection</span><span class="layer-desc">DLP pipeline: PII, PHI, credentials blocked/redacted. Inlet scanning (messages + uploaded files). Outlet scanning (assistant responses + RAG excerpts).</span></div>
-    <div class="layer"><span class="layer-num">Layer 7</span><span class="layer-name">Cost Protection</span><span class="layer-desc">Per-user daily budgets ($5/day default). Global monthly cap ($100/month). Rate limiting: 30 RPM / 100K TPM. 80% budget alert via Slack.</span></div>
-    <div class="layer"><span class="layer-num">Layer 8</span><span class="layer-name">Audit</span><span class="layer-desc">Langfuse callbacks on every LLM call. DLP detection logging (without sensitive data). PostgreSQL spend tracking. Docker health checks.</span></div>
+    <div class="layer"><span class="layer-num">Layer 6</span><span class="layer-name">Supply Chain Security</span><span class="layer-desc">SCFW (Supply Chain Firewall) wraps pip inside WSL2. Blocks known-malicious PyPI packages (Datadog dataset). Warns on packages &lt; 24 hours old. OSV.dev vulnerability advisory checks.</span></div>
+    <div class="layer"><span class="layer-num">Layer 7</span><span class="layer-name">Data Protection</span><span class="layer-desc">DLP pipeline: PII, PHI, credentials blocked/redacted. Inlet scanning (messages + uploaded files). Outlet scanning (assistant responses + RAG excerpts).</span></div>
+    <div class="layer"><span class="layer-num">Layer 8</span><span class="layer-name">Cost Protection</span><span class="layer-desc">Per-user daily budgets ($5/day default). Global monthly cap ($100/month). Rate limiting: 30 RPM / 100K TPM. 80% budget alert via Slack.</span></div>
+    <div class="layer"><span class="layer-num">Layer 9</span><span class="layer-name">Audit &amp; Observability</span><span class="layer-desc">Netdata real-time monitoring (containers, host, DB, Redis). Langfuse callbacks on every LLM call. DLP detection logging (without sensitive data). PostgreSQL spend tracking. Docker health checks.</span></div>
   </div>
 
   <h3>Secret Management</h3>
@@ -1623,10 +1629,24 @@ curl -sk https://localhost/health                     # Open WebUI (via Nginx)</
   <h3>Quick Start</h3>
   <div class="code-block">
     <span class="lang-label">PowerShell (Admin)</span>
-    <pre>.\Install-InsideLLM-WSL.ps1 -AnthropicApiKey "sk-ant-api03-..."</pre>
+    <pre>powershell -ExecutionPolicy Bypass -File .\Install-InsideLLM-WSL.ps1 -AnthropicApiKey "sk-ant-api03-..."</pre>
   </div>
-  <p>The script handles WSL2 installation, Docker setup, config generation,
-  container deployment, and port forwarding automatically.</p>
+  <p>The script handles WSL2 installation, Docker setup, SCFW deployment, TLS certificate
+  generation, config generation, container deployment, and port forwarding automatically.</p>
+
+  <h3>Separate Initialization (Optional)</h3>
+  <p>To provision the base environment (WSL2, Docker, SCFW, TLS) without deploying
+  the application stack, use the standalone initialization script:</p>
+  <div class="code-block">
+    <span class="lang-label">PowerShell (Admin)</span>
+    <pre># Infrastructure only:
+powershell -ExecutionPolicy Bypass -File .\Initialize-InsideLLM.ps1
+
+# Then deploy the stack later:
+powershell -ExecutionPolicy Bypass -File .\Install-InsideLLM-WSL.ps1 -AnthropicApiKey "sk-ant-api03-..."</pre>
+  </div>
+  <p>Both scripts are idempotent &mdash; <code>Install-InsideLLM-WSL.ps1</code> will skip any
+  steps already completed by <code>Initialize-InsideLLM.ps1</code>.</p>
 
   <h3>Disabling Ollama (lighter deployment)</h3>
   <div class="code-block">

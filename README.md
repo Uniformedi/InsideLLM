@@ -8,6 +8,8 @@
 ### What's New in 2.0
 
 - **WSL2 deployment path** -- single PowerShell script, no Terraform or Hyper-V required (`Install-InsideLLM-WSL.ps1`)
+- **Standalone initialization script** -- provision WSL2, Docker, SCFW, and TLS separately (`Initialize-InsideLLM.ps1`)
+- **Supply Chain Firewall (SCFW)** -- Datadog's [supply-chain-firewall](https://github.com/DataDog/supply-chain-firewall) wraps `pip` to block known-malicious PyPI packages before installation
 - **Local LLM support (Ollama)** -- run open-source models locally alongside Claude (Qwen 2.5 Coder 14B + Qwen 2.5 14B by default)
 - **GPU acceleration** -- native GPU via WSL2, or GPU-PV/DDA passthrough for Hyper-V (`Setup-GPU-Passthrough.ps1`)
 - **Setup Wizard** -- interactive HTML form that generates your config file (`Setup.html`)
@@ -51,6 +53,7 @@ services that deliver:
 - **Document Q&A (RAG)** with local embeddings — upload files and ask questions against them
 - **SSO integration** with Azure AD or Okta (OIDC)
 - **Per-user budgets and rate limits** with real-time enforcement
+- **Real-time monitoring** of containers, host resources, and database metrics (Netdata)
 - **Full audit trail** of every API call
 
 All traffic to Anthropic's API is brokered through this internal stack. The
@@ -187,6 +190,11 @@ Docker Bridge Network: insidellm-internal (172.28.0.0/16)
           |  :80  :443   |  <--------  External Users
           +--------------+
 
+          +------+-------+
+          |   Netdata    |
+          |  :19999      |
+          +--------------+
+
 Exposed Host Ports:
   80   -> Nginx   (HTTP redirect to HTTPS)
   443  -> Nginx   (HTTPS -- primary entry point)
@@ -262,6 +270,8 @@ All components are **free and open-source software (FOSS)**:
 | **Reverse Proxy** | [Nginx](https://nginx.org/) | BSD-2 | 1.27 | TLS termination, HTTPS routing, security headers |
 | **Database** | [PostgreSQL](https://www.postgresql.org/) | PostgreSQL | 16 | User data, spend tracking, team budgets, audit logs |
 | **Cache** | [Redis](https://redis.io/) | BSD-3 | 7 | Rate limit counters, response cache, session data |
+| **Monitoring** | [Netdata](https://www.netdata.cloud/) | GPL-3 | stable | Real-time monitoring of containers, host, PostgreSQL, Redis |
+| **Supply Chain** | [SCFW](https://github.com/DataDog/supply-chain-firewall) | Apache 2.0 | latest | Blocks malicious PyPI packages before pip install |
 | **Containers** | [Docker](https://www.docker.com/) + [Compose](https://docs.docker.com/compose/) | Apache 2.0 | CE | Container orchestration, networking, health checks |
 | **IaC** | [Terraform](https://www.terraform.io/) | BSL 1.1 | >= 1.5 | Infrastructure provisioning, config templating (Hyper-V path) |
 | **Provisioning** | [cloud-init](https://cloudinit.readthedocs.io/) | Apache 2.0 | default | First-boot VM automation (Hyper-V path) |
@@ -1119,7 +1129,15 @@ LAYER 5: Authorization
 | Community sharing disabled                                |
 +------------------------------------------------------------+
 
-LAYER 6: Data Protection (DLP)
+LAYER 6: Supply Chain Security
++------------------------------------------------------------+
+| SCFW (Supply Chain Firewall) wraps pip inside WSL2        |
+| Blocks known-malicious PyPI packages (Datadog dataset)    |
+| Warns on packages < 24 hours old                          |
+| OSV.dev vulnerability advisory checks                     |
++------------------------------------------------------------+
+
+LAYER 7: Data Protection (DLP)
 +------------------------------------------------------------+
 | DLP pipeline: PII, PHI, credentials blocked/redacted      |
 | Inlet scanning (messages + uploaded files)                |
@@ -1127,7 +1145,7 @@ LAYER 6: Data Protection (DLP)
 | Custom patterns for org-specific data                     |
 +------------------------------------------------------------+
 
-LAYER 7: Cost Protection
+LAYER 8: Cost Protection
 +------------------------------------------------------------+
 | Per-user daily budgets ($5/day default)                    |
 | Global monthly cap ($100/month default)                   |
@@ -1135,8 +1153,9 @@ LAYER 7: Cost Protection
 | 80% budget alert via Slack                                |
 +------------------------------------------------------------+
 
-LAYER 8: Audit & Observability
+LAYER 9: Audit & Observability
 +------------------------------------------------------------+
+| Netdata real-time monitoring (containers, host, DB, Redis)|
 | Langfuse callbacks on every LLM call                      |
 | DLP detection logging (without sensitive data)            |
 | PostgreSQL spend tracking                                 |
@@ -1330,6 +1349,7 @@ curl -sk https://localhost/health               # Open WebUI (via Nginx)
 | Redis | `redis-cli ping` | 10s |
 | LiteLLM | `python3 urllib > /health/liveliness` | 15s |
 | Open WebUI | `curl > /health` | 15s |
+| Netdata | `curl > /api/v1/info` | 15s |
 | Nginx | Depends on Open WebUI health | -- |
 
 External monitoring endpoints:
@@ -1339,13 +1359,16 @@ External monitoring endpoints:
 ### File Structure
 
 ```
-InternalClaude/
+InsideLLM/
 +-- main.tf                             # Root module: VM + provisioning
 +-- variables.tf                        # All input variables
 +-- outputs.tf                          # VM IP, URLs, secrets
 +-- providers.tf                        # Hyper-V provider config
 +-- terraform.tfvars.example            # Template for your values
++-- Setup.html                          # Interactive setup wizard
 +-- Setup-Prerequisites.ps1             # Windows host preparation
++-- Initialize-InsideLLM.ps1            # Standalone: WSL2 + Docker + SCFW + TLS
++-- Install-InsideLLM-WSL.ps1           # Full WSL2 deployment (includes init steps)
 +-- configs/
 |   +-- cloud-init/
 |   |   +-- user-data.yaml.tpl          # VM first-boot provisioning
@@ -1393,12 +1416,29 @@ configuration as the Hyper-V path.
 ### Quick Start
 
 ```powershell
-# Run as Administrator
-.\Install-InsideLLM-WSL.ps1 -AnthropicApiKey "sk-ant-api03-..."
+# Run as Administrator -- full deployment in one step:
+powershell -ExecutionPolicy Bypass -File .\Install-InsideLLM-WSL.ps1 -AnthropicApiKey "sk-ant-api03-..."
 ```
 
-That's it. The script handles WSL2 installation, Docker setup, config generation,
-container deployment, and port forwarding automatically.
+That's it. The script handles WSL2 installation, Docker setup, SCFW deployment,
+TLS certificate generation, config generation, container deployment, and port
+forwarding automatically.
+
+#### Separate Initialization (Optional)
+
+To provision the base environment (WSL2, Docker, SCFW, TLS) without deploying
+the application stack, use the standalone initialization script:
+
+```powershell
+# Run as Administrator -- infrastructure only:
+powershell -ExecutionPolicy Bypass -File .\Initialize-InsideLLM.ps1
+
+# Then deploy the stack later:
+powershell -ExecutionPolicy Bypass -File .\Install-InsideLLM-WSL.ps1 -AnthropicApiKey "sk-ant-api03-..."
+```
+
+Both scripts are idempotent -- `Install-InsideLLM-WSL.ps1` will skip any steps
+already completed by `Initialize-InsideLLM.ps1`.
 
 ### Disabling Ollama for a lighter deployment
 
