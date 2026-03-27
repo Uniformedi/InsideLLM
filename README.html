@@ -619,7 +619,7 @@ Exposed Host Ports:
       <tr><td><strong>Local LLM</strong></td><td>Ollama</td><td>MIT</td><td>latest</td><td>Local model inference (Qwen 2.5 Coder, Qwen 2.5, etc.)</td></tr>
       <tr><td><strong>Reverse Proxy</strong></td><td>Nginx</td><td>BSD-2</td><td>1.27</td><td>TLS termination, HTTPS routing, security headers</td></tr>
       <tr><td><strong>Database</strong></td><td>PostgreSQL</td><td>PostgreSQL</td><td>16</td><td>User data, spend tracking, team budgets, audit logs</td></tr>
-      <tr><td><strong>Cache</strong></td><td>Redis</td><td>BSD-3</td><td>7</td><td>Rate limit counters, response cache, session data</td></tr>
+      <tr><td><strong>Cache</strong></td><td>Redis</td><td>BSD-3</td><td>7</td><td>Rate limit counters, budget enforcement, LiteLLM internal state</td></tr>
       <tr><td><strong>Monitoring</strong></td><td>Netdata</td><td>GPL-3</td><td>stable</td><td>Real-time monitoring of containers, host, PostgreSQL, Redis</td></tr>
       <tr><td><strong>Supply Chain</strong></td><td>SCFW</td><td>Apache 2.0</td><td>latest</td><td>Blocks malicious PyPI packages before pip install</td></tr>
       <tr><td><strong>Containers</strong></td><td>Docker + Compose</td><td>Apache 2.0</td><td>CE</td><td>Container orchestration, networking, health checks</td></tr>
@@ -637,7 +637,7 @@ Exposed Host Ports:
     <div class="card"><h4>LiteLLM</h4><p>Only FOSS proxy with per-user budgets + SSO. OpenAI-compatible API (works with Claude Code). Built-in admin UI for non-technical admins.</p></div>
     <div class="card"><h4>Open WebUI</h4><p>ChatGPT-like UX (zero learning curve). Pipeline system enables custom DLP filters. RAG built-in for document Q&amp;A out of the box.</p></div>
     <div class="card"><h4>PostgreSQL</h4><p>Enterprise-proven, ACID-compliant. Perfect for financial data (spend tracking).</p></div>
-    <div class="card"><h4>Redis</h4><p>Sub-millisecond rate limit enforcement. Response caching reduces API costs.</p></div>
+    <div class="card"><h4>Redis</h4><p>Sub-millisecond rate limit enforcement. Budget tracking and LiteLLM operational state. Does not cache LLM responses.</p></div>
     <div class="card"><h4>Nginx</h4><p>Industry standard for TLS termination. WebSocket support for streaming responses.</p></div>
     <div class="card"><h4>Ollama</h4><p>Run open-source LLMs locally (no API costs). Qwen 2.5 models for coding and general use. Native GPU acceleration via WSL2 or Hyper-V DDA.</p></div>
     <div class="card"><h4>Hyper-V</h4><p>Built into Windows Pro/Enterprise (no cost). IT departments already have Hyper-V expertise.</p></div>
@@ -742,7 +742,7 @@ All 5 containers running. Stack operational.</pre>
     <thead><tr><th>Data Stored</th><th>Purpose</th></tr></thead>
     <tbody>
       <tr><td>Rate limit counters</td><td>Requests-per-minute (RPM) and tokens-per-minute (TPM) per user</td></tr>
-      <tr><td>Response cache</td><td>Deduplicate identical prompts (cost savings)</td></tr>
+      <tr><td>Budget tracking</td><td>Real-time spend against per-user daily limits and global monthly cap</td></tr>
       <tr><td>Session data</td><td>Temporary session state</td></tr>
     </tbody>
   </table>
