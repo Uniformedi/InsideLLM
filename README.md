@@ -114,40 +114,42 @@ interaction — all without modifying the Claude API experience.
 
 ```
                          +----------------------------------------------+
-                         |          Windows Hyper-V Host                 |
+                         |          Windows Hyper-V / WSL2 Host         |
                          |          (Windows 11 Pro / Server)            |
                          |                                              |
                          |  +----------------------------------------+  |
-                         |  |         Ubuntu 24.04 LTS VM             |  |
-                         |  |         8 vCPU | 32 GB RAM | 80 GB     |  |
+                         |  |         Ubuntu 24.04 LTS               |  |
+                         |  |         SCFW (pip wrapper)              |  |
                          |  |                                         |  |
 +----------+ HTTPS 443   |  |  +-----------------------------------+  |  |
 |          |-------------+--+->|          Nginx 1.27                |  |  |
 |  Users   |             |  |  |   TLS 1.2/1.3 Termination         |  |  |
 | (Browser)|             |  |  |   HSTS | Security Headers         |  |  |
-+----------+             |  |  +-----+----------+----------+-------+  |  |
-                         |  |        |          |          |          |  |
-+----------+ HTTPS 443   |  |   /    |    /v1/  |  /litellm/         |  |
-|  Claude  |-------------+--+->      |          |          |          |  |
-|  Code    |             |  |        v          v          v          |  |
-|  CLI     |             |  |  +-----------+  +------------+         |  |
-+----------+             |  |  | Open      |  | LiteLLM    |         |  |
-                         |  |  | WebUI     |  | Proxy      |<--+     |  |
-                         |  |  | :8080     |  | :4000      |   |     |  |
-                         |  |  +-----+-----+  +------+-----+   |     |  |
-                         |  |        |               |          |     |  |
-                         |  |   DLP Pipeline    Budget/Rate     |     |  |
-                         |  |   (inlet/outlet)  Enforcement     |     |  |
-                         |  |        |               |          |     |  |
-                         |  |        +-------+-------+          |     |  |
-                         |  |                |                  |     |  |
-                         |  |                v                  |     |  |
-                         |  |  +-------------+  +----------+   |     |  |
-                         |  |  | PostgreSQL  |  | Redis    |---+     |  |
-                         |  |  | 16-alpine   |  | 7-alpine |         |  |
-                         |  |  | Users,Spend |  | Rate     |         |  |
-                         |  |  | Audit,Teams |  | Limits   |         |  |
-                         |  |  +-------------+  +----------+         |  |
++----------+             |  |  +--+-------+-------+--------+-------+  |  |
+                         |  |     |       |       |        |          |  |
++----------+ HTTPS 443   |  |  /  | /v1/  |/litellm/  /netdata/      |  |
+|  Claude  |-------------+--+->   |       |       |        |          |  |
+|  Code    |             |  |     v       v       v        v          |  |
+|  CLI     |             |  |  +------+ +------+ +----------+        |  |
++----------+             |  |  | Open | | Lite | | Netdata  |        |  |
+                         |  |  | Web  | | LLM  | | Monitoring|       |  |
+                         |  |  | UI   | | Proxy|<--+:19999  |        |  |
+                         |  |  |:8080 | |:4000 |  | +--------+       |  |
+                         |  |  +--+---+ +--+---+  |                  |  |
+                         |  |     |        |       |                  |  |
+                         |  |  DLP Pipe  Budget/   |                  |  |
+                         |  |  (in/out)  Rate Lim  |                  |  |
+                         |  |     |        |       |                  |  |
+                         |  |     +---+----+       |                  |  |
+                         |  |         |            |                  |  |
+                         |  |         v            |                  |  |
+                         |  |  +----------+ +-----+----+             |  |
+                         |  |  |PostgreSQL| | Redis    |---+         |  |
+                         |  |  |16-alpine | | 7-alpine |   |         |  |
+                         |  |  |Users,    | | Rate     |   |         |  |
+                         |  |  |Spend,    | | Limits,  |   |         |  |
+                         |  |  |Audit     | | Budget   |   |         |  |
+                         |  |  +----------+ +----------+   |         |  |
                          |  +----------------------------------------+  |
                          +----------------------------------------------+
                                          |
@@ -180,25 +182,32 @@ Docker Bridge Network: insidellm-internal (172.28.0.0/16)
           |   :4000      |
           +------+-------+
                  |
-          +------+-------+
-          | Open WebUI   |
-          | :8080        |
-          +------+-------+
-                 |
-          +------+-------+
-          |   Nginx      |
+          +------+-------+         +--------------+
+          | Open WebUI   |         | Netdata      |
+          | :8080        |         | :19999       |
+          +------+-------+         | (monitoring) |
+                 |                 +------+-------+
+          +------+-------+               |
+          |   Nginx      |---------------+
           |  :80  :443   |  <--------  External Users
           +--------------+
+               |
+          +----+------+
+          | pgAdmin   |
+          | :5050     |
+          +-----------+
 
-          +------+-------+
-          |   Netdata    |
-          |  :19999      |
-          +--------------+
+All traffic routed through Nginx (TLS):
+  /           -> Open WebUI  (:8080)
+  /v1/        -> LiteLLM     (:4000)
+  /litellm/   -> LiteLLM     (:4000)
+  /netdata/   -> Netdata     (:19999)
 
 Exposed Host Ports:
   80   -> Nginx   (HTTP redirect to HTTPS)
   443  -> Nginx   (HTTPS -- primary entry point)
   4000 -> LiteLLM (direct API access)
+  5050 -> pgAdmin (database admin)
 ```
 
 ### Request Flow
@@ -229,8 +238,7 @@ Exposed Host Ports:
   | LiteLLM Proxy    |  1. Authenticate user (SSO token / API key)
   |                  |  2. Check budget (PostgreSQL: $5/day remaining?)
   |                  |  3. Check rate limit (Redis: 30 RPM / 100K TPM?)
-  |                  |  4. Check cache (Redis: seen this prompt before?)
-  |                  |  5. Route to correct Claude model
+  |                  |  4. Route to correct Claude model
   +--------+---------+
            |
            v
@@ -240,9 +248,9 @@ Exposed Host Ports:
            |
            v
   +------------------+
-  | LiteLLM Proxy    |  6. Record token usage + cost in PostgreSQL
-  |                  |  7. Log to Langfuse (audit trail)
-  |                  |  8. Update Redis rate limit counters
+  | LiteLLM Proxy    |  5. Record token usage + cost in PostgreSQL
+  |                  |  6. Log to Langfuse (audit trail)
+  |                  |  7. Update Redis rate limit counters
   +--------+---------+
            |
            v
