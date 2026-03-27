@@ -308,21 +308,68 @@ Write-Step "Checking Docker"
 $dockerCheck = Invoke-Wsl "docker --version 2>/dev/null && echo DOCKER_OK || echo DOCKER_MISSING"
 if (-not ($dockerCheck -match "DOCKER_OK")) {
     Write-Warn "Installing Docker Engine..."
-    Invoke-Wsl @"
-export DEBIAN_FRONTEND=noninteractive
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg 2>/dev/null
-echo 'deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu noble stable' | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-sudo DEBIAN_FRONTEND=noninteractive apt-get update -qq
-sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-sudo usermod -aG docker `$(whoami)
-"@ | Out-Null
+
+    # Add Docker GPG key
+    Write-Host "  Adding Docker GPG key..."
+    $gpgResult = Invoke-Wsl "curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --batch --yes --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg 2>&1 && echo GPG_OK || echo GPG_FAIL"
+    if (-not ($gpgResult -match "GPG_OK")) {
+        Write-Fail "Failed to add Docker GPG key. Output:"
+        Write-Host ($gpgResult -join "`n") -ForegroundColor Red
+        exit 1
+    }
+
+    # Add Docker apt repository
+    Write-Host "  Adding Docker apt repository..."
+    $repoResult = Invoke-Wsl "echo 'deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu noble stable' | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null && echo REPO_OK || echo REPO_FAIL"
+    if (-not ($repoResult -match "REPO_OK")) {
+        Write-Fail "Failed to add Docker repository. Output:"
+        Write-Host ($repoResult -join "`n") -ForegroundColor Red
+        exit 1
+    }
+
+    # Update package index
+    Write-Host "  Updating package index..."
+    $updateResult = Invoke-Wsl "sudo DEBIAN_FRONTEND=noninteractive apt-get update -qq 2>&1 && echo UPDATE_OK || echo UPDATE_FAIL"
+    if (-not ($updateResult -match "UPDATE_OK")) {
+        Write-Fail "apt-get update failed. Output:"
+        Write-Host ($updateResult -join "`n") -ForegroundColor Red
+        exit 1
+    }
+
+    # Install Docker packages
+    Write-Host "  Installing Docker packages (this may take a minute)..."
+    $installResult = Invoke-Wsl "sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin 2>&1 && echo INSTALL_OK || echo INSTALL_FAIL"
+    if (-not ($installResult -match "INSTALL_OK")) {
+        Write-Fail "Docker installation failed. Output:"
+        Write-Host ($installResult -join "`n") -ForegroundColor Red
+        exit 1
+    }
+
+    # Add current user to docker group
+    Invoke-Wsl "sudo usermod -aG docker `$(whoami)" | Out-Null
+
     Write-Ok "Docker Engine installed"
 } else {
     Write-Ok "Docker is already installed"
 }
 
-# Ensure Docker is running
-Invoke-Wsl "sudo systemctl start docker 2>/dev/null || sudo service docker start 2>/dev/null; true" | Out-Null
+# Verify Docker binary is actually available
+$dockerVerify = Invoke-Wsl "docker --version 2>&1 && echo DOCKER_VERIFIED || echo DOCKER_MISSING"
+if (-not ($dockerVerify -match "DOCKER_VERIFIED")) {
+    Write-Fail "Docker binary not found after installation. Output:"
+    Write-Host ($dockerVerify -join "`n") -ForegroundColor Red
+    Write-Host "  Try: wsl -d $WslDistroName -- bash -c 'apt-get update && apt-get install -y docker-ce'" -ForegroundColor Yellow
+    exit 1
+}
+
+# Start Docker service
+Write-Host "  Starting Docker service..."
+$startResult = Invoke-Wsl "sudo systemctl start docker 2>&1 && echo STARTED || (sudo service docker start 2>&1 && echo STARTED || echo START_FAIL)"
+if (-not ($startResult -match "STARTED")) {
+    Write-Fail "Failed to start Docker service. Output:"
+    Write-Host ($startResult -join "`n") -ForegroundColor Red
+    exit 1
+}
 
 # Configure Docker log rotation
 Write-WslFile -Path "/etc/docker/daemon.json" -Content @'
@@ -334,7 +381,13 @@ Write-WslFile -Path "/etc/docker/daemon.json" -Content @'
   }
 }
 '@ -Permissions "0644"
-Invoke-Wsl "sudo systemctl restart docker 2>/dev/null || sudo service docker restart 2>/dev/null; true" | Out-Null
+
+$restartResult = Invoke-Wsl "sudo systemctl restart docker 2>&1 && echo RESTARTED || (sudo service docker restart 2>&1 && echo RESTARTED || echo RESTART_FAIL)"
+if (-not ($restartResult -match "RESTARTED")) {
+    Write-Fail "Failed to restart Docker after config change. Output:"
+    Write-Host ($restartResult -join "`n") -ForegroundColor Red
+    exit 1
+}
 Write-Ok "Docker daemon configured"
 
 # =============================================================================
