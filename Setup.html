@@ -773,7 +773,8 @@ function generateNextSteps() {
       <li>Wait for deployment to complete (~5 minutes, longer on first run)</li>
       <li>Open <code>https://localhost</code> in your browser (or use <strong>Start Menu &gt; InsideLLM &gt; Chat</strong>)</li>
       <li>Register your admin account (first user becomes admin)</li>
-      <li>Shortcuts added to <strong>Start Menu &gt; InsideLLM</strong> (Chat, Admin, Monitoring, pgAdmin, Start/Stop, Uninstall)</li>
+      <li>Open the <strong>Admin Portal</strong> at <code>https://localhost/admin</code> &mdash; a dashboard with live service health status, quick links to every service (Chat, LiteLLM, Netdata, pgAdmin, Ollama), full API endpoint reference, internal connection details, Claude Code CLI setup, and links to official documentation for all components</li>
+      <li>Shortcuts added to <strong>Start Menu &gt; InsideLLM</strong> (Admin Portal, Chat, Admin, Monitoring, pgAdmin, Start/Stop, Uninstall)</li>
       ${gpu ? '<li>GPU is native in WSL2 - just ensure the <strong>NVIDIA Windows driver</strong> is installed</li>' : ''}
     </ol>
     <p style="margin-top:14px;font-size:0.9em;color:#4a5568"><strong>Tip:</strong> To provision just the base environment (WSL2, Docker, Supply Chain Firewall, TLS) without deploying the full stack, run
@@ -794,6 +795,7 @@ function generateNextSteps() {
       ${gpu ? `<li>Configure GPU passthrough:<br><code>.\\Setup-GPU-Passthrough.ps1</code></li>` : ''}
       <li>Open <code>https://&lt;vm-ip&gt;</code> in your browser</li>
       <li>Register your admin account (first user becomes admin)</li>
+      <li>Open the <strong>Admin Portal</strong> at <code>https://&lt;vm-ip&gt;/admin</code> &mdash; a dashboard with live service health status, quick links to every service, full API endpoint reference, internal connection details, Claude Code CLI setup, and links to official documentation for all components</li>
     </ol>`;
   }
 
