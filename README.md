@@ -54,6 +54,7 @@ services that deliver:
 - **SSO integration** with Azure AD or Okta (OIDC)
 - **Per-user budgets and rate limits** with real-time enforcement
 - **Real-time monitoring** of containers, host resources, and database metrics (Netdata)
+- **Admin portal** with service quick-access, live health status, API reference, and routing table (`/admin`)
 - **Full audit trail** of every API call
 
 All traffic to Anthropic's API is brokered through this internal stack. The
@@ -125,16 +126,16 @@ interaction — all without modifying the Claude API experience.
 |          |-------------+--+->|          Nginx 1.27                |  |  |
 |  Users   |             |  |  |   TLS 1.2/1.3 Termination         |  |  |
 | (Browser)|             |  |  |   HSTS | Security Headers         |  |  |
-+----------+             |  |  +--+-------+-------+--------+-------+  |  |
-                         |  |     |       |       |        |          |  |
-+----------+ HTTPS 443   |  |  /  | /v1/  |/litellm/  /netdata/      |  |
-|  Claude  |-------------+--+->   |       |       |        |          |  |
-|  Code    |             |  |     v       v       v        v          |  |
-|  CLI     |             |  |  +------+ +------+ +----------+        |  |
-+----------+             |  |  | Open | | Lite | | Netdata  |        |  |
-                         |  |  | Web  | | LLM  | | Monitoring|       |  |
-                         |  |  | UI   | | Proxy|<--+:19999  |        |  |
-                         |  |  |:8080 | |:4000 |  | +--------+       |  |
++----------+             |  |  +--+-------+-------+--------+----+--+  |  |
+                         |  |     |       |       |        |    |     |  |
++----------+ HTTPS 443   |  |  /  | /v1/  |/litellm/ /netdata/ /admin |  |
+|  Claude  |-------------+--+->   |       |       |        |    |     |  |
+|  Code    |             |  |     v       v       v        v    v     |  |
+|  CLI     |             |  |  +------+ +------+ +--------+ +------+ |  |
++----------+             |  |  | Open | | Lite | | Netdata| | Admin| |  |
+                         |  |  | Web  | | LLM  | | Monitor| | Portal |  |
+                         |  |  | UI   | | Proxy|<-+:19999 | | (HTML) |  |
+                         |  |  |:8080 | |:4000 |  +--------+ +------+ |  |
                          |  |  +--+---+ +--+---+  |                  |  |
                          |  |     |        |       |                  |  |
                          |  |  DLP Pipe  Budget/   |                  |  |
@@ -202,6 +203,7 @@ All traffic routed through Nginx (TLS):
   /v1/        -> LiteLLM     (:4000)
   /litellm/   -> LiteLLM     (:4000)
   /netdata/   -> Netdata     (:19999)
+  /admin      -> Admin Portal (static HTML)
 
 Exposed Host Ports:
   80   -> Nginx   (HTTP redirect to HTTPS)
@@ -491,7 +493,9 @@ Port 80 (HTTP)                   Port 443 (HTTPS)
 | /health -> 200   |             | /          -> Open WebUI (:8080)  |
 | /*      -> 301   |--redirect-->| /litellm/  -> LiteLLM UI (:4000) |
 |   to HTTPS       |             | /v1/       -> LiteLLM API (:4000)|
-+------------------+             | /nginx-health -> 200 OK          |
++------------------+             | /netdata/  -> Netdata    (:19999)|
+                                 | /admin     -> Admin Portal (HTML) |
+                                 | /nginx-health -> 200 OK          |
                                  +-----------------------------------+
 ```
 
@@ -984,7 +988,7 @@ For organizations using Microsoft 365 / Azure AD:
 
 ```
  +---------------------------+         +---------------------------+
- |     Azure AD Tenant       |         |     Claude Wrapper        |
+ |     Azure AD Tenant       |         |     Inside LLM            |
  |                           |         |                           |
  |  1. Register App          |         |  4. LiteLLM validates     |
  |     - Client ID           |-------->|     token via Microsoft   |
@@ -1030,7 +1034,7 @@ For organizations using Okta as their identity provider:
 
 ```
  +---------------------------+         +---------------------------+
- |     Okta Tenant           |         |     Claude Wrapper        |
+ |     Okta Tenant           |         |     Inside LLM            |
  |                           |         |                           |
  |  1. Create OIDC App       |         |  4. LiteLLM validates     |
  |     - Client ID           |-------->|     token via Okta        |
@@ -1373,6 +1377,7 @@ InsideLLM/
 +-- outputs.tf                          # VM IP, URLs, secrets
 +-- providers.tf                        # Hyper-V provider config
 +-- terraform.tfvars.example            # Template for your values
++-- admin.html                          # Admin portal (service URLs, health, API docs)
 +-- Setup.html                          # Interactive setup wizard
 +-- Setup-Prerequisites.ps1             # Windows host preparation
 +-- Initialize-InsideLLM.ps1            # Standalone: WSL2 + Docker + SCFW + TLS
@@ -1535,7 +1540,7 @@ The WSL2 distro itself is preserved (remove it with `wsl --unregister InsideLLM`
 
 ### Competitive Comparison
 
-| Feature | Claude Wrapper | Direct API | ChatGPT Enterprise |
+| Feature | Inside LLM | Direct API | ChatGPT Enterprise |
 |---------|---------------|------------|-------------------|
 | DLP scanning | Messages + files (Excel, PDF, etc.) | None | Limited |
 | SSO (Azure AD) | Yes (OIDC) | N/A | Yes |
@@ -1606,9 +1611,11 @@ COST SAVINGS
 
 | Service | URL | Purpose |
 |---------|-----|---------|
+| Admin Portal | `https://<vm-ip>/admin` | Service dashboard, health status, API reference |
 | Chat Interface | `https://<vm-ip>/` | End-user chat with Claude |
 | LiteLLM Admin | `https://<vm-ip>/litellm/ui/chat` | Admin dashboard |
 | LiteLLM API | `https://<vm-ip>/v1/` | OpenAI-compatible endpoint |
+| Netdata | `https://<vm-ip>/netdata/` | Real-time monitoring |
 | SSH | `ssh claude-admin@<vm-ip>` | VM administration |
 
 ### Claude Code CLI Setup
