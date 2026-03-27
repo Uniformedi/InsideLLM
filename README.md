@@ -269,7 +269,7 @@ All components are **free and open-source software (FOSS)**:
 | **Local LLM** | [Ollama](https://ollama.com/) | MIT | latest | Local model inference (Qwen 2.5 Coder, Qwen 2.5, etc.) |
 | **Reverse Proxy** | [Nginx](https://nginx.org/) | BSD-2 | 1.27 | TLS termination, HTTPS routing, security headers |
 | **Database** | [PostgreSQL](https://www.postgresql.org/) | PostgreSQL | 16 | User data, spend tracking, team budgets, audit logs |
-| **Cache** | [Redis](https://redis.io/) | BSD-3 | 7 | Rate limit counters, response cache, session data |
+| **Cache** | [Redis](https://redis.io/) | BSD-3 | 7 | Rate limit counters, budget enforcement, LiteLLM internal state |
 | **Monitoring** | [Netdata](https://www.netdata.cloud/) | GPL-3 | stable | Real-time monitoring of containers, host, PostgreSQL, Redis |
 | **Supply Chain** | [SCFW](https://github.com/DataDog/supply-chain-firewall) | Apache 2.0 | latest | Blocks malicious PyPI packages before pip install |
 | **Containers** | [Docker](https://www.docker.com/) + [Compose](https://docs.docker.com/compose/) | Apache 2.0 | CE | Container orchestration, networking, health checks |
@@ -299,7 +299,7 @@ All components are **free and open-source software (FOSS)**:
 |              - Perfect for financial data (spend tracking)       |
 |                                                                  |
 | Redis        - Sub-millisecond rate limit enforcement            |
-|              - Response caching reduces API costs                |
+|              - Budget tracking and LiteLLM operational state     |
 |                                                                  |
 | Nginx        - Industry standard for TLS termination             |
 |              - WebSocket support (streaming responses)           |
@@ -399,16 +399,16 @@ organizations that want AI capabilities without cloud dependencies.
 
 ### Redis 7
 
-**Role:** High-speed cache and rate limiter.
+**Role:** Operational store for LiteLLM's rate limiting, budget enforcement, and internal state. Redis does **not** cache LLM responses -- every request still goes to Anthropic's API (or Ollama for local models).
 
 | Data Stored | Purpose |
 |-------------|---------|
-| Rate limit counters | Requests-per-minute (RPM) and tokens-per-minute (TPM) per user |
-| Response cache | Deduplicate identical prompts (cost savings) |
-| Session data | Temporary session state |
+| Rate limit counters | Per-user RPM (30) and TPM (100K) enforcement |
+| Budget tracking | Real-time spend against per-user daily limits and global monthly cap |
+| Routing/session state | LiteLLM internal state for fast lookups during request processing |
 
-- **Memory:** Capped at 256 MB with LRU eviction
-- **Volume:** `/opt/InsideLLM/data/redis` (persistence for cache warmth)
+- **Memory:** Capped at 256 MB with `allkeys-lru` eviction (least-recently-used keys are evicted when the cap is hit, which works well for ephemeral rate limit counters)
+- **Volume:** `/opt/InsideLLM/data/redis` (persistence across restarts)
 - **Health check:** `redis-cli ping` every 10s
 
 ### LiteLLM Proxy
