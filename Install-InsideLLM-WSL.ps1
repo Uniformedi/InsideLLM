@@ -256,9 +256,9 @@ $hasDistro = $distros | Where-Object { $_.Trim().Replace("`0","") -eq $WslDistro
 if (-not $hasDistro) {
     Write-Warn "Creating '$WslDistroName' WSL2 distro (this may take a few minutes)..."
 
-    # Download Ubuntu 24.04 rootfs
-    $rootfsUrl = "https://cloud-images.ubuntu.com/wsl/noble/current/ubuntu-noble-wsl-amd64-wsl.rootfs.tar.gz"
-    $rootfsPath = Join-Path $env:TEMP "ubuntu-noble-wsl-rootfs.tar.gz"
+    # Download Ubuntu 24.04 rootfs (cloud image root tarball, works with wsl --import)
+    $rootfsUrl = "https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64-root.tar.xz"
+    $rootfsPath = Join-Path $env:TEMP "ubuntu-noble-wsl-rootfs.tar.xz"
 
     if (-not (Test-Path $rootfsPath)) {
         Write-Host "  Downloading Ubuntu 24.04 rootfs..."
