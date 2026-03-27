@@ -766,7 +766,10 @@ function generateNextSteps() {
     el.innerHTML = `<h3>Next Steps</h3><ol>
       <li>Open <strong>PowerShell as Administrator</strong></li>
       <li>Navigate to the InsideLLM project directory:<br><code>cd ${window.location.pathname.replace(/\/[^/]*$/, '').replace(/^\/([A-Z]):/, '$1:')}</code></li>
-      <li>Run the command above (or the downloaded .ps1 file)</li>
+      <li>Run the command above, or run the downloaded .ps1 file:<br>
+        <code>powershell -ExecutionPolicy Bypass -File .\\Install-InsideLLM.ps1</code><br>
+        <em style="font-size:0.88em;color:#718096">(The <code>-ExecutionPolicy Bypass</code> flag lets PowerShell run the script without changing your system policy.
+        Alternatively, run <code>Set-ExecutionPolicy Bypass -Scope Process</code> first, then <code>.\\Install-InsideLLM.ps1</code>.)</em></li>
       <li>Wait for deployment to complete (~5 minutes, longer on first run)</li>
       <li>Open <code>https://localhost</code> in your browser (or use <strong>Start Menu &gt; InsideLLM &gt; Chat</strong>)</li>
       <li>Register your admin account (first user becomes admin)</li>
