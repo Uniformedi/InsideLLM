@@ -338,7 +338,30 @@ Invoke-Wsl "sudo systemctl restart docker 2>/dev/null || sudo service docker res
 Write-Ok "Docker daemon configured"
 
 # =============================================================================
-# Step 3: Generate TLS certificates
+# Step 3: Install Supply Chain Firewall (SCFW) as pip wrapper
+# =============================================================================
+
+Write-Step "Setting up Supply Chain Firewall (SCFW)"
+
+$scfwCheck = Invoke-Wsl "command -v scfw >/dev/null 2>&1 && echo SCFW_OK || echo SCFW_MISSING"
+if (-not ($scfwCheck -match "SCFW_OK")) {
+    Write-Warn "Installing SCFW..."
+    Invoke-Wsl @"
+export DEBIAN_FRONTEND=noninteractive
+sudo apt-get update -qq
+sudo apt-get install -y -qq pipx python3-pip
+pipx ensurepath
+export PATH="`$HOME/.local/bin:`$PATH"
+pipx install scfw
+scfw configure --alias-pip
+"@ | Out-Null
+    Write-Ok "SCFW installed and configured as pip wrapper"
+} else {
+    Write-Ok "SCFW is already installed"
+}
+
+# =============================================================================
+# Step 4: Generate TLS certificates
 # =============================================================================
 
 Write-Step "TLS Certificates"
@@ -366,13 +389,13 @@ sudo chmod 0644 $InstallPath/nginx/ssl/server.crt
 }
 
 # =============================================================================
-# Step 4: Generate configuration files
+# Step 5: Generate configuration files
 # =============================================================================
 
 Write-Step "Generating configuration files"
 
 # Create directory structure
-Invoke-Wsl "sudo mkdir -p $InstallPath/data/{postgres,redis,open-webui,ollama} $InstallPath/pipelines $InstallPath/nginx/ssl" | Out-Null
+Invoke-Wsl "sudo mkdir -p $InstallPath/data/{postgres,redis,open-webui,ollama,netdata} $InstallPath/pipelines $InstallPath/nginx/ssl" | Out-Null
 
 # --- LiteLLM config ---
 $litellmConfig = @"
@@ -497,6 +520,10 @@ http {
         server litellm:4000;
     }
 
+    upstream netdata {
+        server netdata:19999;
+    }
+
     server {
         listen 80;
         server_name __FQDN__ __HOSTNAME__ _;
@@ -567,6 +594,18 @@ http {
             proxy_set_header X-Forwarded-Proto $scheme;
             proxy_buffering off;
             proxy_read_timeout 300s;
+        }
+
+        location /netdata/ {
+            proxy_pass http://netdata/;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_buffering off;
         }
 
         location /nginx-health {
@@ -780,6 +819,42 @@ $ollamaDependsOn
         condition: service_healthy
     networks:
       - insidellm-internal
+  netdata:
+    image: netdata/netdata:stable
+    container_name: insidellm-netdata
+    restart: always
+    pid: host
+    cap_add:
+      - SYS_PTRACE
+      - SYS_ADMIN
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - /etc/passwd:/host/etc/passwd:ro
+      - /etc/group:/host/etc/group:ro
+      - /etc/localtime:/etc/localtime:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - $InstallPath/data/netdata:/var/lib/netdata
+    environment:
+      NETDATA_CLAIM_TOKEN: ""
+      NETDATA_EXTRA_DEB_PACKAGES: ""
+      DOCKER_HOST: "unix:///var/run/docker.sock"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:19999/api/v1/info"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - insidellm-internal
+
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: insidellm-pgadmin
@@ -918,7 +993,7 @@ Write-WslFile -Path "$InstallPath/post-deploy.sh" -Content $postDeploy -Permissi
 Write-Ok "Post-deploy script"
 
 # =============================================================================
-# Step 5: Pull images and start the stack
+# Step 6: Pull images and start the stack
 # =============================================================================
 
 Write-Step "Starting InsideLLM stack"
@@ -973,7 +1048,7 @@ CREATE OR REPLACE VIEW budgets AS SELECT * FROM \"LiteLLM_BudgetTable\";
 Write-Ok "Database views created"
 
 # =============================================================================
-# Step 6: Port forwarding
+# Step 7: Port forwarding
 # =============================================================================
 
 if (-not $SkipPortForwarding) {
@@ -1044,7 +1119,7 @@ if (`$wslIp) {
 }
 
 # =============================================================================
-# Step 7: Create Start Menu shortcuts
+# Step 8: Create Start Menu shortcuts
 # =============================================================================
 
 Write-Step "Creating Start Menu shortcuts"
@@ -1073,6 +1148,13 @@ $lnk = $shell.CreateShortcut("$shortcutFolder\InsideLLM - pgAdmin.lnk")
 $lnk.TargetPath = "http://localhost:5050"
 $lnk.Description = "PostgreSQL database administration"
 $lnk.IconLocation = "shell32.dll,12"
+$lnk.Save()
+
+# Netdata Monitoring
+$lnk = $shell.CreateShortcut("$shortcutFolder\InsideLLM - Monitoring.lnk")
+$lnk.TargetPath = "https://localhost/netdata/"
+$lnk.Description = "Netdata system monitoring dashboard"
+$lnk.IconLocation = "shell32.dll,16"
 $lnk.Save()
 
 # Start InsideLLM
@@ -1115,6 +1197,7 @@ Write-Host ""
 Write-Host "  Open WebUI:     https://localhost"
 Write-Host "  LiteLLM UI:     https://localhost/litellm/ui/chat"
 Write-Host "  LiteLLM API:    http://localhost:4000"
+Write-Host "  Netdata:        https://localhost/netdata/"
 Write-Host "  pgAdmin:        http://localhost:5050"
 if ($EnableOllama) {
 Write-Host "  Ollama API:     http://localhost:11434"
@@ -1131,7 +1214,7 @@ Write-Host "  pgAdmin login:  admin@insidellm.local / <master key above>"
 Write-Host "  DB connection:  host=postgres, port=5432, db=litellm, user=litellm"
 Write-Host "  DB password:    $PostgresPassword" -ForegroundColor Yellow
 Write-Host ""
-Write-Host "  Start Menu:     Start > InsideLLM (Chat, Admin, pgAdmin, Start/Stop)" -ForegroundColor Cyan
+Write-Host "  Start Menu:     Start > InsideLLM (Chat, Admin, Monitoring, pgAdmin, Start/Stop)" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "  Or from command line:"
 Write-Host "  Stop:    wsl -d $WslDistroName -- bash -c 'cd $InstallPath && sudo docker compose stop'"
