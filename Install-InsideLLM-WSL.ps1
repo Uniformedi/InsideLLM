@@ -17,11 +17,16 @@
 .PARAMETER AnthropicApiKey
     Anthropic API key (required). Get one at https://console.anthropic.com
 
+.PARAMETER PgAdminEmail
+    Valid email address for PgAdmin login. If omitted, PgAdmin is not installed.
+
 .PARAMETER Uninstall
     Remove all InsideLLM containers, configs, port forwarding rules, and firewall rules.
 
 .EXAMPLE
     .\Install-InsideLLM-WSL.ps1 -AnthropicApiKey "sk-ant-api03-..."
+.EXAMPLE
+    .\Install-InsideLLM-WSL.ps1 -AnthropicApiKey "sk-ant-..." -PgAdminEmail "admin@example.com"
 .EXAMPLE
     .\Install-InsideLLM-WSL.ps1 -AnthropicApiKey "sk-ant-..." -EnableOllama $false
 .EXAMPLE
@@ -61,6 +66,8 @@ param(
     [string]$OktaClientId        = "",
     [string]$OktaClientSecret    = "",
     [string]$OktaDomain          = "",
+
+    [string]$PgAdminEmail = "",
 
     [string]$WslDistroName = "InsideLLM",
     [string]$WslInstallPath = "C:\WSL\InsideLLM",
@@ -709,6 +716,32 @@ if ($EnableOllama) {
 "@
 }
 
+$pgadminServices = ""
+if ($PgAdminEmail -ne "") {
+    $pgadminServices = @"
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: insidellm-pgadmin
+    restart: always
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: "$PgAdminEmail"
+      PGADMIN_DEFAULT_PASSWORD: "$LitellmMasterKey"
+      PGADMIN_CONFIG_SERVER_MODE: "True"
+    volumes:
+      - $InstallPath/data/pgadmin:/var/lib/pgadmin
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - insidellm-internal
+"@
+} else {
+    Write-Host "  PgAdmin: skipped (no -PgAdminEmail provided)" -ForegroundColor Yellow
+}
+
 $ollamaServices = ""
 if ($EnableOllama) {
     $gpuBlock = ""
@@ -913,23 +946,7 @@ $ollamaDependsOn
     networks:
       - insidellm-internal
 
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: insidellm-pgadmin
-    restart: always
-    ports:
-      - "5050:80"
-    environment:
-      PGADMIN_DEFAULT_EMAIL: "admin@insidellm.local"
-      PGADMIN_DEFAULT_PASSWORD: "$LitellmMasterKey"
-      PGADMIN_CONFIG_SERVER_MODE: "True"
-    volumes:
-      - $InstallPath/data/pgadmin:/var/lib/pgadmin
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - insidellm-internal
+$pgadminServices
 
 $ollamaServices
 
