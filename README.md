@@ -1301,7 +1301,7 @@ so updating to the newest versions is straightforward.
 
 ```bash
 # SSH into the VM
-ssh claude-admin@<vm-ip>
+ssh insidellm-admin@<vm-ip>
 
 # Pull latest images and recreate containers
 cd /opt/InsideLLM
@@ -1616,7 +1616,7 @@ COST SAVINGS
 | LiteLLM Admin | `https://<vm-ip>/litellm/ui/chat` | Admin dashboard |
 | LiteLLM API | `https://<vm-ip>/v1/` | OpenAI-compatible endpoint |
 | Netdata | `https://<vm-ip>/netdata/` | Real-time monitoring |
-| SSH | `ssh claude-admin@<vm-ip>` | VM administration |
+| SSH | `ssh insidellm-admin@<vm-ip>` | VM administration |
 
 ### Claude Code CLI Setup
 

@@ -31,7 +31,7 @@
     IP address of the VM for SSH. Default: 192.168.100.10
 
 .PARAMETER SshUser
-    SSH username. Default: claude-admin
+    SSH username. Default: insidellm-admin
 
 .PARAMETER SshKeyPath
     Path to SSH private key. Default: ~/.ssh/id_rsa
@@ -54,7 +54,7 @@ param(
     [string]$Mode = "GpuPV",
 
     [string]$VMIpAddress = "192.168.100.10",
-    [string]$SshUser     = "claude-admin",
+    [string]$SshUser     = "insidellm-admin",
     [string]$SshKeyPath  = "$env:USERPROFILE\.ssh\id_rsa",
 
     [switch]$Remove

@@ -164,7 +164,7 @@ variable "ssh_public_key_path" {
 variable "ssh_admin_user" {
   description = "Admin username for the Ubuntu VM"
   type        = string
-  default     = "claude-admin"
+  default     = "insidellm-admin"
 }
 
 # =============================================================================
