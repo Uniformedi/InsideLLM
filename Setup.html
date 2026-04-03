@@ -312,18 +312,26 @@
       <h3 style="font-size:1.1em;color:#2b6cb0;margin:20px 0 10px">Hyper-V Network</h3>
       <div class="row">
         <div class="field">
-          <label>VM Static IP</label>
-          <input type="text" id="vmStaticIp" value="192.168.100.10/24">
+          <label>Network Adapter</label>
+          <div class="hint">Physical NIC for the External switch (e.g., "Ethernet", "Wi-Fi")</div>
+          <input type="text" id="vmSwitchAdapter" value="Ethernet">
         </div>
         <div class="field">
-          <label>Gateway</label>
-          <input type="text" id="vmGateway" value="192.168.100.1">
+          <label>VM IP Address</label>
+          <div class="hint">Static IP in CIDR notation (e.g., 192.168.1.50/24)</div>
+          <input type="text" id="vmStaticIp" placeholder="192.168.1.50/24">
         </div>
       </div>
-      <div class="field">
-        <label>DNS Servers</label>
-        <div class="hint">Comma-separated</div>
-        <input type="text" id="vmDns" value="8.8.8.8, 1.1.1.1">
+      <div class="row">
+        <div class="field">
+          <label>Gateway</label>
+          <input type="text" id="vmGateway" placeholder="192.168.1.1">
+        </div>
+        <div class="field">
+          <label>DNS Servers</label>
+          <div class="hint">Comma-separated</div>
+          <input type="text" id="vmDns" value="8.8.8.8, 1.1.1.1">
+        </div>
       </div>
       <div class="row">
         <div class="field">
@@ -635,11 +643,12 @@ vm_domain            = "${v('domain')}"
 ubuntu_vhdx_source   = "${v('ubuntuVhdx').replace(/\\/g, '\\\\')}"
 
 # Network
-vm_switch_name = "InsideLLM"
-vm_switch_type = "Internal"
-vm_static_ip   = "${v('vmStaticIp')}"
-vm_gateway     = "${v('vmGateway')}"
-vm_dns_servers = [${v('vmDns').split(',').map(s => `"${s.trim()}"`).join(', ')}]
+vm_switch_name    = "InsideLLM"
+vm_switch_type    = "External"
+vm_switch_adapter = "${v('vmSwitchAdapter')}"
+vm_static_ip      = "${v('vmStaticIp')}"
+vm_gateway        = "${v('vmGateway')}"
+vm_dns_servers    = [${v('vmDns').split(',').map(s => `"${s.trim()}"`).join(', ')}]
 
 # SSH
 ssh_admin_user      = "${v('sshAdminUser')}"

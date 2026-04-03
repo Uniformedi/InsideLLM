@@ -97,7 +97,7 @@ variable "vm_switch_name" {
 variable "vm_switch_type" {
   description = "Type of virtual switch: Internal or External"
   type        = string
-  default     = "Internal"
+  default     = "External"
 
   validation {
     condition     = contains(["Internal", "External"], var.vm_switch_type)
