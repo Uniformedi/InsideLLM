@@ -175,7 +175,7 @@ locals {
 # Create Hyper-V virtual switch
 # ---------------------------------------------------------------------------
 
-resource "hyperv_network_switch" "claude_switch" {
+resource "hyperv_network_switch" "insidellm" {
   name        = var.vm_switch_name
   switch_type = var.vm_switch_type
 
@@ -188,7 +188,7 @@ resource "hyperv_network_switch" "claude_switch" {
 # ---------------------------------------------------------------------------
 
 resource "null_resource" "prepare_vm_disk" {
-  depends_on = [hyperv_network_switch.claude_switch]
+  depends_on = [hyperv_network_switch.insidellm]
 
   provisioner "local-exec" {
     command     = <<-EOT
@@ -283,7 +283,7 @@ resource "hyperv_machine_instance" "claude_wrapper" {
   depends_on = [
     null_resource.prepare_vm_disk,
     null_resource.create_cloud_init_iso,
-    hyperv_network_switch.claude_switch,
+    hyperv_network_switch.insidellm,
   ]
 
   name                 = var.vm_name
@@ -332,7 +332,7 @@ resource "hyperv_machine_instance" "claude_wrapper" {
   # Network adapter
   network_adaptors {
     name        = "eth0"
-    switch_name = hyperv_network_switch.claude_switch.name
+    switch_name = hyperv_network_switch.insidellm.name
   }
 
   integration_services = {
