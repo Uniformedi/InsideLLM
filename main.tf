@@ -23,10 +23,16 @@ resource "random_password" "webui_secret" {
   special = false
 }
 
+resource "random_password" "xrdp_password" {
+  length  = 16
+  special = false
+}
+
 locals {
   litellm_master_key = var.litellm_master_key != "" ? var.litellm_master_key : "sk-${random_password.litellm_master_key[0].result}"
   postgres_password  = var.postgres_password != "" ? var.postgres_password : random_password.postgres_password[0].result
   webui_secret       = random_password.webui_secret.result
+  xrdp_password      = random_password.xrdp_password.result
 
   vm_fqdn = "${var.vm_hostname}.${var.vm_domain}"
 
@@ -150,6 +156,7 @@ locals {
     tls_key            = local.tls_key
     dlp_pipeline_py    = file("${path.module}/configs/open-webui/dlp-pipeline.py")
     admin_html         = file("${path.module}/admin.html")
+    xrdp_password      = local.xrdp_password
     post_deploy_sh     = templatefile("${path.module}/scripts/post-deploy.sh.tpl", {
       litellm_master_key  = local.litellm_master_key
       default_user_budget = var.litellm_default_user_budget
@@ -279,7 +286,7 @@ resource "null_resource" "create_cloud_init_iso" {
 # Create the Hyper-V VM
 # ---------------------------------------------------------------------------
 
-resource "hyperv_machine_instance" "claude_wrapper" {
+resource "hyperv_machine_instance" "insidellm" {
   depends_on = [
     null_resource.prepare_vm_disk,
     null_resource.create_cloud_init_iso,
@@ -351,7 +358,7 @@ resource "hyperv_machine_instance" "claude_wrapper" {
 
 resource "null_resource" "configure_nat" {
   count      = var.vm_switch_type == "Internal" ? 1 : 0
-  depends_on = [hyperv_machine_instance.claude_wrapper]
+  depends_on = [hyperv_machine_instance.insidellm]
 
   provisioner "local-exec" {
     command     = <<-EOT
@@ -389,7 +396,7 @@ resource "null_resource" "configure_nat" {
 
 resource "null_resource" "wait_for_cloud_init" {
   depends_on = [
-    hyperv_machine_instance.claude_wrapper,
+    hyperv_machine_instance.insidellm,
     null_resource.configure_nat,
   ]
 
@@ -420,6 +427,7 @@ resource "null_resource" "wait_for_cloud_init" {
               Write-Host "Open WebUI:  https://$ip"
               Write-Host "LiteLLM UI:  https://$ip/litellm"
               Write-Host "SSH:         ssh ${var.ssh_admin_user}@$ip"
+              Write-Host "RDP:         $ip`:3389 (user: ${var.ssh_admin_user})"
               break
             }
           }

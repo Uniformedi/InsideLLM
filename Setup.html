@@ -147,23 +147,23 @@
     <p class="desc">Choose how you want to run InsideLLM.</p>
 
     <div class="toggle-group" id="deployToggle">
-      <label class="selected" onclick="selectDeploy('wsl2')">
-        <input type="radio" name="deployPath" value="wsl2" checked><span>WSL2</span>
-        <div style="font-weight:400;font-size:0.82em;margin-top:4px;color:inherit;opacity:0.85">
-          One script, no Terraform<br>Native GPU support<br>Best for developers
-        </div>
-      </label>
-      <label onclick="selectDeploy('hyperv')">
-        <input type="radio" name="deployPath" value="hyperv"><span>Hyper-V (Terraform)</span>
+      <label class="selected" onclick="selectDeploy('hyperv')">
+        <input type="radio" name="deployPath" value="hyperv" checked><span>Hyper-V (Terraform)</span>
         <div style="font-weight:400;font-size:0.82em;margin-top:4px;color:inherit;opacity:0.85">
           Full VM isolation<br>Static networking<br>Best for production
+        </div>
+      </label>
+      <label onclick="selectDeploy('wsl2')">
+        <input type="radio" name="deployPath" value="wsl2"><span>WSL2</span>
+        <div style="font-weight:400;font-size:0.82em;margin-top:4px;color:inherit;opacity:0.85">
+          One script, no Terraform<br>Native GPU support<br>Best for developers
         </div>
       </label>
     </div>
 
     <div class="info-box" id="deployInfo">
-      <strong>WSL2</strong> is the fastest way to get started. It runs Ubuntu 24.04 inside Windows
-      with native GPU support. No Terraform, Hyper-V, or separate VM needed.
+      <strong>Hyper-V (Terraform)</strong> deploys a fully isolated Ubuntu VM with static networking,
+      cloud-init provisioning, and infrastructure-as-code. Best for production environments.
     </div>
 
     <div class="btn-row"><div></div><button class="btn btn-primary" onclick="nextStep()">Next</button></div>
@@ -308,7 +308,7 @@
     </div>
 
     <!-- Hyper-V specific fields -->
-    <div id="hypervNetworkFields" style="display:none">
+    <div id="hypervNetworkFields" style="display:block">
       <h3 style="font-size:1.1em;color:#2b6cb0;margin:20px 0 10px">Hyper-V Network</h3>
       <div class="row">
         <div class="field">
@@ -463,7 +463,7 @@
 // State
 // ================================================================
 let currentStep = 1;
-let deployPath = 'wsl2';
+let deployPath = 'hyperv';
 const totalStepsHyperv = 7;
 const totalStepsWsl2 = 6; // skip VM config step
 

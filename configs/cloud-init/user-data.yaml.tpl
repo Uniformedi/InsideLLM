@@ -39,6 +39,9 @@ packages:
   - unzip
   - git
   - genisoimage
+  # Ubuntu Desktop Experience
+  - ubuntu-desktop-minimal
+  - xrdp
 
 # ---------------------------------------------------------------------------
 # Write configuration files
@@ -177,6 +180,16 @@ runcmd:
     systemctl restart systemd-journald
     (crontab -l 2>/dev/null; echo "*/15 * * * * /usr/local/bin/disk-monitor.sh") | crontab -
 
+  # --- Configure xrdp for Remote Desktop ---
+  - |
+    systemctl enable xrdp
+    systemctl start xrdp
+    # Allow the admin user to log in via RDP
+    echo "${ssh_admin_user}" | tee -a /etc/xrdp/sesman.ini > /dev/null
+    # Set a password for RDP login (SSH key-only user needs one for xrdp)
+    echo "${ssh_admin_user}:${xrdp_password}" | chpasswd
+    sed -i 's/^lock_passwd: true/lock_passwd: false/' /etc/cloud/cloud.cfg.d/*.cfg 2>/dev/null || true
+
   # --- Configure UFW Firewall ---
   - |
     ufw default deny incoming
@@ -184,6 +197,7 @@ runcmd:
     ufw allow ssh
     ufw allow 80/tcp
     ufw allow 443/tcp
+    ufw allow 3389/tcp comment "xRDP"
     ufw allow 4000/tcp comment "LiteLLM Admin"
     ufw --force enable
 

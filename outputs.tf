@@ -4,7 +4,7 @@
 
 output "vm_name" {
   description = "Hyper-V virtual machine name"
-  value       = hyperv_machine_instance.claude_wrapper.name
+  value       = hyperv_machine_instance.insidellm.name
 }
 
 output "vm_ip_address" {
@@ -35,6 +35,17 @@ output "netdata_url" {
 output "ssh_command" {
   description = "SSH command to connect to the VM"
   value       = "ssh ${var.ssh_admin_user}@${data.external.vm_ip.result.ip}"
+}
+
+output "rdp_connection" {
+  description = "Remote Desktop connection info"
+  value       = "${data.external.vm_ip.result.ip}:3389 (user: ${var.ssh_admin_user})"
+}
+
+output "xrdp_password" {
+  description = "Password for RDP login"
+  value       = local.xrdp_password
+  sensitive   = true
 }
 
 output "litellm_master_key" {
@@ -69,6 +80,8 @@ output "deployment_notes" {
     ║  Netdata:      https://${data.external.vm_ip.result.ip}/netdata/             ║
     ║  pgAdmin:      http://${data.external.vm_ip.result.ip}:5050                  ║
     ║  SSH:          ssh ${var.ssh_admin_user}@${data.external.vm_ip.result.ip}     ║
+    ║  RDP:          ${data.external.vm_ip.result.ip}:3389                         ║
+    ║                (terraform output -raw xrdp_password)         ║
     ║                                                              ║
     ║  First Login:                                                ║
     ║  1. Navigate to Open WebUI URL                               ║
