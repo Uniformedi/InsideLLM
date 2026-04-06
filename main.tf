@@ -116,6 +116,7 @@ locals {
     global_max_budget       = var.litellm_global_max_budget
     ollama_enable           = var.ollama_enable
     ollama_models           = var.ollama_models
+    ollama_api_base         = var.ollama_separate_vm ? "http://${split("/", var.ollama_vm_static_ip)[0]}:11434" : "http://ollama:11434"
   })
 }
 
@@ -128,7 +129,7 @@ locals {
     webui_secret       = local.webui_secret
     sso_provider       = var.sso_provider
     sso_env            = local.sso_env
-    ollama_enable      = var.ollama_enable
+    ollama_enable      = var.ollama_enable && !var.ollama_separate_vm
     ollama_models      = var.ollama_models
     ollama_gpu         = var.ollama_gpu
   })
@@ -161,7 +162,7 @@ locals {
       litellm_master_key  = local.litellm_master_key
       default_user_budget = var.litellm_default_user_budget
       vm_fqdn             = local.vm_fqdn
-      ollama_enable       = var.ollama_enable
+      ollama_enable       = var.ollama_enable && !var.ollama_separate_vm
       ollama_models       = var.ollama_models
     })
   })
@@ -337,6 +338,140 @@ resource "hyperv_machine_instance" "insidellm" {
   }
 
   # Network adapter
+  network_adaptors {
+    name        = "eth0"
+    switch_name = hyperv_network_switch.insidellm.name
+  }
+
+  integration_services = {
+    "Guest Service Interface" = true
+    "Heartbeat"               = true
+    "Key-Value Pair Exchange"  = true
+    "Shutdown"                = true
+    "Time Synchronization"    = true
+    "VSS"                     = true
+  }
+}
+
+# ===========================================================================
+# Ollama Separate VM (conditional)
+# ===========================================================================
+
+locals {
+  ollama_vm_name = "${var.vm_name}-Ollama"
+  ollama_vm_fqdn = "${var.vm_hostname}-ollama.${var.vm_domain}"
+
+  ollama_cloud_init_userdata = var.ollama_separate_vm ? templatefile("${path.module}/configs/cloud-init/ollama-user-data.yaml.tpl", {
+    hostname       = "${var.vm_hostname}-ollama"
+    fqdn           = local.ollama_vm_fqdn
+    ssh_admin_user = var.ssh_admin_user
+    ssh_public_key = local.ssh_public_key
+    ollama_models  = var.ollama_models
+    ollama_gpu     = var.ollama_gpu
+  }) : ""
+
+  ollama_cloud_init_metadata = var.ollama_separate_vm ? templatefile("${path.module}/configs/cloud-init/meta-data.yaml.tpl", {
+    instance_id = local.ollama_vm_name
+    hostname    = "${var.vm_hostname}-ollama"
+  }) : ""
+
+  ollama_cloud_init_network = var.ollama_separate_vm && var.ollama_vm_static_ip != "" ? templatefile("${path.module}/configs/cloud-init/network-config.yaml.tpl", {
+    ip_address  = var.ollama_vm_static_ip
+    gateway     = var.vm_gateway
+    dns_servers = var.vm_dns_servers
+  }) : ""
+}
+
+resource "null_resource" "prepare_ollama_vm_disk" {
+  count      = var.ollama_separate_vm ? 1 : 0
+  depends_on = [hyperv_network_switch.insidellm]
+
+  provisioner "local-exec" {
+    command     = <<-EOT
+      New-Item -ItemType Directory -Force -Path "${var.vm_vhd_path}"
+      $destVhdx = Join-Path "${var.vm_vhd_path}" "${local.ollama_vm_name}-boot.vhdx"
+      if (-not (Test-Path $destVhdx)) {
+        Copy-Item -Path "${var.ubuntu_vhdx_source}" -Destination $destVhdx
+        Resize-VHD -Path $destVhdx -SizeBytes ${var.ollama_vm_disk_size_bytes}
+        Write-Host "Ollama VM boot disk created: $destVhdx"
+      } else {
+        Write-Host "Ollama VM boot disk already exists: $destVhdx"
+      }
+    EOT
+    interpreter = ["PowerShell", "-Command"]
+  }
+}
+
+resource "null_resource" "create_ollama_cloud_init_iso" {
+  count      = var.ollama_separate_vm ? 1 : 0
+  depends_on = [null_resource.prepare_ollama_vm_disk]
+
+  provisioner "local-exec" {
+    command     = <<-EOT
+      $ciDir = "${var.vm_path}\${local.ollama_vm_name}-cloud-init"
+      New-Item -ItemType Directory -Force -Path $ciDir
+
+      Set-Content -Path "$ciDir\user-data" -Value @'
+${local.ollama_cloud_init_userdata}
+'@ -Encoding UTF8NoBOM
+
+      Set-Content -Path "$ciDir\meta-data" -Value @'
+${local.ollama_cloud_init_metadata}
+'@ -Encoding UTF8NoBOM
+
+      if ("${local.ollama_cloud_init_network}" -ne "") {
+        Set-Content -Path "$ciDir\network-config" -Value @'
+${local.ollama_cloud_init_network}
+'@ -Encoding UTF8NoBOM
+      }
+
+      $isoPath = "${var.vm_path}\${local.ollama_vm_name}-cloud-init.iso"
+      $oscdimg = "C:\Program Files (x86)\Windows Kits\10\Assessment and Deployment Kit\Deployment Tools\amd64\Oscdimg\oscdimg.exe"
+      if (Test-Path $oscdimg) {
+        & $oscdimg -j1 -lCIDATA $ciDir $isoPath
+      } else {
+        wsl genisoimage -output $(wsl wslpath -u "$isoPath") -volid CIDATA -joliet -rock $(wsl wslpath -u "$ciDir/user-data") $(wsl wslpath -u "$ciDir/meta-data")
+      }
+      Write-Host "Ollama cloud-init ISO created: $isoPath"
+    EOT
+    interpreter = ["PowerShell", "-Command"]
+  }
+}
+
+resource "hyperv_machine_instance" "ollama" {
+  count = var.ollama_separate_vm ? 1 : 0
+  depends_on = [
+    null_resource.prepare_ollama_vm_disk,
+    null_resource.create_ollama_cloud_init_iso,
+    hyperv_network_switch.insidellm,
+  ]
+
+  name                 = local.ollama_vm_name
+  path                 = var.vm_path
+  generation           = 2
+  processor_count      = var.ollama_vm_processor_count
+  memory_startup_bytes = var.ollama_vm_memory_startup_bytes
+  static_memory        = true
+  state                = "Running"
+
+  vm_firmware {
+    enable_secure_boot = "On"
+    secure_boot_template = "MicrosoftUEFICertificateAuthority"
+  }
+
+  hard_disk_drives {
+    controller_type     = "Scsi"
+    controller_number   = 0
+    controller_location = 0
+    path                = "${var.vm_vhd_path}\\${local.ollama_vm_name}-boot.vhdx"
+  }
+
+  dvd_drives {
+    controller_number   = 0
+    controller_location = 1
+    path                = "${var.vm_path}\\${local.ollama_vm_name}-cloud-init.iso"
+  }
+
   network_adaptors {
     name        = "eth0"
     switch_name = hyperv_network_switch.insidellm.name

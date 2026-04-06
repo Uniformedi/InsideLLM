@@ -32,7 +32,7 @@ model_list:
   - model_name: "ollama/${model}"
     litellm_params:
       model: "ollama/${model}"
-      api_base: http://ollama:11434
+      api_base: ${ollama_api_base}
 %{ endfor ~}
 %{ endif ~}
 

@@ -60,6 +60,11 @@ output "postgres_password" {
   sensitive   = true
 }
 
+output "ollama_vm_ip" {
+  description = "IP address of the Ollama VM (when deployed separately)"
+  value       = var.ollama_separate_vm ? split("/", var.ollama_vm_static_ip)[0] : "N/A (running in main stack)"
+}
+
 output "webui_secret_key" {
   description = "Open WebUI secret key"
   value       = local.webui_secret

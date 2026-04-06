@@ -252,6 +252,36 @@ variable "ollama_gpu" {
   default     = false
 }
 
+variable "ollama_separate_vm" {
+  description = "Deploy Ollama in a separate Hyper-V VM instead of a container in the main stack"
+  type        = bool
+  default     = false
+}
+
+variable "ollama_vm_processor_count" {
+  description = "Number of vCPUs for the Ollama VM (when ollama_separate_vm = true)"
+  type        = number
+  default     = 8
+}
+
+variable "ollama_vm_memory_startup_bytes" {
+  description = "Startup RAM in bytes for the Ollama VM"
+  type        = number
+  default     = 34359738368 # 32 GB
+}
+
+variable "ollama_vm_disk_size_bytes" {
+  description = "Disk size in bytes for the Ollama VM"
+  type        = number
+  default     = 107374182400 # 100 GB
+}
+
+variable "ollama_vm_static_ip" {
+  description = "Static IP for the Ollama VM (CIDR notation). Must be reachable from the main VM."
+  type        = string
+  default     = ""
+}
+
 # =============================================================================
 # DATABASE
 # =============================================================================
