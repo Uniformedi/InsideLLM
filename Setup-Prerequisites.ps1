@@ -235,9 +235,10 @@ Write-Host "  VM Directory: $VmDir"
 Write-Host "  VHD Directory: $VhdDir"
 Write-Host ""
 Write-Host "  Next steps:" -ForegroundColor Yellow
-Write-Host "  1. Copy terraform.tfvars.example to terraform.tfvars"
-Write-Host "  2. Edit terraform.tfvars with your values"
-Write-Host "  3. Run: terraform init"
-Write-Host "  4. Run: terraform plan -out=tfplan"
-Write-Host "  5. Run: terraform apply tfplan"
+Write-Host "  1. Open Setup.html and save the output file to your InsideLLM clone directory"
+Write-Host "     (Or manually: copy terraform.tfvars.example to terraform.tfvars" -ForegroundColor DarkGray
+Write-Host "      and edit it with your values)" -ForegroundColor DarkGray
+Write-Host "  2. Powershell (Run as Admin): terraform init"
+Write-Host "  3. Powershell (Run as Admin): terraform plan -out=tfplan"
+Write-Host "  4. Powershell (Run as Admin): terraform apply tfplan"
 Write-Host ""
