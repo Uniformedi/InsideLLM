@@ -69,12 +69,11 @@ Write-Step "Configuring WinRM"
 # Enable PS Remoting
 Enable-PSRemoting -Force -SkipNetworkProfileCheck -ErrorAction SilentlyContinue
 Write-Ok "PS Remoting enabled"
-Set-WSManInstance WinRM/Config/WinRS -ValueSet @{MaxMemoryPerShellMB = 1024} -ErrorAction SilentlyContinue
 # Configure WinRM settings
-Set-WSManInstance WinRM/Config/WinRS -ValueSet @{MaxMemoryPerShellMB = 1024} -ErrorAction SilentlyContinue
-Set-WSManInstance WinRM/Config -ValueSet @{MaxTimeoutms = 1800000} -ErrorAction SilentlyContinue
-try { Set-WSManInstance WinRM/Config/Client -ValueSet @{TrustedHosts = "*"} -ErrorAction Stop } catch { }
-Set-WSManInstance WinRM/Config/Service/Auth -ValueSet @{Negotiate = $true} -ErrorAction SilentlyContinue
+Set-WSManInstance -ResourceURI WinRM/Config/WinRS -ValueSet @{MaxMemoryPerShellMB = 1024} -ErrorAction SilentlyContinue
+Set-WSManInstance -ResourceURI WinRM/Config -ValueSet @{MaxTimeoutms = 1800000} -ErrorAction SilentlyContinue
+try { Set-WSManInstance -ResourceURI WinRM/Config/Client -ValueSet @{TrustedHosts = "*"} -ErrorAction Stop } catch { }
+Set-WSManInstance -ResourceURI WinRM/Config/Service/Auth -ValueSet @{Negotiate = $true} -ErrorAction SilentlyContinue
 
 # Ensure WinRM service is running
 Set-Service WinRM -StartupType Automatic
