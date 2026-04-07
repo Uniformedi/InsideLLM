@@ -54,6 +54,12 @@ http {
         server docforge:3000;
     }
 %{ endif ~}
+%{ if governance_hub_enable ~}
+
+    upstream governance-hub {
+        server governance-hub:8090;
+    }
+%{ endif ~}
 %{ if ops_grafana_enable ~}
 
     upstream grafana {
@@ -174,6 +180,20 @@ http {
             proxy_buffering off;
             proxy_read_timeout 120s;
             client_max_body_size ${docforge_max_body_size}m;
+        }
+
+%{ endif ~}
+%{ if governance_hub_enable ~}
+        # --- Governance Hub API ---
+        location /governance/ {
+            proxy_pass http://governance-hub/;
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_buffering off;
+            proxy_read_timeout 180s;
         }
 
 %{ endif ~}

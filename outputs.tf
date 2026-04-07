@@ -65,6 +65,17 @@ output "ollama_vm_ip" {
   value       = var.ollama_separate_vm ? split("/", var.ollama_vm_static_ip)[0] : "N/A (running in main stack)"
 }
 
+output "governance_hub_url" {
+  description = "URL for the Governance Hub API"
+  value       = var.governance_hub_enable ? "https://${data.external.vm_ip.result.ip}/governance/" : "N/A (Governance Hub disabled)"
+}
+
+output "governance_hub_api_key" {
+  description = "API key for the Governance Hub"
+  value       = local.governance_hub_secret
+  sensitive   = true
+}
+
 output "grafana_url" {
   description = "URL for the Grafana compliance dashboard"
   value       = var.ops_grafana_enable ? "https://${data.external.vm_ip.result.ip}/grafana/" : "N/A (Grafana disabled)"

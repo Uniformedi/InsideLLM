@@ -164,6 +164,22 @@ write_files:
       ${indent(6, docforge_tool_py)}
 %{ endif ~}
 
+%{ if governance_hub_enable ~}
+  # --- Governance Hub source archive ---
+  - path: /opt/InsideLLM/governance-hub.zip
+    permissions: "0644"
+    owner: root:root
+    encoding: b64
+    content: ${governance_hub_zip_b64}
+
+  # --- Governance Advisor Open WebUI Tool ---
+  - path: /opt/InsideLLM/pipelines/governance-advisor-tool.py
+    permissions: "0644"
+    owner: root:root
+    content: |
+      ${indent(6, governance_advisor_tool_py)}
+%{ endif ~}
+
 %{ if ops_grafana_enable ~}
   # --- Loki config ---
   - path: /opt/InsideLLM/loki/loki-config.yml
@@ -312,6 +328,17 @@ runcmd:
 %{ endif ~}
 %{ if ops_trivy_enable ~}
   - mkdir -p /opt/InsideLLM/data/trivy-reports
+%{ endif ~}
+%{ if governance_hub_enable ~}
+  - mkdir -p /opt/InsideLLM/data/governance-hub
+  - |
+    cd /opt/InsideLLM
+    if [ ! -s governance-hub.zip ]; then
+      echo "ERROR: governance-hub.zip is empty or missing" >&2
+      exit 1
+    fi
+    unzip -o governance-hub.zip -d governance-hub
+    rm -f governance-hub.zip
 %{ endif ~}
 %{ if docforge_enable ~}
   - mkdir -p /opt/InsideLLM/data/docforge/temp

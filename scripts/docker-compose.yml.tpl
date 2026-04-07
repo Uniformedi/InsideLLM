@@ -301,6 +301,57 @@ services:
 
 %{ endif ~}
 
+%{ if governance_hub_enable ~}
+  # -------------------------------------------------------------------------
+  # Governance Hub — Central Sync, Change Management, AI Advisor
+  # -------------------------------------------------------------------------
+  governance-hub:
+    build:
+      context: /opt/InsideLLM/governance-hub
+      dockerfile: Dockerfile
+    container_name: insidellm-governance-hub
+    restart: always
+    environment:
+      GOVERNANCE_HUB_DATABASE_URL: "postgresql+asyncpg://litellm:${postgres_password}@postgres:5432/litellm"
+      GOVERNANCE_HUB_CENTRAL_DB_TYPE: "${governance_hub_central_db_type}"
+      GOVERNANCE_HUB_CENTRAL_DB_HOST: "${governance_hub_central_db_host}"
+      GOVERNANCE_HUB_CENTRAL_DB_PORT: "${governance_hub_central_db_port}"
+      GOVERNANCE_HUB_CENTRAL_DB_NAME: "${governance_hub_central_db_name}"
+      GOVERNANCE_HUB_CENTRAL_DB_USER: "${governance_hub_central_db_user}"
+      GOVERNANCE_HUB_CENTRAL_DB_PASSWORD: "${governance_hub_central_db_password}"
+      GOVERNANCE_HUB_INSTANCE_ID: "${governance_hub_instance_id}"
+      GOVERNANCE_HUB_INSTANCE_NAME: "${governance_hub_instance_name}"
+      GOVERNANCE_HUB_SYNC_SCHEDULE: "${governance_hub_sync_schedule}"
+      GOVERNANCE_HUB_SUPERVISOR_EMAILS: "${governance_hub_supervisor_emails}"
+      GOVERNANCE_HUB_HUB_SECRET: "${governance_hub_secret}"
+      GOVERNANCE_HUB_LITELLM_URL: "http://litellm:4000"
+      GOVERNANCE_HUB_LITELLM_API_KEY: "${litellm_master_key}"
+      GOVERNANCE_HUB_ADVISOR_MODEL: "${governance_hub_advisor_model}"
+      GOVERNANCE_HUB_INDUSTRY: "${governance_hub_industry}"
+      GOVERNANCE_HUB_GOVERNANCE_TIER: "${governance_hub_tier}"
+      GOVERNANCE_HUB_DATA_CLASSIFICATION: "${governance_hub_classification}"
+    volumes:
+      - /opt/InsideLLM/data/governance-hub:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      litellm:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8090/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - insidellm-internal
+
+%{ endif ~}
 %{ if ops_watchtower_enable ~}
   # -------------------------------------------------------------------------
   # Watchtower — Automatic Container Image Updates

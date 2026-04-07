@@ -473,6 +473,92 @@
       + Add Category
     </button>
 
+    <h3 style="font-size:1.1em;color:#2b6cb0;margin:24px 0 10px">Enterprise Governance Hub</h3>
+    <p class="desc" style="margin-bottom:12px">
+      Sync governance data to a central repository, manage framework changes with supervisor approval, and get AI-powered improvement suggestions.
+    </p>
+
+    <div class="switch-row">
+      <label class="switch"><input type="checkbox" id="enableGovernanceHub" onchange="toggleGovernanceHub()"><span class="slider"></span></label>
+      <div><span class="switch-label">Enable Governance Hub</span><div class="switch-hint">Central sync, change management, AI advisor. Requires a central database.</div></div>
+    </div>
+
+    <div id="governanceHubOptions" style="display:none">
+      <h4 style="font-size:1em;color:#2b6cb0;margin:14px 0 8px">Central Repository</h4>
+      <div class="row">
+        <div class="field">
+          <label>Database Type</label>
+          <select id="govHubDbType" onchange="updateGovHubPort()">
+            <option value="postgresql" selected>PostgreSQL</option>
+            <option value="mariadb">MariaDB / MySQL</option>
+            <option value="mssql">Microsoft SQL Server</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Host</label>
+          <input type="text" id="govHubDbHost" placeholder="db.company.com">
+        </div>
+        <div class="field" style="flex:0.5">
+          <label>Port</label>
+          <input type="number" id="govHubDbPort" value="5432">
+        </div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label>Database Name</label>
+          <input type="text" id="govHubDbName" value="insidellm_central">
+        </div>
+        <div class="field">
+          <label>Username</label>
+          <input type="text" id="govHubDbUser" placeholder="insidellm_sync">
+        </div>
+        <div class="field">
+          <label>Password</label>
+          <input type="text" id="govHubDbPassword" placeholder="Central DB password">
+        </div>
+      </div>
+
+      <h4 style="font-size:1em;color:#2b6cb0;margin:14px 0 8px">Instance Identity</h4>
+      <div class="row">
+        <div class="field">
+          <label>Instance Name</label>
+          <div class="hint">Human-readable name for this deployment in the central repo</div>
+          <input type="text" id="govHubInstanceName" placeholder="e.g., HQ-Production, Branch-East">
+        </div>
+        <div class="field">
+          <label>Sync Schedule</label>
+          <select id="govHubSyncSchedule">
+            <option value="0 */6 * * *" selected>Every 6 hours</option>
+            <option value="0 * * * *">Every hour</option>
+            <option value="*/15 * * * *">Every 15 minutes</option>
+            <option value="0 0 * * *">Daily (midnight)</option>
+          </select>
+        </div>
+      </div>
+
+      <h4 style="font-size:1em;color:#2b6cb0;margin:14px 0 8px">Change Management</h4>
+      <div class="field">
+        <label>Supervisor Emails</label>
+        <div class="hint">Comma-separated. These people can approve or reject governance change proposals.</div>
+        <input type="text" id="govHubSupervisorEmails" placeholder="supervisor@company.com, manager@company.com">
+      </div>
+      <div class="field">
+        <label>AI Advisor Model</label>
+        <div class="hint">Which Claude model the governance advisor uses for analysis</div>
+        <select id="govHubAdvisorModel">
+          <option value="claude-sonnet" selected>Claude Sonnet (recommended)</option>
+          <option value="claude-haiku">Claude Haiku (faster, cheaper)</option>
+          <option value="claude-opus">Claude Opus (deepest analysis)</option>
+        </select>
+      </div>
+
+      <div class="info-box">
+        <strong>How it works:</strong> The AI Governance Advisor analyzes your spend patterns, keyword flags, compliance metrics, and team utilization.
+        It generates improvement suggestions as <em>pending change proposals</em>. No changes are made without explicit supervisor approval.
+        Every approval is versioned and audited.
+      </div>
+    </div>
+
     <div class="btn-row">
       <button class="btn btn-secondary" onclick="prevStep()">Back</button>
       <button class="btn btn-primary" onclick="nextStep()">Next</button>
@@ -991,6 +1077,17 @@ function getKeywordCategories() {
   return categories;
 }
 
+function toggleGovernanceHub() {
+  const on = document.getElementById('enableGovernanceHub').checked;
+  document.getElementById('governanceHubOptions').style.display = on ? 'block' : 'none';
+}
+
+function updateGovHubPort() {
+  const type = v('govHubDbType');
+  const portMap = { postgresql: 5432, mariadb: 3306, mssql: 1433 };
+  document.getElementById('govHubDbPort').value = portMap[type] || 5432;
+}
+
 function updateGovernanceHint() {
   const tier = v('governanceTier');
   const hint = document.getElementById('governanceHint');
@@ -1303,6 +1400,22 @@ ops_uptime_kuma_enable   = ${checked('opsUptimeKuma')}
 ops_backup_schedule      = "${v('opsBackupSchedule')}"`;
   if (v('opsAlertWebhook')) out += `\nops_alert_webhook        = "${v('opsAlertWebhook')}"`;
 
+  // Enterprise Governance Hub
+  if (checked('enableGovernanceHub')) {
+    out += `\n\n# Enterprise Governance Hub
+governance_hub_enable              = true
+governance_hub_central_db_type     = "${v('govHubDbType')}"
+governance_hub_central_db_host     = "${v('govHubDbHost')}"
+governance_hub_central_db_port     = ${v('govHubDbPort')}
+governance_hub_central_db_name     = "${v('govHubDbName')}"
+governance_hub_central_db_user     = "${v('govHubDbUser')}"
+governance_hub_central_db_password = "${v('govHubDbPassword')}"
+governance_hub_instance_name       = "${v('govHubInstanceName')}"
+governance_hub_sync_schedule       = "${v('govHubSyncSchedule')}"`;
+    if (v('govHubSupervisorEmails')) out += `\ngovernance_hub_supervisor_emails  = "${v('govHubSupervisorEmails')}"`;
+    out += `\ngovernance_hub_advisor_model      = "${v('govHubAdvisorModel')}"`;
+  }
+
   // Keyword categories
   const kwCats = getKeywordCategories();
   if (Object.keys(kwCats).length > 0) {
@@ -1356,6 +1469,16 @@ function generateWsl2Command() {
   if (!checked('opsUptimeKuma')) args.push('-OpsUptimeKuma $false');
   if (v('opsBackupSchedule') !== 'daily') args.push(`-OpsBackupSchedule "${v('opsBackupSchedule')}"`);
   if (v('opsAlertWebhook')) args.push(`-OpsAlertWebhook "${v('opsAlertWebhook')}"`);
+  if (checked('enableGovernanceHub')) {
+    args.push('-GovernanceHubEnable $true');
+    args.push(`-GovernanceHubDbType "${v('govHubDbType')}"`);
+    args.push(`-GovernanceHubDbHost "${v('govHubDbHost')}"`);
+    args.push(`-GovernanceHubDbName "${v('govHubDbName')}"`);
+    args.push(`-GovernanceHubDbUser "${v('govHubDbUser')}"`);
+    args.push(`-GovernanceHubDbPassword "${v('govHubDbPassword')}"`);
+    if (v('govHubInstanceName')) args.push(`-GovernanceHubInstanceName "${v('govHubInstanceName')}"`);
+    if (v('govHubSupervisorEmails')) args.push(`-GovernanceHubSupervisors "${v('govHubSupervisorEmails')}"`);
+  }
 
   if (ollamaEnabled) {
     const defaultModels = 'qwen2.5-coder:14b, qwen2.5:14b';

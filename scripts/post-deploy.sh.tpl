@@ -413,6 +413,64 @@ END;
 " >> "$LOG" 2>&1 || log "WARNING: Failed to create keyword analysis views"
 log "Keyword analysis infrastructure created"
 
+%{ if governance_hub_enable ~}
+# ---------------------------------------------------------------------------
+# Wait for Governance Hub and register the advisor tool
+# ---------------------------------------------------------------------------
+log "Waiting for Governance Hub..."
+GOV_ATTEMPTS=0
+GOV_MAX=30
+while [ $GOV_ATTEMPTS -lt $GOV_MAX ]; do
+  if docker exec insidellm-governance-hub curl -sf http://localhost:8090/health > /dev/null 2>&1; then
+    log "Governance Hub is healthy"
+    break
+  fi
+  GOV_ATTEMPTS=$((GOV_ATTEMPTS + 1))
+  log "Waiting for Governance Hub... ($GOV_ATTEMPTS/$GOV_MAX)"
+  sleep 5
+done
+
+log "Registering Governance Advisor tool in Open WebUI..."
+docker exec insidellm-open-webui python3 -c "
+import sys
+sys.path.insert(0, '/app/backend')
+
+from open_webui.models.functions import Functions, FunctionForm, FunctionMeta
+
+FUNC_ID = 'governance_advisor'
+SYSTEM_USER = '00000000-0000-0000-0000-000000000000'
+
+with open('/app/backend/pipelines/governance-advisor-tool.py', 'r') as f:
+    code = f.read()
+
+existing = Functions.get_function_by_id(FUNC_ID)
+if existing:
+    Functions.update_function_by_id(FUNC_ID, {
+        'content': code,
+        'is_active': True,
+        'is_global': True
+    })
+    print('Governance Advisor tool updated and activated')
+else:
+    form = FunctionForm(
+        id=FUNC_ID,
+        name='AI Governance Advisor',
+        content=code,
+        meta=FunctionMeta(
+            description='Analyze governance data and suggest framework improvements. All suggestions require supervisor approval.',
+            manifest={}
+        )
+    )
+    result = Functions.insert_new_function(SYSTEM_USER, 'tool', form)
+    if result:
+        Functions.update_function_by_id(result.id, {'is_active': True, 'is_global': True})
+        print(f'Governance Advisor tool registered (id={result.id})')
+    else:
+        print('ERROR: Failed to register Governance Advisor tool')
+        sys.exit(1)
+" >> "$LOG" 2>&1 || log "WARNING: Governance Advisor tool registration failed"
+%{ endif ~}
+
 %{ if docforge_enable ~}
 # ---------------------------------------------------------------------------
 # Wait for DocForge and register as an Open WebUI Tool
@@ -531,6 +589,9 @@ log "  Netdata:      https://$VM_IP/netdata/"
 log "  pgAdmin:      http://$VM_IP:5050"
 %{ if docforge_enable ~}
 log "  DocForge:     https://$VM_IP/docforge/api/formats"
+%{ endif ~}
+%{ if governance_hub_enable ~}
+log "  Governance:   https://$VM_IP/governance/health"
 %{ endif ~}
 %{ if ops_grafana_enable ~}
 log "  Grafana:      https://$VM_IP/grafana/"

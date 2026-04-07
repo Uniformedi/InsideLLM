@@ -537,6 +537,82 @@ variable "keyword_refresh_schedule" {
 }
 
 # =============================================================================
+# ENTERPRISE GOVERNANCE HUB
+# =============================================================================
+
+variable "governance_hub_enable" {
+  description = "Enable the Governance Hub for central repository sync, change management, and AI advisor"
+  type        = bool
+  default     = false
+}
+
+variable "governance_hub_central_db_type" {
+  description = "Central repository database type: postgresql, mariadb, mssql"
+  type        = string
+  default     = "postgresql"
+
+  validation {
+    condition     = contains(["postgresql", "mariadb", "mssql"], var.governance_hub_central_db_type)
+    error_message = "Central DB type must be postgresql, mariadb, or mssql."
+  }
+}
+
+variable "governance_hub_central_db_host" {
+  description = "Central repository database hostname"
+  type        = string
+  default     = ""
+}
+
+variable "governance_hub_central_db_port" {
+  description = "Central repository database port"
+  type        = number
+  default     = 5432
+}
+
+variable "governance_hub_central_db_name" {
+  description = "Central repository database name"
+  type        = string
+  default     = "insidellm_central"
+}
+
+variable "governance_hub_central_db_user" {
+  description = "Central repository database username"
+  type        = string
+  default     = ""
+}
+
+variable "governance_hub_central_db_password" {
+  description = "Central repository database password"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "governance_hub_instance_name" {
+  description = "Human-readable name for this InsideLLM instance in the central repository"
+  type        = string
+  default     = ""
+}
+
+variable "governance_hub_sync_schedule" {
+  description = "Cron schedule for syncing to central repository (default: every 6 hours)"
+  type        = string
+  default     = "0 */6 * * *"
+}
+
+variable "governance_hub_supervisor_emails" {
+  description = "Comma-separated emails of supervisors who can approve governance changes"
+  type        = string
+  default     = ""
+}
+
+variable "governance_hub_advisor_model" {
+  description = "LLM model the AI governance advisor uses for analysis"
+  type        = string
+  default     = "claude-sonnet"
+}
+
+# =============================================================================
 # TLS CONFIGURATION
 # =============================================================================
 

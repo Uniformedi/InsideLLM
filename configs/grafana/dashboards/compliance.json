@@ -210,10 +210,60 @@
         }]
       },
       {
+      {
+        "id": 60,
+        "title": "Change Management Pipeline",
+        "description": "Governance change proposals by status — tracks the approval workflow",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 0, "y": 52 },
+        "datasource": { "type": "postgres", "uid": "PostgreSQL" },
+        "targets": [{
+          "rawSql": "SELECT status, COUNT(*) AS count FROM governance_changes GROUP BY status ORDER BY count DESC",
+          "format": "table"
+        }],
+        "options": { "reduceOptions": { "calcs": ["lastNotNull"] } }
+      },
+      {
+        "id": 61,
+        "title": "AI Advisor Suggestions (30d)",
+        "description": "AI-generated governance improvement proposals by category",
+        "type": "piechart",
+        "gridPos": { "h": 8, "w": 6, "x": 6, "y": 52 },
+        "datasource": { "type": "postgres", "uid": "PostgreSQL" },
+        "targets": [{
+          "rawSql": "SELECT category, COUNT(*) AS count FROM governance_changes WHERE source = 'ai_advisor' AND proposed_at > NOW() - INTERVAL '30 days' GROUP BY category",
+          "format": "table"
+        }]
+      },
+      {
+        "id": 62,
+        "title": "Sync History",
+        "description": "Central repository sync status over time",
+        "type": "table",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 52 },
+        "datasource": { "type": "postgres", "uid": "PostgreSQL" },
+        "targets": [{
+          "rawSql": "SELECT sync_at, status, records_exported, duration_ms, error_message FROM governance_sync_log ORDER BY sync_at DESC LIMIT 20",
+          "format": "table"
+        }]
+      },
+      {
+        "id": 63,
+        "title": "Framework Version History",
+        "description": "Approved and implemented governance framework changes with full audit trail",
+        "type": "table",
+        "gridPos": { "h": 8, "w": 24, "x": 0, "y": 60 },
+        "datasource": { "type": "postgres", "uid": "PostgreSQL" },
+        "targets": [{
+          "rawSql": "SELECT gc.id, gc.title, gc.category, gc.source, gc.proposed_by, gc.proposed_at, gc.status, gc.reviewed_by, gc.reviewed_at, gc.framework_version, gc.implemented_at FROM governance_changes gc WHERE gc.status IN ('approved', 'implemented') ORDER BY gc.proposed_at DESC LIMIT 50",
+          "format": "table"
+        }]
+      },
+      {
         "id": 40,
         "title": "Container Logs",
         "type": "logs",
-        "gridPos": { "h": 10, "w": 24, "x": 0, "y": 52 },
+        "gridPos": { "h": 10, "w": 24, "x": 0, "y": 68 },
         "datasource": { "type": "loki", "uid": "Loki" },
         "targets": [{
           "expr": "{service=~\".+\"} |= ``",

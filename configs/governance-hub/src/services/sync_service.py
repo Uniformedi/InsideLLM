@@ -1,0 +1,144 @@
+import time
+from datetime import datetime, timedelta, timezone
+
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ..config import settings
+from ..db.central_db import get_central_session_factory
+from ..db.models import InstanceRegistry, SyncLog, TelemetryExport
+from ..schemas.sync import SyncExportEnvelope, SyncStatus, TelemetrySummary
+
+
+async def collect_telemetry(db: AsyncSession, days: int = 1) -> TelemetrySummary:
+    """Collect governance telemetry from local PostgreSQL."""
+    now = datetime.now(timezone.utc)
+    since = now - timedelta(days=days)
+
+    result = await db.execute(text("""
+        SELECT
+            COUNT(*) AS total_requests,
+            COALESCE(SUM(spend), 0) AS total_spend,
+            COUNT(DISTINCT "user") AS unique_users,
+            COUNT(*) FILTER (WHERE status != 'success') AS error_count
+        FROM "LiteLLM_SpendLogs"
+        WHERE "startTime" > :since
+    """), {"since": since})
+    row = result.mappings().first()
+
+    # Keyword flags
+    flags = await db.execute(text("""
+        SELECT
+            COALESCE(SUM(CASE WHEN severity = 'critical' THEN match_count ELSE 0 END), 0) AS critical,
+            COALESCE(SUM(CASE WHEN severity = 'high' THEN match_count ELSE 0 END), 0) AS high
+        FROM keyword_daily_summary
+        WHERE day > :since
+    """), {"since": since})
+    flag_row = flags.mappings().first()
+
+    # Top models
+    models_result = await db.execute(text("""
+        SELECT model, COUNT(*) AS cnt
+        FROM "LiteLLM_SpendLogs"
+        WHERE "startTime" > :since
+        GROUP BY model ORDER BY cnt DESC LIMIT 10
+    """), {"since": since})
+    top_models = {r["model"]: r["cnt"] for r in models_result.mappings()}
+
+    # Compliance score: (1 - error_rate) * 100, capped at 100
+    total = row["total_requests"] or 1
+    error_rate = (row["error_count"] or 0) / total
+    compliance_score = round(min(100.0, (1 - error_rate) * 100), 2)
+
+    return TelemetrySummary(
+        total_requests=row["total_requests"] or 0,
+        total_spend=float(row["total_spend"] or 0),
+        unique_users=row["unique_users"] or 0,
+        error_count=row["error_count"] or 0,
+        dlp_blocks=0,  # would require Loki query; placeholder
+        keyword_flags_critical=flag_row["critical"] if flag_row else 0,
+        keyword_flags_high=flag_row["high"] if flag_row else 0,
+        compliance_score=compliance_score,
+        top_models=top_models,
+    )
+
+
+async def export_to_central(local_db: AsyncSession, telemetry: TelemetrySummary) -> SyncLog:
+    """Export telemetry to the central database."""
+    start = time.time()
+    factory = get_central_session_factory()
+
+    if factory is None:
+        log = SyncLog(
+            status="skipped",
+            records_exported=0,
+            central_db_type=settings.central_db_type,
+            error_message="Central DB not configured",
+            duration_ms=0,
+        )
+        local_db.add(log)
+        await local_db.commit()
+        return log
+
+    try:
+        async with factory() as central_db:
+            # Upsert instance registry
+            await central_db.execute(text("""
+                INSERT INTO governance_instances (instance_id, instance_name, industry, governance_tier, data_classification, schema_version, last_sync_at, status)
+                VALUES (:id, :name, :industry, :tier, :classification, :schema_version, NOW(), 'active')
+                ON CONFLICT (instance_id) DO UPDATE SET
+                    instance_name = EXCLUDED.instance_name,
+                    schema_version = EXCLUDED.schema_version,
+                    last_sync_at = NOW()
+            """), {
+                "id": settings.instance_id,
+                "name": settings.instance_name,
+                "industry": settings.industry,
+                "tier": settings.governance_tier,
+                "classification": settings.data_classification,
+                "schema_version": settings.schema_version,
+            })
+
+            # Insert telemetry
+            now = datetime.now(timezone.utc)
+            await central_db.execute(text("""
+                INSERT INTO governance_telemetry
+                    (instance_id, instance_name, schema_version, period_start, period_end,
+                     total_requests, total_spend, unique_users, dlp_blocks, error_count,
+                     keyword_flags_critical, keyword_flags_high, compliance_score, industry, governance_tier, metrics_json)
+                VALUES
+                    (:instance_id, :instance_name, :schema_version, :period_start, :period_end,
+                     :total_requests, :total_spend, :unique_users, :dlp_blocks, :error_count,
+                     :kw_critical, :kw_high, :compliance_score, :industry, :tier, :metrics)
+            """), {
+                "instance_id": settings.instance_id,
+                "instance_name": settings.instance_name,
+                "schema_version": settings.schema_version,
+                "period_start": now - timedelta(days=1),
+                "period_end": now,
+                "total_requests": telemetry.total_requests,
+                "total_spend": telemetry.total_spend,
+                "unique_users": telemetry.unique_users,
+                "dlp_blocks": telemetry.dlp_blocks,
+                "error_count": telemetry.error_count,
+                "kw_critical": telemetry.keyword_flags_critical,
+                "kw_high": telemetry.keyword_flags_high,
+                "compliance_score": telemetry.compliance_score,
+                "industry": settings.industry,
+                "tier": settings.governance_tier,
+                "metrics": "{}",
+            })
+            await central_db.commit()
+
+        duration = int((time.time() - start) * 1000)
+        log = SyncLog(status="success", records_exported=1, central_db_type=settings.central_db_type, duration_ms=duration)
+        local_db.add(log)
+        await local_db.commit()
+        return log
+
+    except Exception as e:
+        duration = int((time.time() - start) * 1000)
+        log = SyncLog(status="error", records_exported=0, central_db_type=settings.central_db_type, error_message=str(e)[:1000], duration_ms=duration)
+        local_db.add(log)
+        await local_db.commit()
+        return log
