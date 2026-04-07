@@ -469,6 +469,46 @@ else:
         print('ERROR: Failed to register Governance Advisor tool')
         sys.exit(1)
 " >> "$LOG" 2>&1 || log "WARNING: Governance Advisor tool registration failed"
+
+log "Registering Fleet Management tool in Open WebUI..."
+docker exec insidellm-open-webui python3 -c "
+import sys
+sys.path.insert(0, '/app/backend')
+
+from open_webui.models.functions import Functions, FunctionForm, FunctionMeta
+
+FUNC_ID = 'fleet_management'
+SYSTEM_USER = '00000000-0000-0000-0000-000000000000'
+
+with open('/app/backend/pipelines/fleet-management-tool.py', 'r') as f:
+    code = f.read()
+
+existing = Functions.get_function_by_id(FUNC_ID)
+if existing:
+    Functions.update_function_by_id(FUNC_ID, {
+        'content': code,
+        'is_active': True,
+        'is_global': True
+    })
+    print('Fleet Management tool updated and activated')
+else:
+    form = FunctionForm(
+        id=FUNC_ID,
+        name='Fleet Management',
+        content=code,
+        meta=FunctionMeta(
+            description='Manage multiple InsideLLM deployments - view instances, compare configs, restore from snapshots.',
+            manifest={}
+        )
+    )
+    result = Functions.insert_new_function(SYSTEM_USER, 'tool', form)
+    if result:
+        Functions.update_function_by_id(result.id, {'is_active': True, 'is_global': True})
+        print(f'Fleet Management tool registered (id={result.id})')
+    else:
+        print('ERROR: Failed to register Fleet Management tool')
+        sys.exit(1)
+" >> "$LOG" 2>&1 || log "WARNING: Fleet Management tool registration failed"
 %{ endif ~}
 
 %{ if docforge_enable ~}

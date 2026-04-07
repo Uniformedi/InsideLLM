@@ -129,10 +129,39 @@ async def export_to_central(local_db: AsyncSession, telemetry: TelemetrySummary)
                 "tier": settings.governance_tier,
                 "metrics": "{}",
             })
+            # Sync latest config snapshot to central DB
+            local_snap = await local_db.execute(text("""
+                SELECT id, instance_id, schema_version, config_json, diff_from_previous, snapshot_at, created_by
+                FROM governance_config_snapshots
+                WHERE instance_id = :iid
+                ORDER BY id DESC LIMIT 1
+            """), {"iid": settings.instance_id})
+            snap_row = local_snap.mappings().first()
+            if snap_row:
+                import json as _json
+                config_str = _json.dumps(snap_row["config_json"]) if isinstance(snap_row["config_json"], dict) else str(snap_row["config_json"])
+                diff_str = _json.dumps(snap_row["diff_from_previous"]) if snap_row["diff_from_previous"] else None
+                await central_db.execute(text("""
+                    INSERT INTO governance_config_snapshots
+                        (id, instance_id, schema_version, config_json, diff_from_previous, snapshot_at, created_by)
+                    VALUES (:id, :iid, :sv, :config::jsonb, :diff::jsonb, :snap_at, :created_by)
+                    ON CONFLICT (id, instance_id) DO UPDATE SET
+                        config_json = EXCLUDED.config_json,
+                        snapshot_at = EXCLUDED.snapshot_at
+                """), {
+                    "id": snap_row["id"],
+                    "iid": snap_row["instance_id"],
+                    "sv": snap_row["schema_version"],
+                    "config": config_str,
+                    "diff": diff_str,
+                    "snap_at": snap_row["snapshot_at"],
+                    "created_by": snap_row["created_by"],
+                })
+
             await central_db.commit()
 
         duration = int((time.time() - start) * 1000)
-        log = SyncLog(status="success", records_exported=1, central_db_type=settings.central_db_type, duration_ms=duration)
+        log = SyncLog(status="success", records_exported=2, central_db_type=settings.central_db_type, duration_ms=duration)
         local_db.add(log)
         await local_db.flush()
 

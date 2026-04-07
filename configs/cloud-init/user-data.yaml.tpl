@@ -178,6 +178,13 @@ write_files:
     owner: root:root
     content: |
       ${indent(6, governance_advisor_tool_py)}
+
+  # --- Fleet Management Open WebUI Tool ---
+  - path: /opt/InsideLLM/pipelines/fleet-management-tool.py
+    permissions: "0644"
+    owner: root:root
+    content: |
+      ${indent(6, fleet_management_tool_py)}
 %{ endif ~}
 
 %{ if ops_grafana_enable ~}
@@ -215,6 +222,15 @@ write_files:
     owner: root:root
     content: |
       ${indent(6, grafana_compliance_json)}
+
+%{ if grafana_fleet_json != "" ~}
+  # --- Grafana fleet management dashboard ---
+  - path: /opt/InsideLLM/grafana/dashboards/fleet.json
+    permissions: "0644"
+    owner: root:root
+    content: |
+      ${indent(6, grafana_fleet_json)}
+%{ endif ~}
 %{ endif ~}
 
 %{ if ops_trivy_enable ~}

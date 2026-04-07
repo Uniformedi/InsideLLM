@@ -232,6 +232,7 @@ locals {
     grafana_datasources_yml  = var.ops_grafana_enable ? templatefile("${path.module}/configs/grafana/provisioning/datasources.yml", { postgres_password = local.postgres_password }) : ""
     grafana_dashboards_yml   = var.ops_grafana_enable ? file("${path.module}/configs/grafana/provisioning/dashboards.yml") : ""
     grafana_compliance_json  = var.ops_grafana_enable ? file("${path.module}/configs/grafana/dashboards/compliance.json") : ""
+    grafana_fleet_json       = var.ops_grafana_enable && var.governance_hub_enable ? file("${path.module}/configs/grafana/dashboards/fleet.json") : ""
     loki_config              = var.ops_grafana_enable ? file("${path.module}/configs/loki/loki-config.yml") : ""
     promtail_config          = var.ops_grafana_enable ? file("${path.module}/configs/promtail/promtail-config.yml") : ""
     trivy_scan_sh            = var.ops_trivy_enable ? file("${path.module}/configs/trivy/scan.sh") : ""
@@ -242,6 +243,7 @@ locals {
     governance_hub_enable        = var.governance_hub_enable
     governance_hub_zip_b64       = var.governance_hub_enable ? filebase64(data.archive_file.governance_hub[0].output_path) : ""
     governance_advisor_tool_py   = var.governance_hub_enable ? file("${path.module}/configs/open-webui/governance-advisor-tool.py") : ""
+    fleet_management_tool_py     = var.governance_hub_enable ? file("${path.module}/configs/open-webui/fleet-management-tool.py") : ""
     post_deploy_sh               = templatefile("${path.module}/scripts/post-deploy.sh.tpl", {
       litellm_master_key  = local.litellm_master_key
       default_user_budget = var.litellm_default_user_budget
