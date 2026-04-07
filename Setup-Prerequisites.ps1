@@ -235,7 +235,8 @@ Write-Host "  VM Directory: $VmDir"
 Write-Host "  VHD Directory: $VhdDir"
 Write-Host ""
 Write-Host "  Next steps:" -ForegroundColor Yellow
-Write-Host "  1. Open Setup.html and save the output file to your InsideLLM clone directory"
+$setupHtmlPath = Join-Path $PSScriptRoot "Setup.html"
+Write-Host "  1. Open $setupHtmlPath and save the output file to this directory"
 Write-Host "     (Or manually: copy terraform.tfvars.example to terraform.tfvars" -ForegroundColor DarkGray
 Write-Host "      and edit it with your values)" -ForegroundColor DarkGray
 Write-Host "  2. Powershell (Run as Admin): terraform init"
