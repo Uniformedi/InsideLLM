@@ -148,6 +148,22 @@ write_files:
           logger -t disk-monitor "Cleanup complete. Usage now: $(df / | tail -1 | awk '{print $5}')"
       fi
 
+%{ if docforge_enable ~}
+  # --- DocForge source archive ---
+  - path: /opt/InsideLLM/docforge.zip
+    permissions: "0644"
+    owner: root:root
+    encoding: b64
+    content: ${docforge_zip_b64}
+
+  # --- DocForge Open WebUI Tool ---
+  - path: /opt/InsideLLM/pipelines/docforge-tool.py
+    permissions: "0644"
+    owner: root:root
+    content: |
+      ${indent(6, docforge_tool_py)}
+%{ endif ~}
+
   # --- Post-deploy script ---
   - path: /opt/InsideLLM/post-deploy.sh
     permissions: "0750"
@@ -208,11 +224,23 @@ runcmd:
   - mkdir -p /opt/InsideLLM/data/pgadmin
   - mkdir -p /opt/InsideLLM/data/netdata
   - mkdir -p /opt/InsideLLM/pipelines
-
-  # --- Pull images and start the stack ---
+%{ if docforge_enable ~}
+  - mkdir -p /opt/InsideLLM/data/docforge/temp
   - |
     cd /opt/InsideLLM
-    docker compose pull
+    if [ ! -s docforge.zip ]; then
+      echo "ERROR: docforge.zip is empty or missing" >&2
+      exit 1
+    fi
+    unzip -o docforge.zip -d docforge
+    rm -f docforge.zip
+%{ endif ~}
+
+  # --- Pull images, build local images, and start the stack ---
+  - |
+    cd /opt/InsideLLM
+    docker compose pull --ignore-buildable
+    docker compose build
     docker compose up -d
 
   # --- Wait for services to be healthy, then run post-deploy ---

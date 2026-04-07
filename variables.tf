@@ -389,6 +389,22 @@ variable "dlp_custom_patterns" {
 }
 
 # =============================================================================
+# FILE CONVERSION (DOCFORGE)
+# =============================================================================
+
+variable "docforge_enable" {
+  description = "Enable the DocForge file generation and conversion service"
+  type        = bool
+  default     = true
+}
+
+variable "docforge_max_file_size_mb" {
+  description = "Maximum file upload size for DocForge conversions (in MB)"
+  type        = number
+  default     = 50
+}
+
+# =============================================================================
 # TLS CONFIGURATION
 # =============================================================================
 

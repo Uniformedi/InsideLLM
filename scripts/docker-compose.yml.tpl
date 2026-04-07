@@ -230,6 +230,40 @@ services:
     networks:
       - insidellm-internal
 
+%{ if docforge_enable ~}
+  # -------------------------------------------------------------------------
+  # DocForge — File Generation & Conversion Service
+  # -------------------------------------------------------------------------
+  docforge:
+    build:
+      context: /opt/InsideLLM/docforge
+      dockerfile: Dockerfile
+    container_name: insidellm-docforge
+    restart: always
+    volumes:
+      - /opt/InsideLLM/data/docforge:/app/data
+    environment:
+      PORT: "3000"
+      TEMP_DIR: "/app/data/temp"
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - insidellm-internal
+
+%{ endif ~}
 %{ if ollama_enable ~}
   # -------------------------------------------------------------------------
   # Ollama — Local LLM Inference Engine

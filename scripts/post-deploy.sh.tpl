@@ -197,6 +197,67 @@ CREATE OR REPLACE VIEW budgets AS SELECT * FROM \"LiteLLM_BudgetTable\";
 " >> "$LOG" 2>&1 || log "WARNING: Failed to create views"
 log "Database views created"
 
+%{ if docforge_enable ~}
+# ---------------------------------------------------------------------------
+# Wait for DocForge and register as an Open WebUI Tool
+# ---------------------------------------------------------------------------
+log "Waiting for DocForge service..."
+DOCFORGE_ATTEMPTS=0
+DOCFORGE_MAX=20
+while [ $DOCFORGE_ATTEMPTS -lt $DOCFORGE_MAX ]; do
+  if docker exec insidellm-docforge curl -sf http://localhost:3000/health > /dev/null 2>&1; then
+    log "DocForge is healthy"
+    break
+  fi
+  DOCFORGE_ATTEMPTS=$((DOCFORGE_ATTEMPTS + 1))
+  log "Waiting for DocForge... ($DOCFORGE_ATTEMPTS/$DOCFORGE_MAX)"
+  sleep 5
+done
+if [ $DOCFORGE_ATTEMPTS -eq $DOCFORGE_MAX ]; then
+  log "WARNING: DocForge did not become healthy within timeout"
+fi
+
+log "Registering DocForge tool in Open WebUI..."
+docker exec insidellm-open-webui python3 -c "
+import sys
+sys.path.insert(0, '/app/backend')
+
+from open_webui.models.functions import Functions, FunctionForm, FunctionMeta
+
+FUNC_ID = 'docforge_tool'
+SYSTEM_USER = '00000000-0000-0000-0000-000000000000'
+
+with open('/app/backend/pipelines/docforge-tool.py', 'r') as f:
+    code = f.read()
+
+existing = Functions.get_function_by_id(FUNC_ID)
+if existing:
+    Functions.update_function_by_id(FUNC_ID, {
+        'content': code,
+        'is_active': True,
+        'is_global': True
+    })
+    print('DocForge tool updated and activated')
+else:
+    form = FunctionForm(
+        id=FUNC_ID,
+        name='DocForge - File Generation & Conversion',
+        content=code,
+        meta=FunctionMeta(
+            description='Generate and convert documents (DOCX, XLSX, PPTX, PDF, CSV, and more) from structured data.',
+            manifest={}
+        )
+    )
+    result = Functions.insert_new_function(SYSTEM_USER, 'tool', form)
+    if result:
+        Functions.update_function_by_id(result.id, {'is_active': True, 'is_global': True})
+        print(f'DocForge tool registered and activated (id={result.id})')
+    else:
+        print('ERROR: Failed to register DocForge tool')
+        sys.exit(1)
+" >> "$LOG" 2>&1 || log "WARNING: DocForge tool registration failed — register manually via Admin > Functions"
+%{ endif ~}
+
 %{ if ollama_enable ~}
 # ---------------------------------------------------------------------------
 # Pull Ollama models via docker exec (reliable for large downloads)
@@ -252,6 +313,9 @@ log "  LiteLLM UI:   https://$VM_IP/litellm/ui/chat"
 log "  LiteLLM API:  https://$VM_IP/v1"
 log "  Netdata:      https://$VM_IP/netdata/"
 log "  pgAdmin:      http://$VM_IP:5050"
+%{ if docforge_enable ~}
+log "  DocForge:     https://$VM_IP/docforge/api/formats"
+%{ endif ~}
 log ""
 log "  First user to register on Open WebUI"
 log "  becomes the admin."

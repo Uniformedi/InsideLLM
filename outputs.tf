@@ -65,6 +65,11 @@ output "ollama_vm_ip" {
   value       = var.ollama_separate_vm ? split("/", var.ollama_vm_static_ip)[0] : "N/A (running in main stack)"
 }
 
+output "docforge_url" {
+  description = "URL for the DocForge file conversion API"
+  value       = var.docforge_enable ? "https://${data.external.vm_ip.result.ip}/docforge/api/formats" : "N/A (DocForge disabled)"
+}
+
 output "webui_secret_key" {
   description = "Open WebUI secret key"
   value       = local.webui_secret
@@ -98,6 +103,7 @@ output "deployment_notes" {
     ║  to retrieve the admin API key                               ║
     ║                                                              ║
     ║  DLP Pipeline: ${var.dlp_enable ? "ENABLED" : "DISABLED"}                                     ║
+    ║  DocForge:     ${var.docforge_enable ? "ENABLED" : "DISABLED"}                                     ║
     ║  SSO Provider: ${var.sso_provider}                                         ║
     ║                                                              ║
     ╚══════════════════════════════════════════════════════════════╝

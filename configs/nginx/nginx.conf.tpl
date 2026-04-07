@@ -48,6 +48,12 @@ http {
     upstream netdata {
         server netdata:19999;
     }
+%{ if docforge_enable ~}
+
+    upstream docforge {
+        server docforge:3000;
+    }
+%{ endif ~}
 
     # --- HTTP -> HTTPS redirect ---
     server {
@@ -144,6 +150,21 @@ http {
             proxy_buffering off;
         }
 
+%{ if docforge_enable ~}
+        # --- DocForge File Conversion API ---
+        location /docforge/ {
+            proxy_pass http://docforge/;
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_buffering off;
+            proxy_read_timeout 120s;
+            client_max_body_size ${docforge_max_body_size}m;
+        }
+
+%{ endif ~}
         # --- Admin Portal ---
         location /admin {
             alias /opt/InsideLLM/admin.html;

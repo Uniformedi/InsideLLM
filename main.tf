@@ -101,6 +101,17 @@ locals {
 }
 
 # ---------------------------------------------------------------------------
+# Archive DocForge source for cloud-init deployment
+# ---------------------------------------------------------------------------
+
+data "archive_file" "docforge" {
+  count       = var.docforge_enable ? 1 : 0
+  type        = "zip"
+  source_dir  = "${path.module}/configs/docforge"
+  output_path = "${path.module}/.terraform/tmp/docforge.zip"
+}
+
+# ---------------------------------------------------------------------------
 # Render configuration templates
 # ---------------------------------------------------------------------------
 
@@ -132,14 +143,17 @@ locals {
     ollama_enable      = var.ollama_enable && !var.ollama_separate_vm
     ollama_models      = var.ollama_models
     ollama_gpu         = var.ollama_gpu
+    docforge_enable    = var.docforge_enable
   })
 }
 
 # --- Nginx config ---
 locals {
   nginx_conf = templatefile("${path.module}/configs/nginx/nginx.conf.tpl", {
-    server_name = local.vm_fqdn
-    vm_hostname = var.vm_hostname
+    server_name            = local.vm_fqdn
+    vm_hostname            = var.vm_hostname
+    docforge_enable        = var.docforge_enable
+    docforge_max_body_size = var.docforge_max_file_size_mb
   })
 }
 
@@ -158,12 +172,16 @@ locals {
     dlp_pipeline_py    = file("${path.module}/configs/open-webui/dlp-pipeline.py")
     admin_html         = file("${path.module}/admin.html")
     xrdp_password      = local.xrdp_password
+    docforge_enable    = var.docforge_enable
+    docforge_zip_b64   = var.docforge_enable ? filebase64(data.archive_file.docforge[0].output_path) : ""
+    docforge_tool_py   = var.docforge_enable ? file("${path.module}/configs/open-webui/docforge-tool.py") : ""
     post_deploy_sh     = templatefile("${path.module}/scripts/post-deploy.sh.tpl", {
       litellm_master_key  = local.litellm_master_key
       default_user_budget = var.litellm_default_user_budget
       vm_fqdn             = local.vm_fqdn
       ollama_enable       = var.ollama_enable && !var.ollama_separate_vm
       ollama_models       = var.ollama_models
+      docforge_enable     = var.docforge_enable
     })
   })
 
@@ -426,12 +444,25 @@ ${local.ollama_cloud_init_network}
       }
 
       $isoPath = "${var.vm_path}\${local.ollama_vm_name}-cloud-init.iso"
-      $oscdimg = "C:\Program Files (x86)\Windows Kits\10\Assessment and Deployment Kit\Deployment Tools\amd64\Oscdimg\oscdimg.exe"
-      if (Test-Path $oscdimg) {
-        & $oscdimg -j1 -lCIDATA $ciDir $isoPath
+
+      # Build ISO using oscdimg (Windows ADK) or genisoimage via WSL
+      $oscdimg = Get-Command oscdimg.exe -ErrorAction SilentlyContinue
+      if ($oscdimg) {
+        & oscdimg.exe -j2 -lcidata $ciDir $isoPath
       } else {
-        wsl genisoimage -output $(wsl wslpath -u "$isoPath") -volid CIDATA -joliet -rock $(wsl wslpath -u "$ciDir/user-data") $(wsl wslpath -u "$ciDir/meta-data")
+        # Convert Windows paths to WSL paths
+        $winCiDir  = $ciDir.Replace('\', '/')
+        $winIsoPath = $isoPath.Replace('\', '/')
+        $wslCiDir  = (wsl wslpath -a $winCiDir).Trim()
+        $wslIsoPath = (wsl wslpath -a $winIsoPath).Trim()
+        Write-Host "WSL ISO dir: $wslCiDir"
+        Write-Host "WSL ISO file: $wslIsoPath"
+        wsl bash -c "genisoimage -output '$wslIsoPath' -volid cidata -joliet -rock '$wslCiDir'"
+        if (-not (Test-Path $isoPath)) {
+          throw "Failed to create Ollama cloud-init ISO at $isoPath"
+        }
       }
+
       Write-Host "Ollama cloud-init ISO created: $isoPath"
     EOT
     interpreter = ["PowerShell", "-Command"]
