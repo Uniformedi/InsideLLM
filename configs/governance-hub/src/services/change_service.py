@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db.models import ChangeProposal, FrameworkVersion
 from ..schemas.changes import ApprovalRequest, ChangeCreate, ChangeResponse, ImplementRequest
+from .audit_chain import append_event
 
 
 async def create_proposal(db: AsyncSession, data: ChangeCreate) -> ChangeProposal:
@@ -19,6 +20,13 @@ async def create_proposal(db: AsyncSession, data: ChangeCreate) -> ChangeProposa
         ai_rationale=data.ai_rationale,
     )
     db.add(proposal)
+    await db.flush()
+    await append_event(db, "change_proposed", proposal.id, {
+        "title": data.title,
+        "category": data.category,
+        "source": data.source,
+        "proposed_by": data.proposed_by,
+    })
     await db.commit()
     await db.refresh(proposal)
     return proposal
@@ -58,6 +66,15 @@ async def approve_or_reject(db: AsyncSession, proposal_id: int, approval: Approv
     proposal.reviewed_by = approval.reviewer_name
     proposal.reviewed_at = datetime.now(timezone.utc)
     proposal.review_notes = approval.comments
+    await db.flush()
+    event_type = f"change_{approval.decision}"
+    await append_event(db, event_type, proposal.id, {
+        "title": proposal.title,
+        "decision": approval.decision,
+        "reviewer": approval.reviewer_name,
+        "reviewer_email": approval.reviewer_email,
+        "comments": approval.comments,
+    })
     await db.commit()
     await db.refresh(proposal)
     return proposal
@@ -90,6 +107,13 @@ async def implement_change(db: AsyncSession, proposal_id: int, req: ImplementReq
     proposal.status = "implemented"
     proposal.framework_version = next_version
     proposal.implemented_at = datetime.now(timezone.utc)
+    await db.flush()
+    await append_event(db, "change_implemented", proposal.id, {
+        "title": proposal.title,
+        "framework_version": next_version,
+        "implemented_by": req.implemented_by,
+        "version_title": req.version_title,
+    })
     await db.commit()
     await db.refresh(proposal)
     return proposal

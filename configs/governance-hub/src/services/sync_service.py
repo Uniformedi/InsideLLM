@@ -8,6 +8,7 @@ from ..config import settings
 from ..db.central_db import get_central_session_factory
 from ..db.models import InstanceRegistry, SyncLog, TelemetryExport
 from ..schemas.sync import SyncExportEnvelope, SyncStatus, TelemetrySummary
+from .audit_chain import append_event
 
 
 async def collect_telemetry(db: AsyncSession, days: int = 1) -> TelemetrySummary:
@@ -133,6 +134,14 @@ async def export_to_central(local_db: AsyncSession, telemetry: TelemetrySummary)
         duration = int((time.time() - start) * 1000)
         log = SyncLog(status="success", records_exported=1, central_db_type=settings.central_db_type, duration_ms=duration)
         local_db.add(log)
+        await local_db.flush()
+
+        # Append to audit hash chain
+        await append_event(local_db, "sync_export", log.id, {
+            "telemetry": telemetry.model_dump(),
+            "central_db_type": settings.central_db_type,
+            "records_exported": 1,
+        })
         await local_db.commit()
         return log
 

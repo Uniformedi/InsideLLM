@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, Integer, Numeric, String, Text
+from sqlalchemy import Boolean, Column, DateTime, Integer, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase
 
@@ -114,4 +114,32 @@ class InstanceRegistry(Base):
     config_version = Column(Integer)
     last_sync_at = Column(DateTime(timezone=True))
     status = Column(String(50), default="active")
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+
+
+class AuditChainEntry(Base):
+    """Hash-chained audit trail — each entry links to the previous via SHA-256."""
+    __tablename__ = "governance_audit_chain"
+
+    id = Column(Integer, primary_key=True)
+    sequence = Column(Integer, nullable=False, unique=True)
+    event_type = Column(String(100), nullable=False)  # sync_export, change_proposed, change_approved, etc.
+    event_id = Column(Integer)  # FK to source record
+    payload_hash = Column(String(64), nullable=False)  # SHA-256 of the event payload
+    previous_hash = Column(String(64), nullable=False)  # chain_hash of the previous entry
+    chain_hash = Column(String(64), nullable=False)  # SHA-256(sequence + event_type + payload_hash + previous_hash)
+    instance_id = Column(String(255), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+
+
+class AuditChainCheckpoint(Base):
+    """Periodic root hash checkpoints for efficient verification."""
+    __tablename__ = "governance_audit_checkpoints"
+
+    id = Column(Integer, primary_key=True)
+    sequence_from = Column(Integer, nullable=False)
+    sequence_to = Column(Integer, nullable=False)
+    root_hash = Column(String(64), nullable=False)
+    entry_count = Column(Integer, nullable=False)
+    verified = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow)

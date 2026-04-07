@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..config import settings
 from ..db.models import ConfigSnapshot
 from ..schemas.config import ConfigDiff
+from .audit_chain import append_event
 
 
 async def capture_snapshot(db: AsyncSession, created_by: str = "system") -> ConfigSnapshot:
@@ -30,6 +31,12 @@ async def capture_snapshot(db: AsyncSession, created_by: str = "system") -> Conf
         created_by=created_by,
     )
     db.add(snapshot)
+    await db.flush()
+    await append_event(db, "config_snapshot", snapshot.id, {
+        "schema_version": settings.schema_version,
+        "created_by": created_by,
+        "has_diff": diff is not None,
+    })
     await db.commit()
     await db.refresh(snapshot)
     return snapshot

@@ -260,10 +260,46 @@
         }]
       },
       {
+      {
+        "id": 70,
+        "title": "Audit Chain Entries",
+        "description": "Hash-chained audit trail — tamper-evident record of all governance events",
+        "type": "timeseries",
+        "gridPos": { "h": 6, "w": 12, "x": 0, "y": 68 },
+        "datasource": { "type": "postgres", "uid": "PostgreSQL" },
+        "targets": [{
+          "rawSql": "SELECT date_trunc('hour', created_at) AS time, event_type, COUNT(*) AS events FROM governance_audit_chain WHERE created_at > NOW() - INTERVAL '7 days' GROUP BY 1, 2 ORDER BY 1",
+          "format": "time_series"
+        }]
+      },
+      {
+        "id": 71,
+        "title": "Chain Integrity",
+        "description": "Latest chain hash and entry count — verify at /governance/api/v1/audit/chain/verify",
+        "type": "stat",
+        "gridPos": { "h": 6, "w": 6, "x": 12, "y": 68 },
+        "datasource": { "type": "postgres", "uid": "PostgreSQL" },
+        "targets": [{
+          "rawSql": "SELECT COUNT(*) AS total_entries, MAX(sequence) AS latest_sequence FROM governance_audit_chain",
+          "format": "table"
+        }]
+      },
+      {
+        "id": 72,
+        "title": "Recent Audit Events",
+        "type": "table",
+        "gridPos": { "h": 6, "w": 6, "x": 18, "y": 68 },
+        "datasource": { "type": "postgres", "uid": "PostgreSQL" },
+        "targets": [{
+          "rawSql": "SELECT sequence, event_type, LEFT(chain_hash, 16) AS hash_prefix, created_at FROM governance_audit_chain ORDER BY sequence DESC LIMIT 10",
+          "format": "table"
+        }]
+      },
+      {
         "id": 40,
         "title": "Container Logs",
         "type": "logs",
-        "gridPos": { "h": 10, "w": 24, "x": 0, "y": 68 },
+        "gridPos": { "h": 10, "w": 24, "x": 0, "y": 74 },
         "datasource": { "type": "loki", "uid": "Loki" },
         "targets": [{
           "expr": "{service=~\".+\"} |= ``",
