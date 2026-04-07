@@ -346,6 +346,27 @@
     <h2><span class="step-num">5</span> AI Governance &amp; Operations</h2>
     <p class="desc">Configure governance controls, compliance monitoring, and automated IT operations aligned with the AI Governance Framework.</p>
 
+    <div class="field">
+      <label>Industry</label>
+      <div class="hint">Select your industry to pre-load relevant keyword templates and governance defaults</div>
+      <select id="industry" onchange="applyIndustryTemplate()">
+        <option value="general">General / Technology</option>
+        <option value="collections">Collections / Debt Recovery</option>
+        <option value="healthcare">Healthcare / Medical</option>
+        <option value="financial">Financial Services / Banking</option>
+        <option value="insurance">Insurance</option>
+        <option value="legal">Legal / Law Firm</option>
+        <option value="realestate">Real Estate</option>
+        <option value="retail">Retail / E-commerce</option>
+        <option value="education">Education</option>
+        <option value="government">Government / Public Sector</option>
+        <option value="manufacturing">Manufacturing / Supply Chain</option>
+        <option value="custom">Custom (no preset keywords)</option>
+      </select>
+    </div>
+
+    <div class="info-box" id="industryHint" style="display:none"></div>
+
     <h3 style="font-size:1.1em;color:#2b6cb0;margin:16px 0 10px">Governance Classification</h3>
 
     <div class="row">
@@ -438,12 +459,12 @@
 
     <h3 style="font-size:1.1em;color:#2b6cb0;margin:24px 0 10px">Keyword Analysis</h3>
     <p class="desc" style="margin-bottom:12px">
-      API requests are analyzed for keyword patterns to track usage topics, flag compliance-sensitive content, and report on governance tier activity. Default categories (collections, legal, development, research, content, PII) are always included.
+      API requests are analyzed for keyword patterns to track usage topics, flag compliance-sensitive content, and report on governance tier activity.
+      Built-in categories (development, research, content, PII) are always active. Industry-specific categories are pre-loaded from your industry selection above.
     </p>
 
     <div class="field">
-      <label>Additional Keyword Categories</label>
-      <div class="hint">Add custom categories with comma-separated keywords. One category per row.</div>
+      <label>Industry Keyword Categories <span style="font-weight:400;color:#718096">(edit or add more)</span></label>
     </div>
 
     <div id="keywordCategoryRows"></div>
@@ -451,10 +472,6 @@
     <button class="btn btn-secondary" onclick="addKeywordCategoryRow()" style="margin-top:4px;padding:8px 18px;font-size:0.88em">
       + Add Category
     </button>
-
-    <div class="info-box" style="margin-top:14px">
-      <strong>Built-in categories:</strong> collections, legal, development, research, content, pii_mention — these are always active and cannot be removed. Add your own for industry-specific tracking.
-    </div>
 
     <div class="btn-row">
       <button class="btn btn-secondary" onclick="prevStep()">Back</button>
@@ -788,6 +805,154 @@ function toggleGpuInfo() {
     hint.textContent = on ? 'WSL2 has native GPU support - just install the Windows NVIDIA driver' : 'Uses NVIDIA GPU for faster inference';
   } else {
     hint.textContent = on ? 'Requires Setup-GPU-Passthrough.ps1 after deployment' : 'Uses NVIDIA GPU for faster inference';
+  }
+}
+
+// ================================================================
+// Industry keyword templates
+// ================================================================
+const INDUSTRY_TEMPLATES = {
+  general: {
+    hint: 'General-purpose deployment — keyword categories focus on common business use patterns.',
+    tier: 'tier3', classification: 'internal',
+    categories: {}
+  },
+  collections: {
+    hint: 'Collections & debt recovery — pre-loaded with FDCPA/FCRA/TCPA terms, debtor communications, and regulatory compliance keywords.',
+    tier: 'tier1', classification: 'confidential',
+    categories: {
+      'collections': 'debt, collection, payment plan, settlement, overdue, delinquent, garnishment, repossession, charge-off, creditor, debtor, past due, default, recovery, skip trace, right party contact',
+      'consumer-comms': 'letter, notice, demand, disclosure, mini-miranda, validation, cease and desist, dispute, hardship, forbearance',
+      'regulatory': 'fdcpa, fcra, tcpa, ecoa, cfpb, regulation f, regulation b, ftc, consent decree, compliance, audit, examination',
+      'financial': 'balance, principal, interest, fee, payment, account, credit report, credit score, bureau, tradeline',
+    }
+  },
+  healthcare: {
+    hint: 'Healthcare & medical — HIPAA-aligned keywords for PHI detection, clinical terminology, and patient safety.',
+    tier: 'tier1', classification: 'restricted',
+    categories: {
+      'hipaa': 'hipaa, phi, protected health information, health record, medical record, ehr, emr, patient data, authorization, consent',
+      'clinical': 'diagnosis, treatment, prescription, medication, procedure, lab result, imaging, radiology, pathology, referral',
+      'patient-safety': 'adverse event, incident, medication error, allergy, contraindication, fall risk, infection, readmission',
+      'billing-medical': 'claim, cpt, icd, drg, prior authorization, denial, appeal, reimbursement, copay, deductible, explanation of benefits',
+      'compliance-health': 'cms, fda, joint commission, stark law, anti-kickback, meaningful use, interoperability, breach notification',
+    }
+  },
+  financial: {
+    hint: 'Financial services & banking — BSA/AML, KYC, lending compliance, and regulatory reporting keywords.',
+    tier: 'tier1', classification: 'restricted',
+    categories: {
+      'aml-bsa': 'aml, bsa, suspicious activity, sar, ctr, money laundering, structuring, smurfing, beneficial owner, ofac, sanctions',
+      'kyc': 'kyc, know your customer, identity verification, due diligence, enhanced due diligence, pep, politically exposed',
+      'lending': 'mortgage, loan, underwriting, apr, tila, respa, hmda, redlining, fair lending, credit decision, adverse action',
+      'banking-reg': 'occ, fdic, federal reserve, dodd-frank, volcker, fiduciary, suitability, reg e, reg z, reg cc, cra',
+      'fraud': 'fraud, unauthorized, chargeback, identity theft, phishing, account takeover, wire transfer, suspicious transaction',
+    }
+  },
+  insurance: {
+    hint: 'Insurance industry — claims processing, underwriting, actuarial, and regulatory compliance keywords.',
+    tier: 'tier1', classification: 'confidential',
+    categories: {
+      'claims': 'claim, claimant, adjuster, settlement, liability, coverage, denial, subrogation, first notice of loss, reserve',
+      'underwriting': 'underwriting, risk assessment, premium, actuarial, loss ratio, combined ratio, reinsurance, catastrophe, exposure',
+      'insurance-reg': 'naic, state insurance, surplus lines, admitted, solvency, rate filing, market conduct, unfair claims practice',
+      'policyholder': 'policyholder, insured, beneficiary, endorsement, rider, exclusion, deductible, coinsurance, waiting period',
+    }
+  },
+  legal: {
+    hint: 'Legal & law firm — case management, litigation, client privilege, and court terminology.',
+    tier: 'tier1', classification: 'restricted',
+    categories: {
+      'litigation': 'lawsuit, plaintiff, defendant, motion, deposition, discovery, interrogatory, subpoena, summary judgment, verdict, appeal',
+      'privilege': 'attorney-client, work product, privileged, confidential communication, waiver, in camera, protective order',
+      'contracts': 'contract, agreement, clause, indemnification, liability, breach, damages, arbitration, mediation, force majeure',
+      'court': 'court, judge, magistrate, docket, filing, brief, exhibit, testimony, witness, jury, hearing, trial',
+      'ethics-legal': 'conflict of interest, malpractice, bar association, disciplinary, disqualification, pro bono, retainer',
+    }
+  },
+  realestate: {
+    hint: 'Real estate — property transactions, fair housing, and regulatory compliance keywords.',
+    tier: 'tier2', classification: 'confidential',
+    categories: {
+      'transactions': 'listing, closing, escrow, title, deed, mortgage, appraisal, inspection, contingency, earnest money, mls',
+      'fair-housing': 'fair housing, discrimination, protected class, reasonable accommodation, steering, blockbusting, redlining',
+      'property': 'zoning, permit, hoa, easement, lien, encumbrance, survey, plat, setback, variance, assessment',
+      'leasing': 'lease, tenant, landlord, eviction, security deposit, rent, occupancy, habitability, maintenance, renewal',
+    }
+  },
+  retail: {
+    hint: 'Retail & e-commerce — customer data, payment processing, and consumer protection keywords.',
+    tier: 'tier2', classification: 'confidential',
+    categories: {
+      'payments': 'payment, refund, chargeback, pci, credit card, transaction, checkout, gateway, recurring billing, authorization',
+      'customer-data': 'customer, order, shipping, returns, loyalty, account, preferences, cart, wishlist, review',
+      'consumer-protection': 'ftc, warranty, recall, false advertising, bait and switch, price gouging, terms of service, privacy policy',
+      'inventory': 'inventory, sku, fulfillment, warehouse, supply chain, vendor, procurement, demand forecast, stockout',
+    }
+  },
+  education: {
+    hint: 'Education — FERPA student privacy, academic integrity, and institutional compliance keywords.',
+    tier: 'tier2', classification: 'confidential',
+    categories: {
+      'ferpa': 'ferpa, student record, education record, directory information, consent, disclosure, eligible student, parent rights',
+      'academic': 'grade, transcript, enrollment, registration, curriculum, accreditation, assessment, learning outcome, syllabus',
+      'integrity': 'plagiarism, academic integrity, cheating, honor code, originality, citation, turnitin, ai detection, academic misconduct',
+      'student-safety': 'title ix, clery act, sexual harassment, discrimination, disability, accommodation, section 504, idea, iep',
+    }
+  },
+  government: {
+    hint: 'Government & public sector — FOIA, public records, procurement, and security classification keywords.',
+    tier: 'tier1', classification: 'restricted',
+    categories: {
+      'records': 'foia, public record, open records, redaction, exemption, classified, sensitive but unclassified, cui, fouo',
+      'procurement': 'rfp, rfq, bid, solicitation, contract, sole source, procurement, far, dfar, small business, set-aside',
+      'security-gov': 'clearance, nist, fisma, fedramp, stigs, ato, poam, vulnerability, incident, cve, stig',
+      'compliance-gov': 'ig, inspector general, gao, audit finding, corrective action, omb, circular, appropriation, anti-deficiency',
+    }
+  },
+  manufacturing: {
+    hint: 'Manufacturing & supply chain — quality control, safety compliance, and logistics keywords.',
+    tier: 'tier2', classification: 'internal',
+    categories: {
+      'quality': 'quality, defect, nonconformance, root cause, corrective action, capa, iso 9001, six sigma, spc, cpk, tolerance',
+      'safety-mfg': 'osha, lockout tagout, ppe, msds, sds, hazmat, incident, near miss, safety audit, ergonomic, workplace injury',
+      'supply-chain': 'supplier, vendor, procurement, lead time, bill of materials, mrp, erp, logistics, freight, customs, tariff',
+      'production': 'production, yield, throughput, downtime, maintenance, preventive, predictive, work order, changeover, lean',
+    }
+  },
+  custom: {
+    hint: 'No preset keywords loaded. Add your own categories below.',
+    tier: 'tier3', classification: 'internal',
+    categories: {}
+  }
+};
+
+function applyIndustryTemplate() {
+  const industry = v('industry');
+  const template = INDUSTRY_TEMPLATES[industry];
+  if (!template) return;
+
+  // Show hint
+  const hintEl = document.getElementById('industryHint');
+  hintEl.innerHTML = `<strong>${document.getElementById('industry').selectedOptions[0].text}:</strong> ${template.hint}`;
+  hintEl.style.display = 'block';
+
+  // Set governance defaults
+  document.getElementById('governanceTier').value = template.tier;
+  updateGovernanceHint();
+  document.getElementById('dataClassification').value = template.classification;
+
+  // Auto-adjust log retention for Tier 1
+  if (template.tier === 'tier1') {
+    const ret = document.getElementById('logRetentionDays');
+    if (parseInt(ret.value) < 1095) ret.value = '1095';
+  }
+
+  // Clear existing keyword rows and populate from template
+  document.getElementById('keywordCategoryRows').innerHTML = '';
+  kwRowCounter = 0;
+  for (const [cat, keywords] of Object.entries(template.categories)) {
+    addKeywordCategoryRow(cat, keywords);
   }
 }
 
@@ -1125,6 +1290,7 @@ docforge_enable = ${checked('enableDocforge')}`;
 
   // Governance & Operations
   out += `\n\n# AI Governance & Operations
+industry                 = "${v('industry')}"
 governance_tier          = "${v('governanceTier')}"
 data_classification      = "${v('dataClassification')}"`;
   if (v('aiEthicsOfficer')) out += `\nai_ethics_officer        = "${v('aiEthicsOfficer')}"`;
@@ -1179,6 +1345,7 @@ function generateWsl2Command() {
   if (!checked('enableDocforge')) args.push('-EnableDocforge $false');
 
   // Governance
+  if (v('industry') !== 'general') args.push(`-Industry "${v('industry')}"`);
   if (v('governanceTier') !== 'tier3') args.push(`-GovernanceTier "${v('governanceTier')}"`);
   if (v('dataClassification') !== 'internal') args.push(`-DataClassification "${v('dataClassification')}"`);
   if (v('aiEthicsOfficer')) args.push(`-AiEthicsOfficer "${v('aiEthicsOfficer')}"`);

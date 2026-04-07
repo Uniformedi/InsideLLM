@@ -432,6 +432,17 @@ variable "docforge_max_file_size_mb" {
 # AI GOVERNANCE & OPERATIONS
 # =============================================================================
 
+variable "industry" {
+  description = "Industry vertical for keyword templates and governance defaults"
+  type        = string
+  default     = "general"
+
+  validation {
+    condition     = contains(["general", "collections", "healthcare", "financial", "insurance", "legal", "realestate", "retail", "education", "government", "manufacturing", "custom"], var.industry)
+    error_message = "Industry must be one of: general, collections, healthcare, financial, insurance, legal, realestate, retail, education, government, manufacturing, custom."
+  }
+}
+
 variable "governance_tier" {
   description = "AI Governance tier: tier1 (material decisions — full controls), tier2 (operational — standard), tier3 (routine tools — lightweight)"
   type        = string
