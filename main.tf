@@ -245,6 +245,7 @@ locals {
     governance_advisor_tool_py   = var.governance_hub_enable ? file("${path.module}/configs/open-webui/governance-advisor-tool.py") : ""
     fleet_management_tool_py     = var.governance_hub_enable ? file("${path.module}/configs/open-webui/fleet-management-tool.py") : ""
     system_designer_tool_py      = var.governance_hub_enable ? file("${path.module}/configs/open-webui/system-designer-tool.py") : ""
+    data_connector_tool_py       = var.governance_hub_enable ? file("${path.module}/configs/open-webui/data-connector-tool.py") : ""
     post_deploy_sh               = templatefile("${path.module}/scripts/post-deploy.sh.tpl", {
       litellm_master_key  = local.litellm_master_key
       default_user_budget = var.litellm_default_user_budget

@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from .config import settings
 from .db.local_db import AsyncSessionLocal, engine
 from .db.models import Base
-from .routers import advisor, audit, changes, config_snapshots, fleet, restore, schema, sync
+from .routers import advisor, audit, changes, config_snapshots, connectors, fleet, restore, schema, sync
 from .services.config_service import capture_snapshot
 from .services.sync_service import collect_telemetry, export_to_central
 
@@ -29,6 +29,7 @@ app.include_router(advisor.router)
 app.include_router(audit.router)
 app.include_router(fleet.router)
 app.include_router(restore.router)
+app.include_router(connectors.router)
 
 scheduler = AsyncIOScheduler()
 

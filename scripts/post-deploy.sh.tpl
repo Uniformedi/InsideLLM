@@ -549,6 +549,46 @@ else:
         print('ERROR: Failed to register AI System Designer tool')
         sys.exit(1)
 " >> "$LOG" 2>&1 || log "WARNING: AI System Designer tool registration failed"
+
+log "Registering Data Connector tool in Open WebUI..."
+docker exec insidellm-open-webui python3 -c "
+import sys
+sys.path.insert(0, '/app/backend')
+
+from open_webui.models.functions import Functions, FunctionForm, FunctionMeta
+
+FUNC_ID = 'data_connector'
+SYSTEM_USER = '00000000-0000-0000-0000-000000000000'
+
+with open('/app/backend/pipelines/data-connector-tool.py', 'r') as f:
+    code = f.read()
+
+existing = Functions.get_function_by_id(FUNC_ID)
+if existing:
+    Functions.update_function_by_id(FUNC_ID, {
+        'content': code,
+        'is_active': True,
+        'is_global': True
+    })
+    print('Data Connector tool updated and activated')
+else:
+    form = FunctionForm(
+        id=FUNC_ID,
+        name='Data Connector',
+        content=code,
+        meta=FunctionMeta(
+            description='Query external data sources for cross-referencing. Team-based access control with full audit logging.',
+            manifest={}
+        )
+    )
+    result = Functions.insert_new_function(SYSTEM_USER, 'tool', form)
+    if result:
+        Functions.update_function_by_id(result.id, {'is_active': True, 'is_global': True})
+        print(f'Data Connector tool registered (id={result.id})')
+    else:
+        print('ERROR: Failed to register Data Connector tool')
+        sys.exit(1)
+" >> "$LOG" 2>&1 || log "WARNING: Data Connector tool registration failed"
 %{ endif ~}
 
 %{ if docforge_enable ~}

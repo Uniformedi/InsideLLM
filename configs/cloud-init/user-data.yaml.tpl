@@ -192,6 +192,13 @@ write_files:
     owner: root:root
     content: |
       ${indent(6, system_designer_tool_py)}
+
+  # --- Data Connector Open WebUI Tool ---
+  - path: /opt/InsideLLM/pipelines/data-connector-tool.py
+    permissions: "0644"
+    owner: root:root
+    content: |
+      ${indent(6, data_connector_tool_py)}
 %{ endif ~}
 
 %{ if ops_grafana_enable ~}

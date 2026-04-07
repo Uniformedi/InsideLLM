@@ -143,3 +143,53 @@ class AuditChainCheckpoint(Base):
     entry_count = Column(Integer, nullable=False)
     verified = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+
+
+class DataConnector(Base):
+    """Registered external data source for cross-referencing."""
+    __tablename__ = "governance_data_connectors"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(255), nullable=False, unique=True)
+    connector_type = Column(String(50), nullable=False)  # postgresql, mysql, mssql, rest_api, s3, smb, sharepoint
+    description = Column(Text)
+    connection_config = Column(JSONB, nullable=False)  # encrypted at rest via app layer
+    data_classification = Column(String(50), default="internal")  # public, internal, confidential, restricted
+    enabled = Column(Boolean, default=True)
+    created_by = Column(String(255), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    last_tested_at = Column(DateTime(timezone=True))
+    last_test_status = Column(String(50))  # success, error
+
+
+class ConnectorAccessRule(Base):
+    """Team/user-based access control for data connectors."""
+    __tablename__ = "governance_connector_access"
+
+    id = Column(Integer, primary_key=True)
+    connector_id = Column(Integer, nullable=False)
+    grant_type = Column(String(50), nullable=False)  # team, user, role
+    grant_value = Column(String(255), nullable=False)  # team name, username, or role
+    permission = Column(String(50), nullable=False, default="read")  # read, write, admin
+    row_filter = Column(Text)  # optional SQL WHERE clause or API filter expression
+    field_mask = Column(JSONB)  # optional list of allowed/denied fields
+    granted_by = Column(String(255), nullable=False)
+    granted_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    expires_at = Column(DateTime(timezone=True))  # optional TTL
+
+
+class ConnectorQueryLog(Base):
+    """Audit log for all data connector queries."""
+    __tablename__ = "governance_connector_queries"
+
+    id = Column(Integer, primary_key=True)
+    connector_id = Column(Integer, nullable=False)
+    connector_name = Column(String(255))
+    queried_by = Column(String(255), nullable=False)
+    query_type = Column(String(50))  # sql, api_call, file_list, search
+    query_text = Column(Text)  # the actual query (redacted if sensitive)
+    row_count = Column(Integer)
+    duration_ms = Column(Integer)
+    status = Column(String(50))  # success, denied, error
+    error_message = Column(Text)
+    queried_at = Column(DateTime(timezone=True), default=datetime.utcnow)
