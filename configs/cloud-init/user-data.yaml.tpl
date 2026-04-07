@@ -185,6 +185,13 @@ write_files:
     owner: root:root
     content: |
       ${indent(6, fleet_management_tool_py)}
+
+  # --- AI System Designer Open WebUI Tool ---
+  - path: /opt/InsideLLM/pipelines/system-designer-tool.py
+    permissions: "0644"
+    owner: root:root
+    content: |
+      ${indent(6, system_designer_tool_py)}
 %{ endif ~}
 
 %{ if ops_grafana_enable ~}

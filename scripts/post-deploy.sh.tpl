@@ -509,6 +509,46 @@ else:
         print('ERROR: Failed to register Fleet Management tool')
         sys.exit(1)
 " >> "$LOG" 2>&1 || log "WARNING: Fleet Management tool registration failed"
+
+log "Registering AI System Designer tool in Open WebUI..."
+docker exec insidellm-open-webui python3 -c "
+import sys
+sys.path.insert(0, '/app/backend')
+
+from open_webui.models.functions import Functions, FunctionForm, FunctionMeta
+
+FUNC_ID = 'system_designer'
+SYSTEM_USER = '00000000-0000-0000-0000-000000000000'
+
+with open('/app/backend/pipelines/system-designer-tool.py', 'r') as f:
+    code = f.read()
+
+existing = Functions.get_function_by_id(FUNC_ID)
+if existing:
+    Functions.update_function_by_id(FUNC_ID, {
+        'content': code,
+        'is_active': True,
+        'is_global': True
+    })
+    print('AI System Designer tool updated and activated')
+else:
+    form = FunctionForm(
+        id=FUNC_ID,
+        name='AI System Designer',
+        content=code,
+        meta=FunctionMeta(
+            description='Design InsideLLM deployments, generate optimized configurations, plan multi-instance architectures, and model cost projections.',
+            manifest={}
+        )
+    )
+    result = Functions.insert_new_function(SYSTEM_USER, 'tool', form)
+    if result:
+        Functions.update_function_by_id(result.id, {'is_active': True, 'is_global': True})
+        print(f'AI System Designer tool registered (id={result.id})')
+    else:
+        print('ERROR: Failed to register AI System Designer tool')
+        sys.exit(1)
+" >> "$LOG" 2>&1 || log "WARNING: AI System Designer tool registration failed"
 %{ endif ~}
 
 %{ if docforge_enable ~}
