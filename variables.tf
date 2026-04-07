@@ -348,6 +348,30 @@ variable "okta_domain" {
   default     = ""
 }
 
+# --- SSO Group-to-Team Mapping ---
+variable "sso_group_field" {
+  description = "JWT claim field containing group membership (usually 'groups')"
+  type        = string
+  default     = "groups"
+
+  validation {
+    condition     = can(regex("^[a-zA-Z_][a-zA-Z0-9_.-]*$", var.sso_group_field))
+    error_message = "sso_group_field must be a valid JWT claim name (alphanumeric, underscores, hyphens, dots)."
+  }
+}
+
+variable "sso_group_mapping" {
+  description = "Map SSO group names to LiteLLM teams with budgets, rate limits, and model access"
+  type = map(object({
+    budget          = number
+    budget_duration = string
+    rpm_limit       = number
+    tpm_limit       = number
+    models          = list(string)
+  }))
+  default = {}
+}
+
 # =============================================================================
 # DLP CONFIGURATION
 # =============================================================================

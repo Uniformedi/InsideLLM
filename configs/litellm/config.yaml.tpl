@@ -81,9 +81,16 @@ general_settings:
   max_budget: ${global_max_budget}
   budget_duration: "30d"
 
-  # Enable the admin UI
-  enable_jwt_auth: false
+  # Admin UI and authentication
+  enable_jwt_auth: ${sso_enabled ? "true" : "false"}
   ui_access_mode: "all"
+%{ if sso_group_mapping_enabled ~}
+
+  # SSO Group-to-Team mapping via JWT claims
+  litellm_jwtauth:
+    team_id_jwt_field: "${sso_group_field}"
+    team_id_upsert: false
+%{ endif ~}
 
   # Alerting on budget thresholds
   alerting:

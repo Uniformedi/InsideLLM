@@ -125,9 +125,12 @@ locals {
     default_user_rpm        = var.litellm_default_user_rpm
     default_user_tpm        = var.litellm_default_user_tpm
     global_max_budget       = var.litellm_global_max_budget
-    ollama_enable           = var.ollama_enable
-    ollama_models           = var.ollama_models
-    ollama_api_base         = var.ollama_separate_vm ? "http://${split("/", var.ollama_vm_static_ip)[0]}:11434" : "http://ollama:11434"
+    ollama_enable               = var.ollama_enable
+    ollama_models               = var.ollama_models
+    ollama_api_base             = var.ollama_separate_vm ? "http://${split("/", var.ollama_vm_static_ip)[0]}:11434" : "http://ollama:11434"
+    sso_enabled                 = var.sso_provider != "none"
+    sso_group_mapping_enabled   = var.sso_provider != "none" && length(var.sso_group_mapping) > 0
+    sso_group_field             = var.sso_group_field
   })
 }
 
@@ -182,6 +185,7 @@ locals {
       ollama_enable       = var.ollama_enable && !var.ollama_separate_vm
       ollama_models       = var.ollama_models
       docforge_enable     = var.docforge_enable
+      sso_group_mapping   = var.sso_group_mapping
     })
   })
 

@@ -89,9 +89,29 @@ else:
 " >> "$LOG" 2>&1 || log "WARNING: DLP pipeline registration failed — register manually via Admin > Functions"
 
 # ---------------------------------------------------------------------------
-# Create default teams in LiteLLM
+# Create teams in LiteLLM
 # ---------------------------------------------------------------------------
-log "Creating default teams..."
+log "Creating teams..."
+
+%{ if length(sso_group_mapping) > 0 ~}
+# --- Teams from SSO group mapping ---
+%{ for group_name, config in sso_group_mapping ~}
+log "Creating team for SSO group '${group_name}'..."
+jq -n \
+  --arg alias "${group_name}" \
+  --argjson budget ${config.budget} \
+  --arg duration "${config.budget_duration}" \
+  --argjson tpm ${config.tpm_limit} \
+  --argjson rpm ${config.rpm_limit} \
+  '{"team_alias":$alias,"max_budget":$budget,"budget_duration":$duration,"tpm_limit":$tpm,"rpm_limit":$rpm,"models":${jsonencode(config.models)}}' \
+| curl -sf -X POST "$LITELLM_URL/team/new" \
+  -H "Authorization: Bearer $LITELLM_KEY" \
+  -H "Content-Type: application/json" \
+  -d @- >> "$LOG" 2>&1 || log "Team '${group_name}' may already exist"
+
+%{ endfor ~}
+%{ else ~}
+# --- Default teams (no SSO group mapping configured) ---
 
 # Admin team (IT / Development)
 curl -sf -X POST "$LITELLM_URL/team/new" \
@@ -131,6 +151,7 @@ curl -sf -X POST "$LITELLM_URL/team/new" \
     "rpm_limit": 60,
     "models": ["claude-sonnet", "claude-haiku", "claude-opus"]
   }' >> "$LOG" 2>&1 || log "Team 'power-users' may already exist"
+%{ endif ~}
 
 # ---------------------------------------------------------------------------
 # Create a default admin API key

@@ -127,6 +127,24 @@
 
     .info-box { background: #ebf8ff; border: 1px solid #90cdf4; border-radius: 6px; padding: 14px 18px; margin: 12px 0; font-size: 0.9em; }
     .warn-box { background: #fffff0; border: 1px solid #ecc94b; border-radius: 6px; padding: 14px 18px; margin: 12px 0; font-size: 0.9em; }
+
+    /* Group mapping rows */
+    .group-row {
+      background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+      padding: 16px; margin-bottom: 12px; position: relative;
+    }
+    .group-row .group-header {
+      display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;
+    }
+    .group-row .group-header .group-title { font-weight: 700; font-size: 0.95em; color: #2d3748; }
+    .group-row .remove-btn {
+      background: none; border: none; color: #e53e3e; cursor: pointer; font-size: 1.2em;
+      padding: 2px 8px; border-radius: 4px; line-height: 1;
+    }
+    .group-row .remove-btn:hover { background: #fed7d7; }
+    .group-row .field { margin-bottom: 10px; }
+    .group-row .models-grid { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 4px; }
+    .group-row .models-grid label { font-weight: 400; font-size: 0.88em; display: flex; align-items: center; gap: 4px; cursor: pointer; }
   </style>
 </head>
 <body>
@@ -272,6 +290,13 @@
       </div>
     </div>
 
+    <h3 style="font-size:1.1em;color:#2b6cb0;margin:24px 0 10px">Additional Services</h3>
+
+    <div class="switch-row">
+      <label class="switch"><input type="checkbox" id="enableDocforge" checked><span class="slider"></span></label>
+      <div><span class="switch-label">DocForge (File Generation &amp; Conversion)</span><div class="switch-hint">Generate DOCX, XLSX, PPTX, PDF, and more from chat. Convert between formats via LibreOffice.</div></div>
+    </div>
+
     <div class="btn-row">
       <button class="btn btn-secondary" onclick="prevStep()">Back</button>
       <button class="btn btn-primary" onclick="nextStep()">Next</button>
@@ -393,6 +418,31 @@
       <div class="field"><label>Okta Client ID</label><input type="text" id="oktaClientId"></div>
       <div class="field"><label>Okta Client Secret</label><input type="text" id="oktaClientSecret"></div>
       <div class="field"><label>Okta Domain</label><input type="text" id="oktaDomain" placeholder="your-org.okta.com"></div>
+    </div>
+
+    <!-- SSO Group-to-Team Mapping -->
+    <div id="groupMappingSection" style="display:none">
+      <h3 style="font-size:1.1em;color:#2b6cb0;margin:24px 0 10px">Group-to-Team Mapping</h3>
+      <p class="desc" style="margin-bottom:12px">
+        Map your SSO groups to LiteLLM teams. Each group gets its own budget, rate limits, and model access.
+        Members are automatically assigned on login.
+      </p>
+
+      <div class="info-box" id="groupClaimHint"></div>
+
+      <div class="field">
+        <label>Group Claim Field</label>
+        <div class="hint">The JWT claim name that contains group membership. Usually "groups" for both Azure AD and Okta.</div>
+        <input type="text" id="ssoGroupField" value="groups">
+      </div>
+
+      <div id="groupRows">
+        <!-- Dynamic group mapping rows inserted here -->
+      </div>
+
+      <button class="btn btn-secondary" onclick="addGroupRow()" style="margin-top:8px;padding:8px 18px;font-size:0.88em">
+        + Add Group
+      </button>
     </div>
 
     <div class="btn-row">
@@ -622,6 +672,129 @@ function toggleSso() {
   const val = document.getElementById('ssoProvider').value;
   document.getElementById('azureFields').style.display = val === 'azure_ad' ? 'block' : 'none';
   document.getElementById('oktaFields').style.display = val === 'okta' ? 'block' : 'none';
+
+  const groupSection = document.getElementById('groupMappingSection');
+  const hintEl = document.getElementById('groupClaimHint');
+
+  if (val === 'azure_ad' || val === 'okta') {
+    groupSection.style.display = 'block';
+    if (val === 'azure_ad') {
+      hintEl.innerHTML = '<strong>Azure AD setup:</strong> In your App Registration, go to <em>Token configuration &rarr; Add groups claim &rarr; Security groups</em>. Select "Group ID" or "sAMAccountName" depending on your preference. The claim will appear as <code>groups</code> in the JWT.';
+    } else {
+      hintEl.innerHTML = '<strong>Okta setup:</strong> In your Authorization Server, go to <em>Claims &rarr; Add Claim</em>. Name it <code>groups</code>, set value type to "Groups", and use a regex filter like <code>.*</code> (or restrict to specific groups).';
+    }
+    // Seed default rows if empty
+    if (document.getElementById('groupRows').children.length === 0) {
+      addGroupRow('AI-Admins', 0, '30d', 100, 500000, true, true, true, true);
+      addGroupRow('AI-PowerUsers', 20, '1d', 60, 200000, true, true, true, false);
+      addGroupRow('AI-Users', 5, '1d', 30, 100000, true, true, false, false);
+    }
+  } else {
+    groupSection.style.display = 'none';
+  }
+}
+
+let groupRowCounter = 0;
+
+function addGroupRow(name, budget, duration, rpm, tpm, sonnet, haiku, opus, ollamaAccess) {
+  const container = document.getElementById('groupRows');
+  const idx = groupRowCounter++;
+  const div = document.createElement('div');
+  div.className = 'group-row';
+  div.id = `groupRow_${idx}`;
+  div.innerHTML = `
+    <div class="group-header">
+      <span class="group-title">Group #${container.children.length + 1}</span>
+      <button class="remove-btn" onclick="removeGroupRow('groupRow_${idx}')" title="Remove">&times;</button>
+    </div>
+    <div class="row">
+      <div class="field" style="flex:2">
+        <label>SSO Group Name <span class="required">*</span></label>
+        <div class="hint">Exact name from Azure AD / Okta. Letters, digits, hyphens, dots, underscores, spaces only.</div>
+        <input type="text" class="grp-name" value="${escapeHtml(name)}" placeholder="e.g., AI-PowerUsers" pattern="^[\\w\\-. ]+$">
+      </div>
+      <div class="field" style="flex:1">
+        <label>Budget (USD)</label>
+        <div class="hint">0 = unlimited</div>
+        <input type="number" class="grp-budget" value="${budget ?? 5}" min="0" step="0.5">
+      </div>
+      <div class="field" style="flex:1">
+        <label>Budget Period</label>
+        <select class="grp-duration">
+          <option value="1d"${duration === '1d' ? ' selected' : ''}>Daily</option>
+          <option value="7d"${duration === '7d' ? ' selected' : ''}>Weekly</option>
+          <option value="30d"${duration === '30d' ? ' selected' : ''}>Monthly</option>
+        </select>
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>RPM</label>
+        <div class="hint">Requests/min</div>
+        <input type="number" class="grp-rpm" value="${rpm || 30}" min="1">
+      </div>
+      <div class="field">
+        <label>TPM</label>
+        <div class="hint">Tokens/min</div>
+        <input type="number" class="grp-tpm" value="${tpm || 100000}" min="1000" step="1000">
+      </div>
+    </div>
+    <div class="field">
+      <label>Allowed Models</label>
+      <div class="models-grid">
+        <label><input type="checkbox" class="grp-model-sonnet" ${sonnet !== false ? 'checked' : ''}> Claude Sonnet</label>
+        <label><input type="checkbox" class="grp-model-haiku" ${haiku !== false ? 'checked' : ''}> Claude Haiku</label>
+        <label><input type="checkbox" class="grp-model-opus" ${opus ? 'checked' : ''}> Claude Opus</label>
+        <label><input type="checkbox" class="grp-model-ollama" ${ollamaAccess ? 'checked' : ''}> Ollama (local models)</label>
+      </div>
+    </div>
+  `;
+  container.appendChild(div);
+  renumberGroupRows();
+}
+
+function removeGroupRow(id) {
+  const el = document.getElementById(id);
+  if (el) el.remove();
+  renumberGroupRows();
+}
+
+function renumberGroupRows() {
+  document.querySelectorAll('#groupRows .group-row').forEach((row, i) => {
+    row.querySelector('.group-title').textContent = `Group #${i + 1}`;
+  });
+}
+
+function escapeHtml(str) {
+  return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+const GROUP_NAME_PATTERN = /^[\w\-. ]+$/;
+
+function getGroupMappings() {
+  const rows = document.querySelectorAll('#groupRows .group-row');
+  const mappings = [];
+  rows.forEach(row => {
+    const name = row.querySelector('.grp-name').value.trim();
+    if (!name) return;
+    if (!GROUP_NAME_PATTERN.test(name)) return;
+    const models = [];
+    if (row.querySelector('.grp-model-sonnet').checked) models.push('claude-sonnet');
+    if (row.querySelector('.grp-model-haiku').checked) models.push('claude-haiku');
+    if (row.querySelector('.grp-model-opus').checked) models.push('claude-opus');
+    if (row.querySelector('.grp-model-ollama').checked) {
+      getOllamaModels().forEach(m => models.push(`ollama/${m}`));
+    }
+    mappings.push({
+      group_name: name,
+      budget: parseFloat(row.querySelector('.grp-budget').value) || 0,
+      budget_duration: row.querySelector('.grp-duration').value,
+      rpm_limit: parseInt(row.querySelector('.grp-rpm').value) || 30,
+      tpm_limit: parseInt(row.querySelector('.grp-tpm').value) || 100000,
+      models: models,
+    });
+  });
+  return mappings;
 }
 
 // ================================================================
@@ -755,6 +928,29 @@ okta_client_secret = "${v('oktaClientSecret')}"
 okta_domain        = "${v('oktaDomain')}"`;
   }
 
+  // SSO Group-to-Team Mapping
+  if (sso !== 'none') {
+    const mappings = getGroupMappings();
+    if (mappings.length > 0) {
+      out += `\n\n# SSO Group-to-Team Mapping
+sso_group_field = "${v('ssoGroupField')}"
+sso_group_mapping = {`;
+      for (const m of mappings) {
+        out += `\n  "${m.group_name}" = {`;
+        out += `\n    budget          = ${m.budget}`;
+        out += `\n    budget_duration = "${m.budget_duration}"`;
+        out += `\n    rpm_limit       = ${m.rpm_limit}`;
+        out += `\n    tpm_limit       = ${m.tpm_limit}`;
+        out += `\n    models          = [${m.models.map(x => `"${x}"`).join(', ')}]`;
+        out += `\n  }`;
+      }
+      out += `\n}`;
+    }
+  }
+
+  out += `\n\n# DocForge (File Generation & Conversion)
+docforge_enable = ${checked('enableDocforge')}`;
+
   out += `\n\n# DLP
 dlp_enable           = true
 dlp_block_ssn        = true
@@ -784,6 +980,7 @@ function generateWsl2Command() {
   if (!checked('enableHaiku')) args.push('-EnableHaiku $false');
   if (!checked('enableOpus')) args.push('-EnableOpus $false');
   if (!ollamaEnabled) args.push('-EnableOllama $false');
+  if (!checked('enableDocforge')) args.push('-EnableDocforge $false');
 
   if (ollamaEnabled) {
     const defaultModels = 'qwen2.5-coder:14b, qwen2.5:14b';
@@ -812,6 +1009,19 @@ function generateWsl2Command() {
     args.push(`-OktaClientId "${v('oktaClientId')}"`);
     args.push(`-OktaClientSecret "${v('oktaClientSecret')}"`);
     args.push(`-OktaDomain "${v('oktaDomain')}"`);
+  }
+
+  if (sso !== 'none') {
+    const mappings = getGroupMappings();
+    if (mappings.length > 0) {
+      if (v('ssoGroupField') !== 'groups') {
+        args.push(`-SsoGroupField "${v('ssoGroupField')}"`);
+      }
+      const groupJson = JSON.stringify(Object.fromEntries(
+        mappings.map(m => [m.group_name, { budget: m.budget, budget_duration: m.budget_duration, rpm_limit: m.rpm_limit, tpm_limit: m.tpm_limit, models: m.models }])
+      ));
+      args.push(`-SsoGroupMapping '${groupJson}'`);
+    }
   }
 
   const cmd = `.\\Install-InsideLLM-WSL.ps1 \`\n    ${args.join(' `\n    ')}`;
