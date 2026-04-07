@@ -429,6 +429,91 @@ variable "docforge_max_file_size_mb" {
 }
 
 # =============================================================================
+# AI GOVERNANCE & OPERATIONS
+# =============================================================================
+
+variable "governance_tier" {
+  description = "AI Governance tier: tier1 (material decisions — full controls), tier2 (operational — standard), tier3 (routine tools — lightweight)"
+  type        = string
+  default     = "tier3"
+
+  validation {
+    condition     = contains(["tier1", "tier2", "tier3"], var.governance_tier)
+    error_message = "Governance tier must be tier1, tier2, or tier3."
+  }
+}
+
+variable "data_classification" {
+  description = "Highest data classification level handled: public, internal, confidential, restricted"
+  type        = string
+  default     = "internal"
+
+  validation {
+    condition     = contains(["public", "internal", "confidential", "restricted"], var.data_classification)
+    error_message = "Data classification must be public, internal, confidential, or restricted."
+  }
+}
+
+variable "ai_ethics_officer" {
+  description = "Name of the AI Ethics Officer (for incident escalation and audit reports)"
+  type        = string
+  default     = ""
+}
+
+variable "ai_ethics_officer_email" {
+  description = "Email of the AI Ethics Officer"
+  type        = string
+  default     = ""
+}
+
+variable "log_retention_days" {
+  description = "Number of days to retain API logs and audit trails (governance requires 1095-2555 for Tier 1)"
+  type        = number
+  default     = 365
+}
+
+variable "ops_watchtower_enable" {
+  description = "Enable Watchtower for automatic container image updates"
+  type        = bool
+  default     = true
+}
+
+variable "ops_trivy_enable" {
+  description = "Enable Trivy daily CVE scanning of container images"
+  type        = bool
+  default     = true
+}
+
+variable "ops_grafana_enable" {
+  description = "Enable Grafana + Loki for compliance dashboards and centralized logging"
+  type        = bool
+  default     = true
+}
+
+variable "ops_uptime_kuma_enable" {
+  description = "Enable Uptime Kuma for service health monitoring and alerting"
+  type        = bool
+  default     = true
+}
+
+variable "ops_backup_schedule" {
+  description = "PostgreSQL backup frequency: daily, weekly, or none"
+  type        = string
+  default     = "daily"
+
+  validation {
+    condition     = contains(["daily", "weekly", "none"], var.ops_backup_schedule)
+    error_message = "Backup schedule must be daily, weekly, or none."
+  }
+}
+
+variable "ops_alert_webhook" {
+  description = "Webhook URL for operational alerts (Slack, Teams, etc.)"
+  type        = string
+  default     = ""
+}
+
+# =============================================================================
 # TLS CONFIGURATION
 # =============================================================================
 

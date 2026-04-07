@@ -54,6 +54,18 @@ http {
         server docforge:3000;
     }
 %{ endif ~}
+%{ if ops_grafana_enable ~}
+
+    upstream grafana {
+        server grafana:3000;
+    }
+%{ endif ~}
+%{ if ops_uptime_kuma_enable ~}
+
+    upstream uptime-kuma {
+        server uptime-kuma:3001;
+    }
+%{ endif ~}
 
     # --- HTTP -> HTTPS redirect ---
     server {
@@ -162,6 +174,36 @@ http {
             proxy_buffering off;
             proxy_read_timeout 120s;
             client_max_body_size ${docforge_max_body_size}m;
+        }
+
+%{ endif ~}
+%{ if ops_grafana_enable ~}
+        # --- Grafana Compliance Dashboard ---
+        location /grafana/ {
+            proxy_pass http://grafana;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_buffering off;
+        }
+
+%{ endif ~}
+%{ if ops_uptime_kuma_enable ~}
+        # --- Uptime Kuma Service Monitoring ---
+        location /status/ {
+            proxy_pass http://uptime-kuma/;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_buffering off;
         }
 
 %{ endif ~}

@@ -164,6 +164,69 @@ write_files:
       ${indent(6, docforge_tool_py)}
 %{ endif ~}
 
+%{ if ops_grafana_enable ~}
+  # --- Loki config ---
+  - path: /opt/InsideLLM/loki/loki-config.yml
+    permissions: "0644"
+    owner: root:root
+    content: |
+      ${indent(6, loki_config)}
+
+  # --- Promtail config ---
+  - path: /opt/InsideLLM/promtail/promtail-config.yml
+    permissions: "0644"
+    owner: root:root
+    content: |
+      ${indent(6, promtail_config)}
+
+  # --- Grafana datasources ---
+  - path: /opt/InsideLLM/grafana/provisioning/datasources.yml
+    permissions: "0644"
+    owner: root:root
+    content: |
+      ${indent(6, grafana_datasources_yml)}
+
+  # --- Grafana dashboard provisioning ---
+  - path: /opt/InsideLLM/grafana/provisioning/dashboards.yml
+    permissions: "0644"
+    owner: root:root
+    content: |
+      ${indent(6, grafana_dashboards_yml)}
+
+  # --- Grafana compliance dashboard ---
+  - path: /opt/InsideLLM/grafana/dashboards/compliance.json
+    permissions: "0644"
+    owner: root:root
+    content: |
+      ${indent(6, grafana_compliance_json)}
+%{ endif ~}
+
+%{ if ops_trivy_enable ~}
+  # --- Trivy CVE scan script ---
+  - path: /opt/InsideLLM/trivy-scan.sh
+    permissions: "0755"
+    owner: root:root
+    content: |
+      ${indent(6, trivy_scan_sh)}
+%{ endif ~}
+
+%{ if ops_backup_schedule != "none" ~}
+  # --- PostgreSQL backup script ---
+  - path: /opt/InsideLLM/backup-postgres.sh
+    permissions: "0755"
+    owner: root:root
+    content: |
+      #!/bin/bash
+      set -euo pipefail
+      BACKUP_DIR="/opt/InsideLLM/data/backups"
+      mkdir -p "$BACKUP_DIR"
+      DATE=$(date +%Y-%m-%d_%H%M)
+      docker exec insidellm-postgres pg_dump -U litellm -d litellm | gzip > "$BACKUP_DIR/litellm-$DATE.sql.gz"
+      echo "[$(date)] Backup created: litellm-$DATE.sql.gz" >> /var/log/InsideLLM-deploy.log
+      # Retain last 30 backups
+      ls -t "$BACKUP_DIR"/litellm-*.sql.gz | tail -n +31 | xargs -r rm --
+%{ endif ~}
+
   # --- Post-deploy script ---
   - path: /opt/InsideLLM/post-deploy.sh
     permissions: "0750"
@@ -194,7 +257,17 @@ runcmd:
   - |
     mkdir -p /etc/systemd/journald.conf.d
     systemctl restart systemd-journald
-    (crontab -l 2>/dev/null; echo "*/15 * * * * /usr/local/bin/disk-monitor.sh") | crontab -
+    CRON_ENTRIES="*/15 * * * * /usr/local/bin/disk-monitor.sh"
+%{ if ops_backup_schedule == "daily" ~}
+    CRON_ENTRIES="$CRON_ENTRIES\n0 2 * * * /opt/InsideLLM/backup-postgres.sh"
+%{ endif ~}
+%{ if ops_backup_schedule == "weekly" ~}
+    CRON_ENTRIES="$CRON_ENTRIES\n0 2 * * 0 /opt/InsideLLM/backup-postgres.sh"
+%{ endif ~}
+%{ if ops_trivy_enable ~}
+    CRON_ENTRIES="$CRON_ENTRIES\n0 5 * * * /opt/InsideLLM/trivy-scan.sh"
+%{ endif ~}
+    (crontab -l 2>/dev/null; echo -e "$CRON_ENTRIES") | crontab -
 
   # --- Configure xrdp for Remote Desktop ---
   - |
@@ -224,6 +297,21 @@ runcmd:
   - mkdir -p /opt/InsideLLM/data/pgadmin
   - mkdir -p /opt/InsideLLM/data/netdata
   - mkdir -p /opt/InsideLLM/pipelines
+%{ if ops_grafana_enable ~}
+  - mkdir -p /opt/InsideLLM/data/grafana
+  - mkdir -p /opt/InsideLLM/data/loki
+  - chown 472:472 /opt/InsideLLM/data/grafana
+  - chown 10001:10001 /opt/InsideLLM/data/loki
+%{ endif ~}
+%{ if ops_uptime_kuma_enable ~}
+  - mkdir -p /opt/InsideLLM/data/uptime-kuma
+%{ endif ~}
+%{ if ops_backup_schedule != "none" ~}
+  - mkdir -p /opt/InsideLLM/data/backups
+%{ endif ~}
+%{ if ops_trivy_enable ~}
+  - mkdir -p /opt/InsideLLM/data/trivy-reports
+%{ endif ~}
 %{ if docforge_enable ~}
   - mkdir -p /opt/InsideLLM/data/docforge/temp
   - |

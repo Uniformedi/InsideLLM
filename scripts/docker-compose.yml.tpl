@@ -301,6 +301,150 @@ services:
 
 %{ endif ~}
 
+%{ if ops_watchtower_enable ~}
+  # -------------------------------------------------------------------------
+  # Watchtower — Automatic Container Image Updates
+  # -------------------------------------------------------------------------
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: insidellm-watchtower
+    restart: always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      WATCHTOWER_CLEANUP: "true"
+      WATCHTOWER_SCHEDULE: "0 0 4 * * *"
+      WATCHTOWER_ROLLING_RESTART: "true"
+      WATCHTOWER_INCLUDE_STOPPED: "false"
+      WATCHTOWER_LABEL_ENABLE: "false"
+%{ if ops_alert_webhook != "" ~}
+      WATCHTOWER_NOTIFICATION_URL: "${ops_alert_webhook}"
+%{ endif ~}
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - insidellm-internal
+
+%{ endif ~}
+%{ if ops_grafana_enable ~}
+  # -------------------------------------------------------------------------
+  # Loki — Log Aggregation
+  # -------------------------------------------------------------------------
+  loki:
+    image: grafana/loki:3-latest
+    container_name: insidellm-loki
+    restart: always
+    volumes:
+      - /opt/InsideLLM/loki/loki-config.yml:/etc/loki/local-config.yaml:ro
+      - /opt/InsideLLM/data/loki:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3100/ready || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - insidellm-internal
+
+  # -------------------------------------------------------------------------
+  # Promtail — Log Collector (ships Docker logs to Loki)
+  # -------------------------------------------------------------------------
+  promtail:
+    image: grafana/promtail:3-latest
+    container_name: insidellm-promtail
+    restart: always
+    volumes:
+      - /opt/InsideLLM/promtail/promtail-config.yml:/etc/promtail/config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      loki:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - insidellm-internal
+
+  # -------------------------------------------------------------------------
+  # Grafana — Compliance Dashboards & Visualization
+  # -------------------------------------------------------------------------
+  grafana:
+    image: grafana/grafana-oss:latest
+    container_name: insidellm-grafana
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SERVER_ROOT_URL: "https://${server_name}/grafana/"
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+      GF_SECURITY_ADMIN_PASSWORD: "${grafana_admin_password}"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    volumes:
+      - /opt/InsideLLM/data/grafana:/var/lib/grafana
+      - /opt/InsideLLM/grafana/provisioning:/etc/grafana/provisioning:ro
+      - /opt/InsideLLM/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      loki:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - insidellm-internal
+
+%{ endif ~}
+%{ if ops_uptime_kuma_enable ~}
+  # -------------------------------------------------------------------------
+  # Uptime Kuma — Service Health Monitoring & Alerting
+  # -------------------------------------------------------------------------
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    container_name: insidellm-uptime-kuma
+    restart: always
+    ports:
+      - "3001:3001"
+    volumes:
+      - /opt/InsideLLM/data/uptime-kuma:/app/data
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"const http=require('http');const o={hostname:'localhost',port:3001,path:'/api/entry',timeout:2000};http.get(o,r=>{process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - insidellm-internal
+
+%{ endif ~}
+
 networks:
   insidellm-internal:
     driver: bridge

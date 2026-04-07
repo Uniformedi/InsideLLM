@@ -28,11 +28,18 @@ resource "random_password" "xrdp_password" {
   special = false
 }
 
+resource "random_password" "grafana_password" {
+  count   = var.ops_grafana_enable ? 1 : 0
+  length  = 20
+  special = false
+}
+
 locals {
   litellm_master_key = var.litellm_master_key != "" ? var.litellm_master_key : "sk-${random_password.litellm_master_key[0].result}"
   postgres_password  = var.postgres_password != "" ? var.postgres_password : random_password.postgres_password[0].result
   webui_secret       = random_password.webui_secret.result
   xrdp_password      = random_password.xrdp_password.result
+  grafana_password   = var.ops_grafana_enable ? random_password.grafana_password[0].result : ""
 
   vm_fqdn = "${var.vm_hostname}.${var.vm_domain}"
 
@@ -145,8 +152,15 @@ locals {
     sso_env            = local.sso_env
     ollama_enable      = var.ollama_enable && !var.ollama_separate_vm
     ollama_models      = var.ollama_models
-    ollama_gpu         = var.ollama_gpu
-    docforge_enable    = var.docforge_enable
+    ollama_gpu               = var.ollama_gpu
+    docforge_enable          = var.docforge_enable
+    ops_watchtower_enable    = var.ops_watchtower_enable
+    ops_grafana_enable       = var.ops_grafana_enable
+    ops_uptime_kuma_enable   = var.ops_uptime_kuma_enable
+    ops_alert_webhook        = var.ops_alert_webhook
+    server_name              = local.vm_fqdn
+    grafana_admin_password   = local.grafana_password
+    postgres_password_plain  = local.postgres_password
   })
 }
 
@@ -157,6 +171,8 @@ locals {
     vm_hostname            = var.vm_hostname
     docforge_enable        = var.docforge_enable
     docforge_max_body_size = var.docforge_max_file_size_mb
+    ops_grafana_enable     = var.ops_grafana_enable
+    ops_uptime_kuma_enable = var.ops_uptime_kuma_enable
   })
 }
 
@@ -175,17 +191,33 @@ locals {
     dlp_pipeline_py    = file("${path.module}/configs/open-webui/dlp-pipeline.py")
     admin_html         = file("${path.module}/admin.html")
     xrdp_password      = local.xrdp_password
-    docforge_enable    = var.docforge_enable
-    docforge_zip_b64   = var.docforge_enable ? filebase64(data.archive_file.docforge[0].output_path) : ""
-    docforge_tool_py   = var.docforge_enable ? file("${path.module}/configs/open-webui/docforge-tool.py") : ""
-    post_deploy_sh     = templatefile("${path.module}/scripts/post-deploy.sh.tpl", {
+    docforge_enable          = var.docforge_enable
+    docforge_zip_b64         = var.docforge_enable ? filebase64(data.archive_file.docforge[0].output_path) : ""
+    docforge_tool_py         = var.docforge_enable ? file("${path.module}/configs/open-webui/docforge-tool.py") : ""
+    ops_grafana_enable       = var.ops_grafana_enable
+    ops_uptime_kuma_enable   = var.ops_uptime_kuma_enable
+    ops_trivy_enable         = var.ops_trivy_enable
+    ops_backup_schedule      = var.ops_backup_schedule
+    grafana_datasources_yml  = var.ops_grafana_enable ? templatefile("${path.module}/configs/grafana/provisioning/datasources.yml", { postgres_password = local.postgres_password }) : ""
+    grafana_dashboards_yml   = var.ops_grafana_enable ? file("${path.module}/configs/grafana/provisioning/dashboards.yml") : ""
+    grafana_compliance_json  = var.ops_grafana_enable ? file("${path.module}/configs/grafana/dashboards/compliance.json") : ""
+    loki_config              = var.ops_grafana_enable ? file("${path.module}/configs/loki/loki-config.yml") : ""
+    promtail_config          = var.ops_grafana_enable ? file("${path.module}/configs/promtail/promtail-config.yml") : ""
+    trivy_scan_sh            = var.ops_trivy_enable ? file("${path.module}/configs/trivy/scan.sh") : ""
+    governance_tier          = var.governance_tier
+    data_classification      = var.data_classification
+    ai_ethics_officer        = var.ai_ethics_officer
+    ai_ethics_officer_email  = var.ai_ethics_officer_email
+    post_deploy_sh           = templatefile("${path.module}/scripts/post-deploy.sh.tpl", {
       litellm_master_key  = local.litellm_master_key
       default_user_budget = var.litellm_default_user_budget
       vm_fqdn             = local.vm_fqdn
       ollama_enable       = var.ollama_enable && !var.ollama_separate_vm
       ollama_models       = var.ollama_models
-      docforge_enable     = var.docforge_enable
-      sso_group_mapping   = var.sso_group_mapping
+      docforge_enable        = var.docforge_enable
+      sso_group_mapping      = var.sso_group_mapping
+      ops_grafana_enable     = var.ops_grafana_enable
+      ops_uptime_kuma_enable = var.ops_uptime_kuma_enable
     })
   })
 

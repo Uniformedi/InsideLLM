@@ -65,6 +65,22 @@ output "ollama_vm_ip" {
   value       = var.ollama_separate_vm ? split("/", var.ollama_vm_static_ip)[0] : "N/A (running in main stack)"
 }
 
+output "grafana_url" {
+  description = "URL for the Grafana compliance dashboard"
+  value       = var.ops_grafana_enable ? "https://${data.external.vm_ip.result.ip}/grafana/" : "N/A (Grafana disabled)"
+}
+
+output "grafana_password" {
+  description = "Grafana admin password"
+  value       = local.grafana_password
+  sensitive   = true
+}
+
+output "uptime_kuma_url" {
+  description = "URL for the Uptime Kuma status page"
+  value       = var.ops_uptime_kuma_enable ? "https://${data.external.vm_ip.result.ip}/status/" : "N/A (Uptime Kuma disabled)"
+}
+
 output "docforge_url" {
   description = "URL for the DocForge file conversion API"
   value       = var.docforge_enable ? "https://${data.external.vm_ip.result.ip}/docforge/api/formats" : "N/A (DocForge disabled)"
@@ -104,6 +120,13 @@ output "deployment_notes" {
     ║                                                              ║
     ║  DLP Pipeline: ${var.dlp_enable ? "ENABLED" : "DISABLED"}                                     ║
     ║  DocForge:     ${var.docforge_enable ? "ENABLED" : "DISABLED"}                                     ║
+    ║  Governance:   ${var.governance_tier} / ${var.data_classification}                        ║
+%{ if var.ops_grafana_enable ~}
+    ║  Grafana:      https://${data.external.vm_ip.result.ip}/grafana/             ║
+%{ endif ~}
+%{ if var.ops_uptime_kuma_enable ~}
+    ║  Uptime Kuma:  https://${data.external.vm_ip.result.ip}/status/              ║
+%{ endif ~}
     ║  SSO Provider: ${var.sso_provider}                                         ║
     ║                                                              ║
     ╚══════════════════════════════════════════════════════════════╝

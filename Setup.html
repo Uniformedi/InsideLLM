@@ -340,10 +340,113 @@
   </div>
 
   <!-- ============================================================ -->
-  <!-- STEP 5: Network & Identity                                    -->
+  <!-- STEP 5: AI Governance & Operations                            -->
   <!-- ============================================================ -->
   <div class="step" data-step="5">
-    <h2><span class="step-num">5</span> Network &amp; Identity</h2>
+    <h2><span class="step-num">5</span> AI Governance &amp; Operations</h2>
+    <p class="desc">Configure governance controls, compliance monitoring, and automated IT operations aligned with the AI Governance Framework.</p>
+
+    <h3 style="font-size:1.1em;color:#2b6cb0;margin:16px 0 10px">Governance Classification</h3>
+
+    <div class="row">
+      <div class="field">
+        <label>Governance Tier</label>
+        <div class="hint">Controls strictness level per the framework</div>
+        <select id="governanceTier" onchange="updateGovernanceHint()">
+          <option value="tier3" selected>Tier 3 — Routine Tools (lightweight controls)</option>
+          <option value="tier2">Tier 2 — Operational (standard controls)</option>
+          <option value="tier1">Tier 1 — Material Decisions (full controls)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Data Classification</label>
+        <div class="hint">Highest data sensitivity handled</div>
+        <select id="dataClassification">
+          <option value="public">Public</option>
+          <option value="internal" selected>Internal</option>
+          <option value="confidential">Confidential</option>
+          <option value="restricted">Restricted</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="info-box" id="governanceHint">
+      <strong>Tier 3 (Routine Tools):</strong> Approved vendors, no confidential data in public AI. Lightweight monitoring.
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label>AI Ethics Officer</label>
+        <div class="hint">Named individual accountable for AI governance</div>
+        <input type="text" id="aiEthicsOfficer" placeholder="e.g., Jane Smith">
+      </div>
+      <div class="field">
+        <label>Ethics Officer Email</label>
+        <input type="text" id="aiEthicsOfficerEmail" placeholder="jsmith@company.com">
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Log Retention Period</label>
+      <div class="hint">Tier 1 requires 3-7 years. Framework minimum: 1 year.</div>
+      <select id="logRetentionDays">
+        <option value="365" selected>1 Year</option>
+        <option value="1095">3 Years</option>
+        <option value="1825">5 Years</option>
+        <option value="2555">7 Years</option>
+      </select>
+    </div>
+
+    <h3 style="font-size:1.1em;color:#2b6cb0;margin:24px 0 10px">Automated Operations</h3>
+    <p class="desc" style="margin-bottom:14px">FOSS tools for daily IT administration — container patching, CVE scanning, centralized logging, and compliance dashboards.</p>
+
+    <div class="switch-row">
+      <label class="switch"><input type="checkbox" id="opsWatchtower" checked><span class="slider"></span></label>
+      <div><span class="switch-label">Watchtower (Auto-Patching)</span><div class="switch-hint">Automatically pulls updated container images daily at 4 AM. Rolls restarts safely.</div></div>
+    </div>
+
+    <div class="switch-row">
+      <label class="switch"><input type="checkbox" id="opsTrivy" checked><span class="slider"></span></label>
+      <div><span class="switch-label">Trivy (CVE Scanning)</span><div class="switch-hint">Daily vulnerability scan of all running container images. Reports HIGH/CRITICAL CVEs.</div></div>
+    </div>
+
+    <div class="switch-row">
+      <label class="switch"><input type="checkbox" id="opsGrafana" checked><span class="slider"></span></label>
+      <div><span class="switch-label">Grafana + Loki (Compliance Dashboard)</span><div class="switch-hint">Centralized logging, spend tracking, DLP metrics, audit trails. Pre-built governance dashboard.</div></div>
+    </div>
+
+    <div class="switch-row">
+      <label class="switch"><input type="checkbox" id="opsUptimeKuma" checked><span class="slider"></span></label>
+      <div><span class="switch-label">Uptime Kuma (Health Monitoring)</span><div class="switch-hint">Service health checks with alerting. Tracks uptime SLA for all components.</div></div>
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label>Backup Schedule</label>
+        <select id="opsBackupSchedule">
+          <option value="daily" selected>Daily (2 AM)</option>
+          <option value="weekly">Weekly (Sunday 2 AM)</option>
+          <option value="none">None</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Alert Webhook (optional)</label>
+        <div class="hint">Slack, Teams, or Discord webhook URL for operational alerts</div>
+        <input type="text" id="opsAlertWebhook" placeholder="https://hooks.slack.com/services/...">
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="prevStep()">Back</button>
+      <button class="btn btn-primary" onclick="nextStep()">Next</button>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- STEP 6: Network & Identity                                    -->
+  <!-- ============================================================ -->
+  <div class="step" data-step="6">
+    <h2><span class="step-num">6</span> Network &amp; Identity</h2>
     <p class="desc">Configure hostname, TLS, and SSO.</p>
 
     <div class="row">
@@ -452,10 +555,10 @@
   </div>
 
   <!-- ============================================================ -->
-  <!-- STEP 6: Hyper-V VM Settings (conditional)                     -->
+  <!-- STEP 7: Hyper-V VM Settings (conditional)                     -->
   <!-- ============================================================ -->
-  <div class="step" data-step="6" id="stepHypervVm">
-    <h2><span class="step-num">6</span> VM Configuration</h2>
+  <div class="step" data-step="7" id="stepHypervVm">
+    <h2><span class="step-num">7</span> VM Configuration</h2>
     <p class="desc">Hyper-V virtual machine sizing and paths.</p>
 
     <div class="row">
@@ -509,10 +612,10 @@
   </div>
 
   <!-- ============================================================ -->
-  <!-- STEP 7: Review & Download                                     -->
+  <!-- STEP 8: Review & Download                                     -->
   <!-- ============================================================ -->
-  <div class="step" data-step="7">
-    <h2><span class="step-num" id="reviewStepNum">7</span> Review &amp; Download</h2>
+  <div class="step" data-step="8">
+    <h2><span class="step-num" id="reviewStepNum">8</span> Review &amp; Download</h2>
     <p class="desc">Review your configuration, download the file, then follow the remaining steps.</p>
 
     <div id="outputContainer">
@@ -544,8 +647,8 @@
 // ================================================================
 let currentStep = 1;
 let deployPath = 'hyperv';
-const totalStepsHyperv = 7;
-const totalStepsWsl2 = 6; // skip VM config step
+const totalStepsHyperv = 8;
+const totalStepsWsl2 = 7; // skip VM config step
 
 function getTotalSteps() { return deployPath === 'hyperv' ? totalStepsHyperv : totalStepsWsl2; }
 
@@ -568,15 +671,15 @@ function showStep(n) {
 
   // Map logical step to actual step element
   let targetStep = n;
-  if (deployPath === 'wsl2' && n >= 6) {
-    targetStep = 7; // skip step 6 (VM config), go to review
+  if (deployPath === 'wsl2' && n >= 7) {
+    targetStep = 8; // skip step 7 (VM config), go to review
   }
 
   const el = document.querySelector(`.step[data-step="${targetStep}"]`);
   if (el) el.classList.add('active');
 
   // Update review step number display
-  if (targetStep === 7) {
+  if (targetStep === 8) {
     document.getElementById('reviewStepNum').textContent = getTotalSteps();
     generateOutput();
   }
@@ -665,6 +768,20 @@ function toggleGpuInfo() {
     hint.textContent = on ? 'WSL2 has native GPU support - just install the Windows NVIDIA driver' : 'Uses NVIDIA GPU for faster inference';
   } else {
     hint.textContent = on ? 'Requires Setup-GPU-Passthrough.ps1 after deployment' : 'Uses NVIDIA GPU for faster inference';
+  }
+}
+
+function updateGovernanceHint() {
+  const tier = v('governanceTier');
+  const hint = document.getElementById('governanceHint');
+  const retentionSelect = document.getElementById('logRetentionDays');
+  if (tier === 'tier1') {
+    hint.innerHTML = '<strong>Tier 1 (Material Decisions):</strong> Full controls required — bias audits, human oversight, complete audit trails, regulatory compliance. Log retention must be 3-7 years.';
+    if (parseInt(retentionSelect.value) < 1095) retentionSelect.value = '1095';
+  } else if (tier === 'tier2') {
+    hint.innerHTML = '<strong>Tier 2 (Operational):</strong> Standard controls — documented purpose, data controls, periodic review. Recommended: 1-3 year log retention.';
+  } else {
+    hint.innerHTML = '<strong>Tier 3 (Routine Tools):</strong> Approved vendors, no confidential data in public AI. Lightweight monitoring.';
   }
 }
 
@@ -951,6 +1068,20 @@ sso_group_mapping = {`;
   out += `\n\n# DocForge (File Generation & Conversion)
 docforge_enable = ${checked('enableDocforge')}`;
 
+  // Governance & Operations
+  out += `\n\n# AI Governance & Operations
+governance_tier          = "${v('governanceTier')}"
+data_classification      = "${v('dataClassification')}"`;
+  if (v('aiEthicsOfficer')) out += `\nai_ethics_officer        = "${v('aiEthicsOfficer')}"`;
+  if (v('aiEthicsOfficerEmail')) out += `\nai_ethics_officer_email  = "${v('aiEthicsOfficerEmail')}"`;
+  out += `\nlog_retention_days       = ${v('logRetentionDays')}
+ops_watchtower_enable    = ${checked('opsWatchtower')}
+ops_trivy_enable         = ${checked('opsTrivy')}
+ops_grafana_enable       = ${checked('opsGrafana')}
+ops_uptime_kuma_enable   = ${checked('opsUptimeKuma')}
+ops_backup_schedule      = "${v('opsBackupSchedule')}"`;
+  if (v('opsAlertWebhook')) out += `\nops_alert_webhook        = "${v('opsAlertWebhook')}"`;
+
   out += `\n\n# DLP
 dlp_enable           = true
 dlp_block_ssn        = true
@@ -981,6 +1112,18 @@ function generateWsl2Command() {
   if (!checked('enableOpus')) args.push('-EnableOpus $false');
   if (!ollamaEnabled) args.push('-EnableOllama $false');
   if (!checked('enableDocforge')) args.push('-EnableDocforge $false');
+
+  // Governance
+  if (v('governanceTier') !== 'tier3') args.push(`-GovernanceTier "${v('governanceTier')}"`);
+  if (v('dataClassification') !== 'internal') args.push(`-DataClassification "${v('dataClassification')}"`);
+  if (v('aiEthicsOfficer')) args.push(`-AiEthicsOfficer "${v('aiEthicsOfficer')}"`);
+  if (v('logRetentionDays') !== '365') args.push(`-LogRetentionDays ${v('logRetentionDays')}`);
+  if (!checked('opsWatchtower')) args.push('-OpsWatchtower $false');
+  if (!checked('opsTrivy')) args.push('-OpsTrivy $false');
+  if (!checked('opsGrafana')) args.push('-OpsGrafana $false');
+  if (!checked('opsUptimeKuma')) args.push('-OpsUptimeKuma $false');
+  if (v('opsBackupSchedule') !== 'daily') args.push(`-OpsBackupSchedule "${v('opsBackupSchedule')}"`);
+  if (v('opsAlertWebhook')) args.push(`-OpsAlertWebhook "${v('opsAlertWebhook')}"`);
 
   if (ollamaEnabled) {
     const defaultModels = 'qwen2.5-coder:14b, qwen2.5:14b';

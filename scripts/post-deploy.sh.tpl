@@ -337,6 +337,12 @@ log "  pgAdmin:      http://$VM_IP:5050"
 %{ if docforge_enable ~}
 log "  DocForge:     https://$VM_IP/docforge/api/formats"
 %{ endif ~}
+%{ if ops_grafana_enable ~}
+log "  Grafana:      https://$VM_IP/grafana/"
+%{ endif ~}
+%{ if ops_uptime_kuma_enable ~}
+log "  Uptime Kuma:  https://$VM_IP/status/"
+%{ endif ~}
 log ""
 log "  First user to register on Open WebUI"
 log "  becomes the admin."
