@@ -144,10 +144,76 @@
         }]
       },
       {
+        "id": 50,
+        "title": "Topic Distribution (30d)",
+        "description": "What are users asking AI about? Categories from keyword analysis.",
+        "type": "piechart",
+        "gridPos": { "h": 8, "w": 8, "x": 0, "y": 28 },
+        "datasource": { "type": "postgres", "uid": "PostgreSQL" },
+        "targets": [{
+          "rawSql": "SELECT category, total_matches FROM topic_distribution ORDER BY total_matches DESC",
+          "format": "table"
+        }]
+      },
+      {
+        "id": 51,
+        "title": "Keyword Trends (30d)",
+        "description": "Daily keyword category match volume — detect shifts in AI usage patterns",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 16, "x": 8, "y": 28 },
+        "datasource": { "type": "postgres", "uid": "PostgreSQL" },
+        "targets": [{
+          "rawSql": "SELECT day AS time, category, SUM(match_count) AS matches FROM keyword_daily_summary WHERE day > NOW() - INTERVAL '30 days' GROUP BY day, category ORDER BY day",
+          "format": "time_series"
+        }]
+      },
+      {
+        "id": 52,
+        "title": "Flagged Requests (Critical/High)",
+        "description": "Requests matching critical or high-severity keywords — requires compliance review",
+        "type": "table",
+        "gridPos": { "h": 8, "w": 24, "x": 0, "y": 36 },
+        "datasource": { "type": "postgres", "uid": "PostgreSQL" },
+        "targets": [{
+          "rawSql": "SELECT request_time, username, team_id, model, category, keyword, severity, spend, LEFT(message_text, 200) AS message_preview FROM flagged_requests WHERE request_time > NOW() - INTERVAL '7 days' LIMIT 100",
+          "format": "table"
+        }],
+        "fieldConfig": {
+          "overrides": [
+            { "matcher": { "id": "byName", "options": "severity" }, "properties": [{ "id": "custom.displayMode", "value": "color-text" }, { "id": "mappings", "value": [{ "type": "value", "options": { "critical": { "color": "red", "text": "CRITICAL" }, "high": { "color": "orange", "text": "HIGH" } } }] }] }
+          ]
+        }
+      },
+      {
+        "id": 53,
+        "title": "Top Keywords (30d)",
+        "description": "Most frequently matched keywords across all requests",
+        "type": "barchart",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 44 },
+        "datasource": { "type": "postgres", "uid": "PostgreSQL" },
+        "targets": [{
+          "rawSql": "SELECT keyword, category, SUM(match_count) AS total_matches FROM keyword_daily_summary WHERE day > NOW() - INTERVAL '30 days' GROUP BY keyword, category ORDER BY total_matches DESC LIMIT 20",
+          "format": "table"
+        }],
+        "options": { "orientation": "horizontal" }
+      },
+      {
+        "id": 54,
+        "title": "Flagged Keywords by Team (30d)",
+        "description": "Which teams trigger high/critical keyword flags — governance tier alignment check",
+        "type": "table",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 44 },
+        "datasource": { "type": "postgres", "uid": "PostgreSQL" },
+        "targets": [{
+          "rawSql": "SELECT team_id, category, keyword, severity, SUM(match_count) AS total_matches, SUM(unique_users) AS unique_users, SUM(total_spend) AS spend FROM keyword_daily_summary WHERE day > NOW() - INTERVAL '30 days' AND severity IN ('critical', 'high') GROUP BY team_id, category, keyword, severity ORDER BY total_matches DESC LIMIT 50",
+          "format": "table"
+        }]
+      },
+      {
         "id": 40,
         "title": "Container Logs",
         "type": "logs",
-        "gridPos": { "h": 10, "w": 24, "x": 0, "y": 28 },
+        "gridPos": { "h": 10, "w": 24, "x": 0, "y": 52 },
         "datasource": { "type": "loki", "uid": "Loki" },
         "targets": [{
           "expr": "{service=~\".+\"} |= ``",

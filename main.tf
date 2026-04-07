@@ -218,6 +218,7 @@ locals {
       sso_group_mapping      = var.sso_group_mapping
       ops_grafana_enable     = var.ops_grafana_enable
       ops_uptime_kuma_enable = var.ops_uptime_kuma_enable
+      keyword_categories     = var.keyword_categories
     })
   })
 

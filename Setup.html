@@ -436,6 +436,26 @@
       </div>
     </div>
 
+    <h3 style="font-size:1.1em;color:#2b6cb0;margin:24px 0 10px">Keyword Analysis</h3>
+    <p class="desc" style="margin-bottom:12px">
+      API requests are analyzed for keyword patterns to track usage topics, flag compliance-sensitive content, and report on governance tier activity. Default categories (collections, legal, development, research, content, PII) are always included.
+    </p>
+
+    <div class="field">
+      <label>Additional Keyword Categories</label>
+      <div class="hint">Add custom categories with comma-separated keywords. One category per row.</div>
+    </div>
+
+    <div id="keywordCategoryRows"></div>
+
+    <button class="btn btn-secondary" onclick="addKeywordCategoryRow()" style="margin-top:4px;padding:8px 18px;font-size:0.88em">
+      + Add Category
+    </button>
+
+    <div class="info-box" style="margin-top:14px">
+      <strong>Built-in categories:</strong> collections, legal, development, research, content, pii_mention — these are always active and cannot be removed. Add your own for industry-specific tracking.
+    </div>
+
     <div class="btn-row">
       <button class="btn btn-secondary" onclick="prevStep()">Back</button>
       <button class="btn btn-primary" onclick="nextStep()">Next</button>
@@ -771,6 +791,41 @@ function toggleGpuInfo() {
   }
 }
 
+let kwRowCounter = 0;
+
+function addKeywordCategoryRow(category, keywords) {
+  const container = document.getElementById('keywordCategoryRows');
+  const idx = kwRowCounter++;
+  const div = document.createElement('div');
+  div.className = 'group-row';
+  div.id = `kwRow_${idx}`;
+  div.innerHTML = `
+    <div style="display:flex;gap:12px;align-items:flex-start">
+      <div class="field" style="flex:1;margin-bottom:0">
+        <input type="text" class="kw-category" value="${escapeHtml(category)}" placeholder="Category name (e.g., finance)">
+      </div>
+      <div class="field" style="flex:3;margin-bottom:0">
+        <input type="text" class="kw-words" value="${escapeHtml(keywords)}" placeholder="Comma-separated keywords (e.g., invoice, billing, refund)">
+      </div>
+      <button class="remove-btn" onclick="document.getElementById('kwRow_${idx}').remove()" title="Remove">&times;</button>
+    </div>
+  `;
+  container.appendChild(div);
+}
+
+function getKeywordCategories() {
+  const rows = document.querySelectorAll('#keywordCategoryRows .group-row');
+  const categories = {};
+  rows.forEach(row => {
+    const cat = row.querySelector('.kw-category').value.trim().toLowerCase();
+    const words = row.querySelector('.kw-words').value.trim();
+    if (!cat || !words) return;
+    if (!/^[\w\-]+$/.test(cat)) return;
+    categories[cat] = words.split(',').map(w => w.trim().toLowerCase()).filter(w => w);
+  });
+  return categories;
+}
+
 function updateGovernanceHint() {
   const tier = v('governanceTier');
   const hint = document.getElementById('governanceHint');
@@ -1081,6 +1136,16 @@ ops_grafana_enable       = ${checked('opsGrafana')}
 ops_uptime_kuma_enable   = ${checked('opsUptimeKuma')}
 ops_backup_schedule      = "${v('opsBackupSchedule')}"`;
   if (v('opsAlertWebhook')) out += `\nops_alert_webhook        = "${v('opsAlertWebhook')}"`;
+
+  // Keyword categories
+  const kwCats = getKeywordCategories();
+  if (Object.keys(kwCats).length > 0) {
+    out += `\n\n# Custom Keyword Analysis Categories\nkeyword_categories = {`;
+    for (const [cat, words] of Object.entries(kwCats)) {
+      out += `\n  ${cat} = [${words.map(w => `"${w}"`).join(', ')}]`;
+    }
+    out += `\n}`;
+  }
 
   out += `\n\n# DLP
 dlp_enable           = true

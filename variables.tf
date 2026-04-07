@@ -513,6 +513,18 @@ variable "ops_alert_webhook" {
   default     = ""
 }
 
+variable "keyword_categories" {
+  description = "Additional keyword categories for request analysis (map of category name => list of keywords)"
+  type        = map(list(string))
+  default     = {}
+}
+
+variable "keyword_refresh_schedule" {
+  description = "Cron schedule for refreshing keyword materialized views (default: every 15 minutes)"
+  type        = string
+  default     = "*/15 * * * *"
+}
+
 # =============================================================================
 # TLS CONFIGURATION
 # =============================================================================

@@ -218,6 +218,201 @@ CREATE OR REPLACE VIEW budgets AS SELECT * FROM \"LiteLLM_BudgetTable\";
 " >> "$LOG" 2>&1 || log "WARNING: Failed to create views"
 log "Database views created"
 
+# ---------------------------------------------------------------------------
+# Create keyword analysis tables, views, and materialized views
+# ---------------------------------------------------------------------------
+log "Creating keyword analysis infrastructure..."
+docker exec insidellm-postgres psql -U litellm -d litellm -c "
+-- ==========================================================================
+-- Keyword category dictionary — configurable word-to-category mapping
+-- ==========================================================================
+CREATE TABLE IF NOT EXISTS keyword_categories (
+  id SERIAL PRIMARY KEY,
+  category TEXT NOT NULL,
+  keyword TEXT NOT NULL,
+  severity TEXT DEFAULT 'info',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(category, keyword)
+);
+
+-- Seed default categories aligned with AI Governance Framework
+INSERT INTO keyword_categories (category, keyword, severity) VALUES
+  -- Collections / Material Decisions (Tier 1 flags)
+  ('collections', 'debt', 'high'),
+  ('collections', 'collection', 'high'),
+  ('collections', 'payment plan', 'high'),
+  ('collections', 'settlement', 'high'),
+  ('collections', 'overdue', 'high'),
+  ('collections', 'delinquent', 'high'),
+  ('collections', 'garnishment', 'high'),
+  ('collections', 'repossession', 'high'),
+  ('collections', 'charge-off', 'high'),
+  ('collections', 'creditor', 'medium'),
+  ('collections', 'debtor', 'medium'),
+  -- Legal / Compliance
+  ('legal', 'fdcpa', 'critical'),
+  ('legal', 'fcra', 'critical'),
+  ('legal', 'tcpa', 'critical'),
+  ('legal', 'regulation f', 'critical'),
+  ('legal', 'cfpb', 'critical'),
+  ('legal', 'ecoa', 'critical'),
+  ('legal', 'lawsuit', 'high'),
+  ('legal', 'litigation', 'high'),
+  ('legal', 'subpoena', 'high'),
+  ('legal', 'compliance', 'medium'),
+  ('legal', 'regulatory', 'medium'),
+  ('legal', 'legal', 'medium'),
+  ('legal', 'attorney', 'medium'),
+  -- Code / Development (Tier 3)
+  ('development', 'code', 'info'),
+  ('development', 'function', 'info'),
+  ('development', 'api', 'info'),
+  ('development', 'debug', 'info'),
+  ('development', 'refactor', 'info'),
+  ('development', 'deploy', 'info'),
+  ('development', 'database', 'info'),
+  ('development', 'script', 'info'),
+  -- Research / Analysis (Tier 2-3)
+  ('research', 'analyze', 'info'),
+  ('research', 'research', 'info'),
+  ('research', 'report', 'info'),
+  ('research', 'summarize', 'info'),
+  ('research', 'compare', 'info'),
+  ('research', 'data', 'info'),
+  -- Content / Writing (Tier 3)
+  ('content', 'write', 'info'),
+  ('content', 'draft', 'info'),
+  ('content', 'email', 'info'),
+  ('content', 'letter', 'info'),
+  ('content', 'template', 'info'),
+  ('content', 'document', 'info'),
+  -- PII / Sensitive (should be caught by DLP but flag for audit)
+  ('pii_mention', 'social security', 'critical'),
+  ('pii_mention', 'ssn', 'critical'),
+  ('pii_mention', 'credit card', 'critical'),
+  ('pii_mention', 'account number', 'high'),
+  ('pii_mention', 'date of birth', 'high'),
+  ('pii_mention', 'medical record', 'critical'),
+  ('pii_mention', 'password', 'high'),
+  ('pii_mention', 'api key', 'high')
+ON CONFLICT (category, keyword) DO NOTHING;
+%{ for cat, keywords in keyword_categories ~}
+%{ for kw in keywords ~}
+INSERT INTO keyword_categories (category, keyword, severity)
+VALUES ('${cat}', '${kw}', 'medium')
+ON CONFLICT (category, keyword) DO NOTHING;
+%{ endfor ~}
+%{ endfor ~}
+
+-- ==========================================================================
+-- View: message_content — extracts user message text from JSONB
+-- ==========================================================================
+CREATE OR REPLACE VIEW message_content AS
+SELECT
+  s.request_id,
+  s.\"startTime\" AS request_time,
+  s.\"user\" AS username,
+  s.team_id,
+  s.model,
+  s.spend,
+  s.total_tokens,
+  msg->>'role' AS message_role,
+  msg->>'content' AS message_text,
+  to_tsvector('english', COALESCE(msg->>'content', '')) AS search_vector
+FROM \"LiteLLM_SpendLogs\" s,
+LATERAL jsonb_array_elements(
+  CASE
+    WHEN s.messages IS NOT NULL AND s.messages::text != 'null' AND s.messages::text != ''
+    THEN s.messages::jsonb
+    ELSE '[]'::jsonb
+  END
+) AS msg
+WHERE msg->>'role' = 'user';
+
+-- ==========================================================================
+-- View: keyword_matches — joins messages against the keyword dictionary
+-- ==========================================================================
+CREATE OR REPLACE VIEW keyword_matches AS
+SELECT
+  mc.request_id,
+  mc.request_time,
+  mc.username,
+  mc.team_id,
+  mc.model,
+  mc.spend,
+  kc.category,
+  kc.keyword,
+  kc.severity
+FROM message_content mc
+JOIN keyword_categories kc
+  ON mc.search_vector @@ plainto_tsquery('english', kc.keyword);
+
+-- ==========================================================================
+-- Materialized view: keyword_daily_summary — refreshed on schedule
+-- ==========================================================================
+DROP MATERIALIZED VIEW IF EXISTS keyword_daily_summary;
+CREATE MATERIALIZED VIEW keyword_daily_summary AS
+SELECT
+  date_trunc('day', request_time) AS day,
+  category,
+  keyword,
+  severity,
+  team_id,
+  COUNT(*) AS match_count,
+  COUNT(DISTINCT username) AS unique_users,
+  ROUND(SUM(spend)::numeric, 4) AS total_spend
+FROM keyword_matches
+GROUP BY 1, 2, 3, 4, 5;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_kds_day_cat_kw_team
+  ON keyword_daily_summary (day, category, keyword, severity, team_id);
+
+-- ==========================================================================
+-- Materialized view: topic_distribution — category totals for pie chart
+-- ==========================================================================
+DROP MATERIALIZED VIEW IF EXISTS topic_distribution;
+CREATE MATERIALIZED VIEW topic_distribution AS
+SELECT
+  category,
+  COUNT(*) AS total_matches,
+  COUNT(DISTINCT request_id) AS unique_requests,
+  COUNT(DISTINCT username) AS unique_users
+FROM keyword_matches
+WHERE request_time > NOW() - INTERVAL '30 days'
+GROUP BY category;
+
+-- ==========================================================================
+-- View: flagged_requests — high/critical keyword hits for compliance review
+-- ==========================================================================
+CREATE OR REPLACE VIEW flagged_requests AS
+SELECT
+  km.request_id,
+  km.request_time,
+  km.username,
+  km.team_id,
+  km.model,
+  km.category,
+  km.keyword,
+  km.severity,
+  km.spend,
+  mc.message_text
+FROM keyword_matches km
+JOIN message_content mc USING (request_id)
+WHERE km.severity IN ('critical', 'high')
+ORDER BY km.request_time DESC;
+
+-- ==========================================================================
+-- Function to refresh materialized views (called by cron)
+-- ==========================================================================
+CREATE OR REPLACE FUNCTION refresh_keyword_views() RETURNS void AS \$\$
+BEGIN
+  REFRESH MATERIALIZED VIEW CONCURRENTLY keyword_daily_summary;
+  REFRESH MATERIALIZED VIEW topic_distribution;
+END;
+\$\$ LANGUAGE plpgsql;
+" >> "$LOG" 2>&1 || log "WARNING: Failed to create keyword analysis views"
+log "Keyword analysis infrastructure created"
+
 %{ if docforge_enable ~}
 # ---------------------------------------------------------------------------
 # Wait for DocForge and register as an Open WebUI Tool

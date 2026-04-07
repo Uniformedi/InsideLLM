@@ -267,6 +267,7 @@ runcmd:
 %{ if ops_trivy_enable ~}
     CRON_ENTRIES="$CRON_ENTRIES\n0 5 * * * /opt/InsideLLM/trivy-scan.sh"
 %{ endif ~}
+    CRON_ENTRIES="$CRON_ENTRIES\n*/15 * * * * docker exec insidellm-postgres psql -U litellm -d litellm -c 'SELECT refresh_keyword_views()' > /dev/null 2>&1"
     (crontab -l 2>/dev/null; echo -e "$CRON_ENTRIES") | crontab -
 
   # --- Configure xrdp for Remote Desktop ---
