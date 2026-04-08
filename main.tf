@@ -366,31 +366,8 @@ resource "null_resource" "create_cloud_init_iso" {
       $isoDir  = Join-Path "${var.vm_path}" "${var.vm_name}-cloud-init"
       $isoFile = Join-Path "${var.vm_path}" "${var.vm_name}-cloud-init.iso"
 
-      # Build ISO using oscdimg (Windows ADK) or genisoimage via WSL
-      $oscdimg = Get-Command oscdimg.exe -ErrorAction SilentlyContinue
-      if ($oscdimg) {
-        & oscdimg.exe -j2 -lcidata $isoDir $isoFile
-      } else {
-        $wslCmd = Get-Command wsl.exe -ErrorAction SilentlyContinue
-        if (-not $wslCmd) {
-          throw "Neither oscdimg (Windows ADK) nor WSL is installed. Install one of:`n  - Windows ADK: https://learn.microsoft.com/en-us/windows-hardware/get-started/adk-install`n  - WSL: wsl --install`nThen re-run terraform apply."
-        }
-        # Convert Windows paths to WSL paths
-        $winIsoDir  = $isoDir.Replace('\', '/')
-        $winIsoFile = $isoFile.Replace('\', '/')
-        $wslIsoDir  = (wsl wslpath -a $winIsoDir).Trim()
-        $wslIsoFile = (wsl wslpath -a $winIsoFile).Trim()
-        if (-not $wslIsoDir -or -not $wslIsoFile) {
-          throw "WSL is installed but wslpath failed. Ensure a WSL distro is installed: wsl --install Ubuntu"
-        }
-        Write-Host "Using WSL for conversion. ISO dir: $wslIsoDir"
-        wsl bash -c "command -v genisoimage > /dev/null || { echo 'ERROR: genisoimage not found in WSL. Run: sudo apt install genisoimage'; exit 1; } && genisoimage -output '$wslIsoFile' -volid cidata -joliet -rock '$wslIsoDir'"
-        if (-not (Test-Path $isoFile)) {
-          throw "Failed to create cloud-init ISO at $isoFile. Check WSL genisoimage output above."
-        }
-      }
-
-      Write-Host "Cloud-init ISO created at $isoFile"
+      # Build cloud-init ISO (tries: oscdimg > WSL genisoimage > PowerShell native)
+      & "${path.module}\New-CloudInitIso.ps1" -SourceDir $isoDir -OutputIso $isoFile -VolumeLabel "cidata"
     EOT
     interpreter = ["PowerShell", "-Command"]
   }
@@ -540,31 +517,8 @@ ${local.ollama_cloud_init_network}
 
       $isoPath = "${var.vm_path}\${local.ollama_vm_name}-cloud-init.iso"
 
-      # Build ISO using oscdimg (Windows ADK) or genisoimage via WSL
-      $oscdimg = Get-Command oscdimg.exe -ErrorAction SilentlyContinue
-      if ($oscdimg) {
-        & oscdimg.exe -j2 -lcidata $ciDir $isoPath
-      } else {
-        $wslCmd = Get-Command wsl.exe -ErrorAction SilentlyContinue
-        if (-not $wslCmd) {
-          throw "Neither oscdimg (Windows ADK) nor WSL is installed. Install one of:`n  - Windows ADK: https://learn.microsoft.com/en-us/windows-hardware/get-started/adk-install`n  - WSL: wsl --install`nThen re-run terraform apply."
-        }
-        # Convert Windows paths to WSL paths
-        $winCiDir  = $ciDir.Replace('\', '/')
-        $winIsoPath = $isoPath.Replace('\', '/')
-        $wslCiDir  = (wsl wslpath -a $winCiDir).Trim()
-        $wslIsoPath = (wsl wslpath -a $winIsoPath).Trim()
-        if (-not $wslCiDir -or -not $wslIsoPath) {
-          throw "WSL is installed but wslpath failed. Ensure a WSL distro is installed: wsl --install Ubuntu"
-        }
-        Write-Host "Using WSL for conversion. ISO dir: $wslCiDir"
-        wsl bash -c "command -v genisoimage > /dev/null || { echo 'ERROR: genisoimage not found in WSL. Run: sudo apt install genisoimage'; exit 1; } && genisoimage -output '$wslIsoPath' -volid cidata -joliet -rock '$wslCiDir'"
-        if (-not (Test-Path $isoPath)) {
-          throw "Failed to create Ollama cloud-init ISO at $isoPath. Check WSL genisoimage output above."
-        }
-      }
-
-      Write-Host "Ollama cloud-init ISO created: $isoPath"
+      # Build cloud-init ISO (tries: oscdimg > WSL genisoimage > PowerShell native)
+      & "${path.module}\New-CloudInitIso.ps1" -SourceDir $ciDir -OutputIso $isoPath -VolumeLabel "cidata"
     EOT
     interpreter = ["PowerShell", "-Command"]
   }
