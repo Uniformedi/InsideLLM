@@ -678,11 +678,16 @@ data "external" "vm_ip" {
 
   program = ["powershell", "-Command", <<-EOT
     $vm = Get-VM -Name "${var.vm_name}" -ErrorAction SilentlyContinue
-    $ip = "unknown"
+    $ip = ""
     if ($vm) {
       $ips = ($vm | Get-VMNetworkAdapter).IPAddresses | Where-Object { $_ -match "^\d+\.\d+\.\d+\.\d+$" }
       if ($ips) { $ip = $ips[0] }
     }
+    # Fall back to the static IP from terraform.tfvars if VM query returned nothing
+    if (-not $ip -and "${var.vm_static_ip}" -ne "") {
+      $ip = "${var.vm_static_ip}".Split("/")[0]
+    }
+    if (-not $ip) { $ip = "unknown" }
     @{ ip = $ip } | ConvertTo-Json
   EOT
   ]
