@@ -1139,6 +1139,25 @@ Write-Ok "Database views created"
 if (-not $SkipPortForwarding) {
     Write-Step "Configuring port forwarding"
 
+    # Allow inbound traffic on the WSL vEthernet adapter
+    $wslSwitch = "vEthernet (WSL)"
+    $defaultSwitch = "vEthernet (Default Switch)"
+    $ruleName = "InsideLLM WSL vSwitch"
+    Remove-NetFirewallRule -DisplayName $ruleName -ErrorAction SilentlyContinue
+    $adapterAlias = if (Get-NetAdapter -Name $wslSwitch -ErrorAction SilentlyContinue) { $wslSwitch } elseif (Get-NetAdapter -Name $defaultSwitch -ErrorAction SilentlyContinue) { $defaultSwitch } else { $null }
+    if ($adapterAlias) {
+        New-NetFirewallRule `
+            -DisplayName $ruleName `
+            -Group "InsideLLM WSL2" `
+            -Direction Inbound `
+            -InterfaceAlias $adapterAlias `
+            -Action Allow `
+            -Enabled True | Out-Null
+        Write-Ok "Firewall rule added for $adapterAlias"
+    } else {
+        Write-Warn "WSL vEthernet adapter not found — manually run: New-NetFirewallRule -DisplayName 'WSL' -Direction Inbound -InterfaceAlias 'vEthernet (Default Switch)' -Action Allow"
+    }
+
     $wslIp = (Invoke-Wsl "hostname -I" | ForEach-Object { $_.Trim().Split(" ")[0] })
     Write-Ok "WSL2 IP: $wslIp"
 
