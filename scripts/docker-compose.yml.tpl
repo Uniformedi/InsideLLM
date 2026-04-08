@@ -416,7 +416,7 @@ services:
   # Loki — Log Aggregation
   # -------------------------------------------------------------------------
   loki:
-    image: grafana/loki:3-latest
+    image: grafana/loki:latest
     container_name: insidellm-loki
     restart: always
     volumes:
@@ -441,7 +441,7 @@ services:
   # Promtail — Log Collector (ships Docker logs to Loki)
   # -------------------------------------------------------------------------
   promtail:
-    image: grafana/promtail:3-latest
+    image: grafana/promtail:latest
     container_name: insidellm-promtail
     restart: always
     volumes:
