@@ -1,11 +1,28 @@
 # Inside LLM — Architecture & Product Use Case
 
-**Version:** 2.0 | **Author:** Dan Medina, Uniformedi LLC | **Date:** March 2026
+**Version:** 3.0 | **Author:** Dan Medina, Uniformedi LLC | **Date:** April 2026
 **Source:** [github.com/Uniformedi/InsideLLM](https://github.com/Uniformedi/InsideLLM) | **License:** MIT
 
 > **Ready to deploy?** Open the [Setup Wizard (Setup.html)](Setup.html) for a guided, step-by-step configuration experience.
 
-### What's New in 2.0
+### What's New in 3.0
+
+- **DocForge** -- Node.js file generation and conversion service (DOCX, XLSX, PPTX, PDF, CSV, ODF) with LibreOffice headless, accessible as an Open WebUI Tool
+- **SSO Group-to-Team Mapping** -- Azure AD / Okta groups auto-map to LiteLLM teams with per-group budgets, rate limits, and model access
+- **AI Governance Framework Compliance** -- governance tier classification, data classification, AI Ethics Officer tracking, configurable log retention
+- **Industry Keyword Templates** -- 12 industry presets (Collections, Healthcare, Financial, Legal, Insurance, etc.) with curated regulatory keyword dictionaries
+- **Keyword Analysis Engine** -- PostgreSQL full-text search on API requests with materialized views, topic distribution, and flagged request detection
+- **Automated Operations Stack** -- Watchtower (container patching), Trivy (CVE scanning), Grafana+Loki (centralized logging), Uptime Kuma (health monitoring), PostgreSQL backup cron
+- **Enterprise Governance Hub** -- FastAPI service for central repository sync (PostgreSQL/MariaDB/MSSQL), change management with supervisor approval, AI-powered governance advisor
+- **Hash-Chained Audit Integrity** -- SHA-256 chain on all governance events (sync, proposals, approvals, snapshots) with verification endpoint
+- **Fleet Management** -- cross-instance visibility, config snapshot restore, terraform.tfvars generation from any instance's snapshot
+- **OPA Policy Engine** -- Open Policy Agent with SAIVAS mandatory alignment + 6 industry policies (HIPAA, FDCPA, SOX, PCI-DSS, FERPA, GLBA), obligation execution pipeline
+- **External Data Connectors** -- query PostgreSQL, MySQL, MSSQL, REST APIs with team-based RBAC, row filtering, field masking, and full audit logging
+- **Interactive Admin Hub** -- command center SPA replacing static admin.html with governance dashboard, change management UI, fleet overview, and service status
+- **AI System Designer** -- Open WebUI Tool that designs deployments, estimates costs, recommends configs, and plans multi-instance fleet architectures
+- **PowerShell-native ISO creation** -- cloud-init ISO creation without WSL or Windows ADK using pure .NET (`New-CloudInitIso.ps1`)
+
+### What Was New in 2.0
 
 - **WSL2 deployment path** -- single PowerShell script, no Terraform or Hyper-V required (`Install-InsideLLM-WSL.ps1`)
 - **Standalone initialization script** -- provision WSL2, Docker, SCFW, and TLS separately (`Initialize-InsideLLM.ps1`)
@@ -37,6 +54,12 @@
 11. [Deployment & Operations](#11-deployment--operations)
 11a. [WSL2 Deployment (Alternative)](#11a-wsl2-deployment-alternative)
 12. [Product Use Case](#12-product-use-case)
+13. [DocForge (File Generation & Conversion)](#13-docforge-file-generation--conversion)
+14. [AI Governance & Compliance](#14-ai-governance--compliance)
+15. [Enterprise Governance Hub](#15-enterprise-governance-hub)
+16. [OPA Policy Engine](#16-opa-policy-engine)
+17. [External Data Connectors](#17-external-data-connectors)
+18. [Cloud-Init ISO Creation](#18-cloud-init-iso-creation)
 
 ---
 
@@ -54,8 +77,13 @@ services that deliver:
 - **SSO integration** with Azure AD or Okta (OIDC)
 - **Per-user budgets and rate limits** with real-time enforcement
 - **Real-time monitoring** of containers, host resources, and database metrics (Netdata)
-- **Admin portal** with service quick-access, live health status, API reference, and routing table (`/admin`)
-- **Full audit trail** of every API call
+- **Admin portal** — interactive command center with governance dashboard, change management UI, fleet overview (`/admin`)
+- **Full audit trail** of every API call with hash-chained integrity verification
+- **File generation** — create DOCX, XLSX, PPTX, PDF from chat via DocForge
+- **AI governance compliance** — industry keyword analysis, OPA policy enforcement, SAIVAS alignment
+- **Enterprise fleet management** — central repository sync, cross-instance restore, multi-DB support (PostgreSQL/MariaDB/MSSQL)
+- **Automated operations** — container patching (Watchtower), CVE scanning (Trivy), centralized logging (Grafana+Loki), health monitoring (Uptime Kuma)
+- **External data connectors** — query external databases and APIs with team-based RBAC and audit logging
 
 All traffic to Anthropic's API is brokered through this internal stack. The
 organization retains complete control over who accesses Claude, what data they
@@ -1588,6 +1616,261 @@ COST SAVINGS
 
 ---
 
+## 13. DocForge (File Generation & Conversion)
+
+DocForge is a Node.js microservice with LibreOffice headless that runs as a Docker container in the stack. Claude can generate and convert files directly from chat via an Open WebUI Tool.
+
+### Supported Formats
+
+| Category | Generate | Convert To/From |
+|----------|----------|-----------------|
+| Office | DOCX, XLSX, PPTX | All Office + PDF + ODF |
+| ODF | ODT, ODS, ODP | Via LibreOffice conversion |
+| PDF | Native (PDFKit) | From any Office/ODF format |
+| Text | CSV, JSON, XML, YAML, Markdown, TXT | Between text formats |
+
+### API Endpoints
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/docforge/api/generate` | POST | Generate files from structured JSON |
+| `/docforge/api/convert` | POST | Convert uploaded files between formats |
+| `/docforge/api/formats` | GET | List supported formats |
+
+### Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `docforge_enable` | `true` | Enable the DocForge service |
+| `docforge_max_file_size_mb` | `50` | Max upload size for conversions |
+
+LibreOffice conversions are serialized via an async queue to prevent conflicts. Temp files are cleaned every 30 minutes.
+
+---
+
+## 14. AI Governance & Compliance
+
+### Governance Tier Classification
+
+The Setup Wizard collects governance metadata aligned with the AI Governance Framework:
+
+| Variable | Options | Description |
+|----------|---------|-------------|
+| `industry` | 12 presets | Drives keyword templates and governance defaults |
+| `governance_tier` | `tier1`, `tier2`, `tier3` | Controls strictness (full, standard, lightweight) |
+| `data_classification` | `public`, `internal`, `confidential`, `restricted` | Highest data sensitivity handled |
+| `ai_ethics_officer` | free text | Named individual for incident escalation |
+| `log_retention_days` | 365-2555 | Audit trail retention (Tier 1 requires 3-7 years) |
+
+### Industry Keyword Templates
+
+Selecting an industry in the wizard pre-loads curated keyword dictionaries:
+
+| Industry | Example Keywords | Default Tier |
+|----------|-----------------|-------------|
+| Collections | fdcpa, settlement, garnishment, mini-miranda | Tier 1 |
+| Healthcare | hipaa, phi, diagnosis, adverse event, breach notification | Tier 1 |
+| Financial | aml, bsa, sar, kyc, adverse action, dodd-frank | Tier 1 |
+| Legal | litigation, privilege, deposition, malpractice | Tier 1 |
+| Government | foia, fedramp, clearance, inspector general | Tier 1 |
+| Insurance | claims, subrogation, actuarial, naic | Tier 1 |
+| Education | ferpa, student record, plagiarism, title ix | Tier 2 |
+| Real Estate | fair housing, escrow, zoning, eviction | Tier 2 |
+| Retail | pci, chargeback, false advertising, fulfillment | Tier 2 |
+| Manufacturing | osha, capa, iso 9001, lockout tagout | Tier 2 |
+| General | *(no preset — built-in defaults only)* | Tier 3 |
+
+### Keyword Analysis
+
+Every API request is analyzed via PostgreSQL full-text search against a keyword dictionary:
+
+- `message_content` view extracts user messages from JSONB with `ts_vector`
+- `keyword_matches` joins against the dictionary using `plainto_tsquery`
+- `keyword_daily_summary` materialized view refreshed every 15 minutes
+- `flagged_requests` view filters high/critical severity matches for compliance review
+
+### Automated Operations Stack
+
+| Service | Purpose | Schedule |
+|---------|---------|----------|
+| Watchtower | Auto-pull container image updates | Daily 4 AM |
+| Trivy | CVE scan all running images | Daily 5 AM |
+| Grafana + Loki | Centralized logging + compliance dashboards | Continuous |
+| Uptime Kuma | Service health monitoring + alerting | Continuous |
+| PostgreSQL backup | `pg_dump` with 30-backup retention | Daily/Weekly |
+
+All operations services are toggled via Terraform variables (`ops_watchtower_enable`, etc.).
+
+---
+
+## 15. Enterprise Governance Hub
+
+The Governance Hub is a FastAPI microservice (`governance-hub` container) that provides enterprise-wide AI governance management. Enabled via `governance_hub_enable = true`.
+
+### Central Repository Sync
+
+Exports governance telemetry to a central database on a configurable schedule:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `governance_hub_central_db_type` | `postgresql` | `postgresql`, `mariadb`, or `mssql` |
+| `governance_hub_central_db_host` | *(empty)* | Central DB hostname |
+| `governance_hub_sync_schedule` | `0 */6 * * *` | Cron schedule (every 6 hours) |
+
+Data exported: spend logs, user counts, DLP blocks, keyword flags, compliance scores, config snapshots.
+
+### Change Management Workflow
+
+Formal proposal/approval pipeline for governance framework changes:
+
+1. **Propose** — human or AI advisor creates a change proposal
+2. **Review** — supervisor reviews with impact assessment
+3. **Approve/Reject** — decision recorded with reviewer name, email, comments
+4. **Implement** — creates a new framework version with full audit trail
+
+All state transitions are recorded in the hash-chained audit trail.
+
+### Hash-Chained Audit Integrity
+
+Every governance event is appended to an immutable SHA-256 chain:
+
+```
+chain_hash = SHA-256(sequence || event_type || payload_hash || previous_hash)
+```
+
+Tampering with any record breaks the chain. The `/audit/chain/verify` endpoint detects the first broken link. Checkpoints are created every 100 entries for efficient partial verification.
+
+### Fleet Management
+
+Cross-instance visibility via the central database:
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /fleet/instances` | List all registered InsideLLM deployments |
+| `GET /fleet/summary` | Fleet-wide aggregate metrics |
+| `POST /fleet/compare` | Compare configs across instances |
+| `POST /restore/generate-tfvars` | Generate terraform.tfvars from any config snapshot |
+
+### AI Governance Advisor
+
+Open WebUI Tool that analyzes telemetry and suggests framework improvements. All suggestions enter the change management pipeline as pending proposals — AI never makes changes directly.
+
+### AI System Designer
+
+Open WebUI Tool for planning deployments:
+
+- `design_deployment` — natural language requirements to architecture + terraform.tfvars
+- `estimate_costs` — monthly cost projections by user count and model tier
+- `recommend_config` — optimized settings for industry + compliance level
+- `plan_fleet` — multi-instance architecture with per-instance configurations
+
+---
+
+## 16. OPA Policy Engine
+
+Open Policy Agent enforcement based on the `policyengine.md` normative specification. Enabled via `policy_engine_enable = true`.
+
+### Architecture
+
+```
+User Message → DLP Pipeline → OPA Pipeline → LiteLLM → Claude
+                                    │
+                              ┌─────▼─────┐
+                              │ OPA :8181  │
+                              │ SAIVAS     │  (always on)
+                              │ + Industry │  (toggled)
+                              └─────┬─────┘
+                                    │
+                              Decision + Obligations
+```
+
+### SAIVAS (Mandatory)
+
+Always loaded, cannot be disabled. Denies when:
+- Metaphysical context produces directives
+- High-confidence output lacks uncertainty declaration
+- Authority or superiority is claimed
+- High-impact output lacks documented human consensus
+- Asymmetric persuasion is attempted
+
+### Industry Policies
+
+Toggled via `policy_engine_industry_policies`:
+
+| Policy | Regulation | Key Controls |
+|--------|-----------|--------------|
+| `hipaa` | HIPAA | PHI filtering, break-glass audit, authorization check |
+| `fdcpa` | FDCPA | Collection communication review queue, debt content tagging |
+| `sox` | SOX | Financial reporting attestation, audit logging |
+| `pci_dss` | PCI-DSS | Cardholder data blocking, payment content redaction |
+| `ferpa` | FERPA | Student record filtering, education data authorization |
+| `glba` | GLBA | NPI filtering, financial data authorization |
+
+### Obligation Types
+
+Executed in strict order: filter (1) -> audit (2) -> attestation (3) -> review (4).
+
+| Type | Behavior |
+|------|----------|
+| `filter.fields` | Redact/remove sensitive fields from messages |
+| `audit.log` | Write immutable audit record |
+| `audit.break_glass` | Capture emergency justification |
+| `audit.tag` | Attach classification/risk tags |
+| `require.attestation` | Block until user explicitly attests (24h TTL) |
+| `review.queue` | Block and queue for supervisor approval |
+
+### Fail Modes
+
+| Variable | Value | Behavior |
+|----------|-------|----------|
+| `policy_engine_fail_mode` | `closed` (default) | Any OPA error or obligation failure blocks the request |
+| `policy_engine_fail_mode` | `log_only` | Allow through but log violations (for rollout observation) |
+
+---
+
+## 17. External Data Connectors
+
+Query external databases and APIs from chat with team-based access control. Part of the Governance Hub.
+
+### Supported Types
+
+| Type | Driver | Example |
+|------|--------|---------|
+| `postgresql` | asyncpg | Company CRM, ERP databases |
+| `mysql` | aiomysql | Legacy systems, WordPress |
+| `mssql` | pymssql | Microsoft SQL Server |
+| `rest_api` | httpx | Internal APIs, ticketing systems |
+
+### Access Control Model
+
+| Field | Description |
+|-------|-------------|
+| `grant_type` | `team` (SSO group), `user` (individual), `role` (`*` for all) |
+| `permission` | `read` (SELECT only), `write` (all SQL), `admin` (manage connector) |
+| `row_filter` | SQL WHERE clause injected into every query |
+| `field_mask` | Allowed/denied field lists applied to results |
+| `expires_at` | Optional TTL for temporary access |
+
+Write operations are blocked for read-only grants. Results capped at 1000 rows. All queries logged to the audit chain.
+
+---
+
+## 18. Cloud-Init ISO Creation
+
+The Hyper-V deployment path requires a cloud-init ISO to provision the Ubuntu VM. The `New-CloudInitIso.ps1` script creates this ISO using a three-tier fallback:
+
+| Priority | Method | Dependency |
+|----------|--------|------------|
+| 1 | `oscdimg.exe` | Windows ADK |
+| 2 | WSL `genisoimage` | WSL + Ubuntu distro |
+| 3 | **PowerShell native** | **None** |
+
+The PowerShell native fallback writes a minimal ISO 9660 image using .NET `System.IO.BinaryWriter`. This means Hyper-V deployments work on bare Windows Server without WSL or ADK installed.
+
+`Setup-Prerequisites.ps1` (Step 5) attempts to install `genisoimage` in WSL if available, and warns if no ISO tool is found. The native fallback ensures `terraform apply` succeeds regardless.
+
+---
+
 ## Appendix: Quick Reference
 
 ### Key Terraform Variables
@@ -1606,16 +1889,28 @@ COST SAVINGS
 | `dlp_block_phi` | `true` | Block PHI (HIPAA) |
 | `dlp_block_credentials` | `true` | Block API keys, passwords |
 | `dlp_custom_patterns` | `{}` | Organization-specific regex |
+| `docforge_enable` | `true` | Enable DocForge file service |
+| `industry` | `general` | Industry for keyword templates |
+| `governance_tier` | `tier3` | Governance strictness level |
+| `ops_watchtower_enable` | `true` | Auto-patch containers |
+| `ops_grafana_enable` | `true` | Compliance dashboards |
+| `governance_hub_enable` | `false` | Enterprise governance hub |
+| `policy_engine_enable` | `false` | OPA policy enforcement |
+| `policy_engine_industry_policies` | `[]` | Industry policies to load |
 
 ### Post-Deployment URLs
 
 | Service | URL | Purpose |
 |---------|-----|---------|
-| Admin Portal | `https://<vm-ip>/admin` | Service dashboard, health status, API reference |
+| Admin Hub | `https://<vm-ip>/admin` | Interactive command center |
 | Chat Interface | `https://<vm-ip>/` | End-user chat with Claude |
 | LiteLLM Admin | `https://<vm-ip>/litellm/ui/chat` | Admin dashboard |
 | LiteLLM API | `https://<vm-ip>/v1/` | OpenAI-compatible endpoint |
-| Netdata | `https://<vm-ip>/netdata/` | Real-time monitoring |
+| Grafana | `https://<vm-ip>/grafana/` | Compliance & fleet dashboards |
+| Governance Hub | `https://<vm-ip>/governance/` | Change management, sync, advisor API |
+| DocForge | `https://<vm-ip>/docforge/api/formats` | File generation & conversion |
+| Uptime Kuma | `https://<vm-ip>/status/` | Service health monitoring |
+| Netdata | `https://<vm-ip>/netdata/` | Infrastructure monitoring |
 | SSH | `ssh insidellm-admin@<vm-ip>` | VM administration |
 
 ### Claude Code CLI Setup
