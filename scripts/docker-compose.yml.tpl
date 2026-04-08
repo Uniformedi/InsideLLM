@@ -301,6 +301,37 @@ services:
 
 %{ endif ~}
 
+%{ if policy_engine_enable ~}
+  # -------------------------------------------------------------------------
+  # OPA — Open Policy Agent (Policy Enforcement)
+  # -------------------------------------------------------------------------
+  opa:
+    image: openpolicyagent/opa:latest
+    container_name: insidellm-opa
+    restart: always
+    command:
+      - "run"
+      - "--server"
+      - "--addr=:8181"
+      - "--log-level=info"
+      - "/policies"
+    volumes:
+      - /opt/InsideLLM/opa/policies:/policies:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8181/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - insidellm-internal
+
+%{ endif ~}
 %{ if governance_hub_enable ~}
   # -------------------------------------------------------------------------
   # Governance Hub — Central Sync, Change Management, AI Advisor

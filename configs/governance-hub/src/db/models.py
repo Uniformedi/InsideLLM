@@ -145,6 +145,58 @@ class AuditChainCheckpoint(Base):
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
 
 
+class PolicyAuditLog(Base):
+    """Audit log for OPA policy decisions and obligation execution."""
+    __tablename__ = "governance_policy_audit_log"
+
+    id = Column(Integer, primary_key=True)
+    event_type = Column(String(100), nullable=False)
+    severity = Column(String(50), default="info")
+    user_id = Column(String(255))
+    details = Column(JSONB)
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+
+
+class BreakGlassLog(Base):
+    """Emergency break-glass access records."""
+    __tablename__ = "governance_break_glass_log"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(String(255), nullable=False)
+    reason = Column(Text, nullable=False)
+    data_classification = Column(String(50))
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+
+
+class UserAttestation(Base):
+    """User attestation records for policy obligations."""
+    __tablename__ = "governance_user_attestations"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(String(255), nullable=False)
+    action_type = Column(String(255), nullable=False)
+    attestation_text = Column(Text)
+    attested_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    expires_at = Column(DateTime(timezone=True))
+    revoked_at = Column(DateTime(timezone=True))
+
+
+class ReviewQueueItem(Base):
+    """Requests queued for supervisor review by policy obligations."""
+    __tablename__ = "governance_review_queue"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(String(255), nullable=False)
+    review_type = Column(String(100))
+    regulation = Column(String(100))
+    request_summary = Column(Text)
+    status = Column(String(50), default="pending")  # pending, approved, rejected
+    reviewer_id = Column(String(255))
+    reviewed_at = Column(DateTime(timezone=True))
+    review_notes = Column(Text)
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+
+
 class DataConnector(Base):
     """Registered external data source for cross-referencing."""
     __tablename__ = "governance_data_connectors"

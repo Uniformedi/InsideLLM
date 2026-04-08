@@ -164,6 +164,22 @@ write_files:
       ${indent(6, docforge_tool_py)}
 %{ endif ~}
 
+%{ if policy_engine_enable ~}
+  # --- OPA policies archive ---
+  - path: /opt/InsideLLM/opa-policies.zip
+    permissions: "0644"
+    owner: root:root
+    encoding: b64
+    content: ${opa_zip_b64}
+
+  # --- OPA Policy Enforcement Pipeline ---
+  - path: /opt/InsideLLM/pipelines/opa-policy-pipeline.py
+    permissions: "0644"
+    owner: root:root
+    content: |
+      ${indent(6, opa_policy_pipeline_py)}
+%{ endif ~}
+
 %{ if governance_hub_enable ~}
   # --- Governance Hub source archive ---
   - path: /opt/InsideLLM/governance-hub.zip
@@ -358,6 +374,17 @@ runcmd:
 %{ endif ~}
 %{ if ops_trivy_enable ~}
   - mkdir -p /opt/InsideLLM/data/trivy-reports
+%{ endif ~}
+%{ if policy_engine_enable ~}
+  - mkdir -p /opt/InsideLLM/opa/policies
+  - |
+    cd /opt/InsideLLM
+    if [ ! -s opa-policies.zip ]; then
+      echo "ERROR: opa-policies.zip is empty or missing" >&2
+      exit 1
+    fi
+    unzip -o opa-policies.zip -d opa
+    rm -f opa-policies.zip
 %{ endif ~}
 %{ if governance_hub_enable ~}
   - mkdir -p /opt/InsideLLM/data/governance-hub

@@ -125,6 +125,13 @@ data "archive_file" "docforge" {
   output_path = "${path.module}/.terraform/tmp/docforge.zip"
 }
 
+data "archive_file" "opa_policies" {
+  count       = var.policy_engine_enable ? 1 : 0
+  type        = "zip"
+  source_dir  = "${path.module}/configs/opa"
+  output_path = "${path.module}/.terraform/tmp/opa-policies.zip"
+}
+
 data "archive_file" "governance_hub" {
   count       = var.governance_hub_enable ? 1 : 0
   type        = "zip"
@@ -175,6 +182,7 @@ locals {
     server_name                     = local.vm_fqdn
     grafana_admin_password          = local.grafana_password
     postgres_password_plain         = local.postgres_password
+    policy_engine_enable            = var.policy_engine_enable
     governance_hub_enable           = var.governance_hub_enable
     governance_hub_central_db_type  = var.governance_hub_central_db_type
     governance_hub_central_db_host  = var.governance_hub_central_db_host
@@ -246,6 +254,10 @@ locals {
     fleet_management_tool_py     = var.governance_hub_enable ? file("${path.module}/configs/open-webui/fleet-management-tool.py") : ""
     system_designer_tool_py      = var.governance_hub_enable ? file("${path.module}/configs/open-webui/system-designer-tool.py") : ""
     data_connector_tool_py       = var.governance_hub_enable ? file("${path.module}/configs/open-webui/data-connector-tool.py") : ""
+    policy_engine_enable         = var.policy_engine_enable
+    policy_engine_fail_mode      = var.policy_engine_fail_mode
+    opa_zip_b64                  = var.policy_engine_enable ? filebase64(data.archive_file.opa_policies[0].output_path) : ""
+    opa_policy_pipeline_py       = var.policy_engine_enable ? file("${path.module}/configs/open-webui/opa-policy-pipeline.py") : ""
     post_deploy_sh               = templatefile("${path.module}/scripts/post-deploy.sh.tpl", {
       litellm_master_key  = local.litellm_master_key
       default_user_budget = var.litellm_default_user_budget
@@ -258,6 +270,7 @@ locals {
       ops_uptime_kuma_enable = var.ops_uptime_kuma_enable
       keyword_categories       = var.keyword_categories
       governance_hub_enable    = var.governance_hub_enable
+      policy_engine_enable     = var.policy_engine_enable
     })
   })
 

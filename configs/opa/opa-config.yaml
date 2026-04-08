@@ -1,0 +1,11 @@
+services: {}
+
+bundles:
+  insidellm:
+    resource: /policies
+    persist: false
+
+decision_logs:
+  console: true
+
+default_decision: /insidellm/policy/decision

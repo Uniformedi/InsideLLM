@@ -413,6 +413,64 @@ END;
 " >> "$LOG" 2>&1 || log "WARNING: Failed to create keyword analysis views"
 log "Keyword analysis infrastructure created"
 
+%{ if policy_engine_enable ~}
+# ---------------------------------------------------------------------------
+# Wait for OPA and register the policy enforcement pipeline
+# ---------------------------------------------------------------------------
+log "Waiting for OPA Policy Agent..."
+OPA_ATTEMPTS=0
+OPA_MAX=20
+while [ $OPA_ATTEMPTS -lt $OPA_MAX ]; do
+  if docker exec insidellm-opa wget -q --spider http://localhost:8181/health 2>/dev/null; then
+    log "OPA is healthy"
+    break
+  fi
+  OPA_ATTEMPTS=$((OPA_ATTEMPTS + 1))
+  log "Waiting for OPA... ($OPA_ATTEMPTS/$OPA_MAX)"
+  sleep 3
+done
+
+log "Registering OPA Policy Pipeline in Open WebUI..."
+docker exec insidellm-open-webui python3 -c "
+import sys
+sys.path.insert(0, '/app/backend')
+
+from open_webui.models.functions import Functions, FunctionForm, FunctionMeta
+
+FUNC_ID = 'opa_policy_filter'
+SYSTEM_USER = '00000000-0000-0000-0000-000000000000'
+
+with open('/app/backend/pipelines/opa-policy-pipeline.py', 'r') as f:
+    code = f.read()
+
+existing = Functions.get_function_by_id(FUNC_ID)
+if existing:
+    Functions.update_function_by_id(FUNC_ID, {
+        'content': code,
+        'is_active': True,
+        'is_global': True
+    })
+    print('OPA Policy Pipeline updated and activated')
+else:
+    form = FunctionForm(
+        id=FUNC_ID,
+        name='OPA Policy Enforcement',
+        content=code,
+        meta=FunctionMeta(
+            description='Enforces SAIVAS and industry policies via Open Policy Agent. Fail-closed on errors.',
+            manifest={}
+        )
+    )
+    result = Functions.insert_new_function(SYSTEM_USER, 'filter', form)
+    if result:
+        Functions.update_function_by_id(result.id, {'is_active': True, 'is_global': True})
+        print(f'OPA Policy Pipeline registered (id={result.id})')
+    else:
+        print('ERROR: Failed to register OPA Policy Pipeline')
+        sys.exit(1)
+" >> "$LOG" 2>&1 || log "WARNING: OPA Policy Pipeline registration failed"
+%{ endif ~}
+
 %{ if governance_hub_enable ~}
 # ---------------------------------------------------------------------------
 # Wait for Governance Hub and register the advisor tool

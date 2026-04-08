@@ -537,6 +537,38 @@ variable "keyword_refresh_schedule" {
 }
 
 # =============================================================================
+# OPA POLICY ENGINE
+# =============================================================================
+
+variable "policy_engine_enable" {
+  description = "Enable the OPA policy enforcement engine (SAIVAS + industry policies)"
+  type        = bool
+  default     = false
+}
+
+variable "policy_engine_industry_policies" {
+  description = "Industry regulatory policies to load: hipaa, fdcpa, sox, pci_dss, ferpa, glba"
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition     = alltrue([for p in var.policy_engine_industry_policies : contains(["hipaa", "fdcpa", "sox", "pci_dss", "ferpa", "glba"], p)])
+    error_message = "Industry policies must be from: hipaa, fdcpa, sox, pci_dss, ferpa, glba."
+  }
+}
+
+variable "policy_engine_fail_mode" {
+  description = "Policy engine fail mode: 'closed' (block on error) or 'log_only' (allow but log)"
+  type        = string
+  default     = "closed"
+
+  validation {
+    condition     = contains(["closed", "log_only"], var.policy_engine_fail_mode)
+    error_message = "Fail mode must be 'closed' or 'log_only'."
+  }
+}
+
+# =============================================================================
 # ENTERPRISE GOVERNANCE HUB
 # =============================================================================
 
