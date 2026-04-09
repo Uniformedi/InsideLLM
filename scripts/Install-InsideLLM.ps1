@@ -8,5 +8,5 @@
 .\Install-InsideLLM-WSL.ps1 `
     -AnthropicApiKey "YOUR_API_KEY_HERE" `
     -OllamaGpu $true `
-    -Domain "uniformedi.local" `
-    -Owner "Uniformedi"
+    -Domain "local" `
+    -Owner "Your Company Name"

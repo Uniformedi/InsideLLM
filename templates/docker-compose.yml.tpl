@@ -122,7 +122,7 @@ services:
 
       # WebUI settings
       WEBUI_SECRET_KEY: "${webui_secret}"
-      WEBUI_NAME: "Claude @ Uniformedi"
+      WEBUI_NAME: "InsideLLM"
       ENABLE_SIGNUP: "true"
       DEFAULT_USER_ROLE: "user"
       ENABLE_COMMUNITY_SHARING: "false"

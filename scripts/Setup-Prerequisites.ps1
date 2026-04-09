@@ -1,7 +1,7 @@
 #Requires -RunAsAdministrator
 <#
 .SYNOPSIS
-    Prepares the Windows Hyper-V host for the Claude Wrapper Terraform deployment.
+    Prepares the Windows Hyper-V host for the InsideLLM Terraform deployment.
 
 .DESCRIPTION
     This script:

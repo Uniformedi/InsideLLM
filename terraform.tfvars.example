@@ -29,7 +29,7 @@ vm_processor_count   = 8                   # 8 CPUs (default, for Ollama); use 4
 vm_path              = "C:\\HyperV\\VMs"
 vm_vhd_path          = "C:\\HyperV\\VHDs"
 vm_hostname          = "InsideLLM"
-vm_domain            = "uniformedi.local"
+vm_domain            = "local"
 ubuntu_vhdx_source   = "C:\\HyperV\\Images\\ubuntu-24.04-cloudimg-amd64.vhdx"
 
 # =============================================================================

@@ -1,5 +1,5 @@
 ###############################################################################
-# variables.tf — Input variables for the Claude Wrapper deployment
+# variables.tf — Input variables for the InsideLLM deployment
 ###############################################################################
 
 # =============================================================================
@@ -148,7 +148,7 @@ variable "vm_hostname" {
 variable "vm_domain" {
   description = "Domain name for the VM (for FQDN and TLS cert)"
   type        = string
-  default     = "uniformedi.local"
+  default     = "local"
 }
 
 # =============================================================================

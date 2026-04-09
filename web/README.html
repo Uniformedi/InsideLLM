@@ -414,7 +414,7 @@
 
   <h3>Competitive Comparison</h3>
   <table>
-    <thead><tr><th>Feature</th><th>Claude Wrapper</th><th>Direct API</th><th>ChatGPT Enterprise</th></tr></thead>
+    <thead><tr><th>Feature</th><th>InsideLLM</th><th>Direct API</th><th>ChatGPT Enterprise</th></tr></thead>
     <tbody>
       <tr><td>DLP scanning</td><td><strong>Messages + files</strong></td><td>None</td><td>Limited</td></tr>
       <tr><td>SSO (Azure AD)</td><td>Yes (OIDC)</td><td>N/A</td><td>Yes</td></tr>
@@ -1282,7 +1282,7 @@ vm_memory_startup_bytes = 8589934592    # 8 GB (down from 32 GB)</pre>
     <span class="diagram-label">Azure AD SSO Flow</span>
     <pre>
 +---------------------------+         +---------------------------+
-|     Azure AD Tenant       |         |     Claude Wrapper        |
+|     Azure AD Tenant       |         |     InsideLLM        |
 |                           |         |                           |
 |  1. Register App          |         |  4. LiteLLM validates     |
 |     - Client ID           |--------&gt;|     token via Microsoft   |
@@ -1329,7 +1329,7 @@ azure_ad_tenant_id     = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"</pre>
     <span class="diagram-label">Okta SSO Flow</span>
     <pre>
 +---------------------------+         +---------------------------+
-|     Okta Tenant           |         |     Claude Wrapper        |
+|     Okta Tenant           |         |     InsideLLM        |
 |                           |         |                           |
 |  1. Create OIDC App       |         |  4. LiteLLM validates     |
 |     - Client ID           |--------&gt;|     token via Okta        |
