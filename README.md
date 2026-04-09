@@ -1289,17 +1289,22 @@ knowledge needed to configure -- just fill in the form and click Download.
 | WSL2 | For genisoimage (cloud-init ISO creation) |
 | Anthropic API key | From console.anthropic.com |
 
-### One-Command Deployment
+### Deployment
 
 ```powershell
-# 1. Run prerequisites (once, requires admin)
-.\Setup-Prerequisites.ps1
+# 1. Open html/Setup.html in your browser and generate terraform.tfvars
+#    Save it to the terraform/ directory
 
-# 2. Configure
-cp terraform.tfvars.example terraform.tfvars
-# Edit terraform.tfvars with your settings
+# 2. Run prerequisites + deploy (requires admin)
+.\scripts\Setup-Prerequisites.ps1
+# This script: enables Hyper-V, downloads Ubuntu image, configures WinRM,
+# then automatically runs terraform init → plan → apply from terraform/
+```
 
-# 3. Deploy
+For manual terraform commands, run from the `terraform/` directory:
+
+```powershell
+cd terraform
 terraform init
 terraform plan -out=tfplan
 terraform apply tfplan
@@ -1400,30 +1405,59 @@ External monitoring endpoints:
 
 ```
 InsideLLM/
-+-- main.tf                             # Root module: VM + provisioning
-+-- variables.tf                        # All input variables
-+-- outputs.tf                          # VM IP, URLs, secrets
-+-- providers.tf                        # Hyper-V provider config
-+-- terraform.tfvars.example            # Template for your values
-+-- admin.html                          # Admin portal (service URLs, health, API docs)
-+-- Setup.html                          # Interactive setup wizard
-+-- Setup-Prerequisites.ps1             # Windows host preparation
-+-- Initialize-InsideLLM.ps1            # Standalone: WSL2 + Docker + SCFW + TLS
-+-- Install-InsideLLM-WSL.ps1           # Full WSL2 deployment (includes init steps)
-+-- configs/
-|   +-- cloud-init/
-|   |   +-- user-data.yaml.tpl          # VM first-boot provisioning
-|   |   +-- meta-data.yaml.tpl          # Cloud-init identity
-|   |   +-- network-config.yaml.tpl     # Static IP / DHCP config
-|   +-- litellm/
-|   |   +-- config.yaml.tpl             # API gateway configuration
-|   +-- nginx/
-|   |   +-- nginx.conf.tpl              # Reverse proxy + TLS
-|   +-- open-webui/
-|       +-- dlp-pipeline.py             # DLP filter (messages + files)
-+-- scripts/
-    +-- docker-compose.yml.tpl          # All 5 services definition
-    +-- post-deploy.sh.tpl              # Team creation, systemd setup
++-- README.md                           # This document
++-- README.html                         # Visual landing page
++-- LICENSE                             # MIT License
++-- New-CloudInitIso.ps1                # PowerShell-native ISO builder
++-- terraform/                          # Terraform infrastructure-as-code
+|   +-- main.tf                         # Root module: VM + provisioning
+|   +-- variables.tf                    # All input variables
+|   +-- outputs.tf                      # VM IP, URLs, secrets
+|   +-- providers.tf                    # Hyper-V provider config
+|   +-- terraform.tfvars.example        # Template for your values
++-- scripts/                            # User-facing PowerShell scripts
+|   +-- Setup-Prerequisites.ps1         # Host prep + auto terraform deploy
+|   +-- Initialize-InsideLLM.ps1        # Standalone: WSL2 + Docker + SCFW + TLS
+|   +-- Install-InsideLLM.ps1           # Generated wrapper (from Setup Wizard)
+|   +-- Install-InsideLLM-WSL.ps1       # Full WSL2 deployment
+|   +-- Port-Forward-InsideLLM.ps1      # Expose services to LAN
+|   +-- Setup-GPU-Passthrough.ps1       # GPU-PV / DDA passthrough
+|   +-- Join-ADDomain.ps1              # Active Directory domain join
++-- html/                               # Browser-facing UI files
+|   +-- Setup.html                      # Interactive setup wizard
+|   +-- admin.html                      # Admin command center SPA
++-- markdown/                           # Documentation
+|   +-- policyengine.md                 # OPA policy engine normative spec
+|   +-- images/BlockedDLP.png           # DLP screenshot
++-- templates/                          # Terraform .tpl templates
+|   +-- docker-compose.yml.tpl          # All Docker services definition
+|   +-- post-deploy.sh.tpl             # Post-deploy: teams, tools, systemd
++-- configs/                            # Service configuration files
+    +-- cloud-init/                     # VM first-boot provisioning
+    |   +-- user-data.yaml.tpl          # Main VM cloud-init
+    |   +-- ollama-user-data.yaml.tpl   # Ollama VM cloud-init
+    |   +-- meta-data.yaml.tpl          # Cloud-init identity
+    |   +-- network-config.yaml.tpl     # Static IP configuration
+    +-- docforge/                       # Node.js file generation service
+    +-- governance-hub/                 # FastAPI governance service (45 files)
+    +-- grafana/                        # Dashboards + datasource provisioning
+    +-- litellm/                        # API gateway config template
+    +-- loki/                           # Log aggregation config
+    +-- nginx/                          # Reverse proxy + TLS template
+    +-- opa/                            # Open Policy Agent (Humility + industry)
+    |   +-- policies/humility/          # Mandatory alignment policy (Rego)
+    |   +-- policies/industry/          # HIPAA, FDCPA, SOX, PCI, FERPA, GLBA
+    |   +-- policies/decision.rego      # Decision aggregation
+    +-- open-webui/                     # DLP pipeline + 6 tool integrations
+    |   +-- dlp-pipeline.py             # DLP filter (messages + files)
+    |   +-- docforge-tool.py            # File generation/conversion
+    |   +-- governance-advisor-tool.py  # AI governance analysis
+    |   +-- fleet-management-tool.py    # Cross-instance management
+    |   +-- system-designer-tool.py     # Deployment planning + cost modeling
+    |   +-- data-connector-tool.py      # External data source queries
+    |   +-- opa-policy-pipeline.py      # Policy enforcement filter
+    +-- promtail/                       # Log shipping config
+    +-- trivy/                          # CVE scan script
 ```
 
 ---
@@ -1768,9 +1802,9 @@ Open WebUI Tool for planning deployments:
 
 ## 16. OPA Policy Engine
 
-Open Policy Agent (OPA) enforcement based on the `docs/policyengine.md` normative specification. Enabled via `policy_engine_enable = true`.
+Open Policy Agent (OPA) enforcement based on the `markdown/policyengine.md` normative specification. Enabled via `policy_engine_enable = true`.
 
-OPA is a **pure, side-effect-free policy evaluation engine**. It receives input, evaluates Rego rules, and returns a structured decision — it never logs, persists, filters, or calls external systems. This separation ensures policy rules are testable offline (`opa test`), replayable, auditable, and fast (<5ms). All side effects (logging, redacting, blocking, queueing) are executed by the InsideLLM enforcement pipeline *after* OPA returns its decision. See `docs/policyengine.md` Section 1.1 for the full rationale.
+OPA is a **pure, side-effect-free policy evaluation engine**. It receives input, evaluates Rego rules, and returns a structured decision — it never logs, persists, filters, or calls external systems. This separation ensures policy rules are testable offline (`opa test`), replayable, auditable, and fast (<5ms). All side effects (logging, redacting, blocking, queueing) are executed by the InsideLLM enforcement pipeline *after* OPA returns its decision. See `markdown/policyengine.md` Section 1.1 for the full rationale.
 
 ### Architecture
 
@@ -1899,6 +1933,10 @@ The PowerShell native fallback writes a minimal ISO 9660 image using .NET `Syste
 | `governance_hub_enable` | `false` | Enterprise governance hub |
 | `policy_engine_enable` | `false` | OPA policy enforcement |
 | `policy_engine_industry_policies` | `[]` | Industry policies to load |
+| `ad_domain_join` | `false` | Join VM to Active Directory |
+| `keyword_categories` | `{}` | Custom keyword analysis categories |
+| `log_retention_days` | `365` | Audit trail retention period |
+| `ops_backup_schedule` | `daily` | PostgreSQL backup frequency |
 
 ### Post-Deployment URLs
 
