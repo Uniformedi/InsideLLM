@@ -152,6 +152,41 @@ variable "vm_domain" {
 }
 
 # =============================================================================
+# ACTIVE DIRECTORY DOMAIN JOIN
+# =============================================================================
+
+variable "ad_domain_join" {
+  description = "Join the Ubuntu VM to the Active Directory domain specified in vm_domain"
+  type        = bool
+  default     = false
+}
+
+variable "ad_join_user" {
+  description = "AD username with permission to join computers to the domain (e.g., Administrator or a service account)"
+  type        = string
+  default     = ""
+}
+
+variable "ad_join_password" {
+  description = "Password for the AD join account"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "ad_join_ou" {
+  description = "Organizational Unit for the computer account (e.g., OU=Servers,DC=company,DC=local). Leave empty for default."
+  type        = string
+  default     = ""
+}
+
+variable "ad_dns_register" {
+  description = "Register the VM hostname in Active Directory DNS via dynamic update"
+  type        = bool
+  default     = true
+}
+
+# =============================================================================
 # SSH ACCESS
 # =============================================================================
 

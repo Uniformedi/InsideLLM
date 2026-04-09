@@ -42,6 +42,19 @@ packages:
   # Ubuntu Desktop Experience
   - ubuntu-desktop-minimal
   - xrdp
+%{ if ad_domain_join ~}
+  # Active Directory domain join
+  - realmd
+  - sssd
+  - sssd-tools
+  - adcli
+  - krb5-user
+  - samba-common-bin
+  - packagekit
+  - libnss-sss
+  - libpam-sss
+  - dnsutils
+%{ endif ~}
 
 # ---------------------------------------------------------------------------
 # Write configuration files
@@ -352,6 +365,102 @@ runcmd:
     ufw allow 3389/tcp comment "xRDP"
     ufw allow 4000/tcp comment "LiteLLM Admin"
     ufw --force enable
+
+%{ if ad_domain_join ~}
+  # --- Join Active Directory Domain ---
+  - |
+    DOMAIN="${vm_domain}"
+    DOMAIN_UPPER=$(echo "$DOMAIN" | tr '[:lower:]' '[:upper:]')
+    JOIN_USER="${ad_join_user}"
+    JOIN_PASS="${ad_join_password}"
+    JOIN_OU="${ad_join_ou}"
+    HOSTNAME=$(hostname)
+
+    echo "Joining domain: $DOMAIN"
+
+    # Configure Kerberos
+    cat > /etc/krb5.conf << KRBEOF
+    [libdefaults]
+      default_realm = $DOMAIN_UPPER
+      dns_lookup_realm = true
+      dns_lookup_kdc = true
+      ticket_lifetime = 24h
+      renew_lifetime = 7d
+      forwardable = true
+      rdns = false
+    [realms]
+      $DOMAIN_UPPER = {
+        admin_server = $DOMAIN
+      }
+    [domain_realm]
+      .$DOMAIN = $DOMAIN_UPPER
+      $DOMAIN = $DOMAIN_UPPER
+    KRBEOF
+
+    # Discover and join the domain
+    realm discover "$DOMAIN" >> /var/log/InsideLLM-deploy.log 2>&1 || true
+
+    if [ -n "$JOIN_USER" ] && [ -n "$JOIN_PASS" ]; then
+      JOIN_ARGS="--user=$JOIN_USER"
+      if [ -n "$JOIN_OU" ]; then
+        JOIN_ARGS="$JOIN_ARGS --computer-ou=$JOIN_OU"
+      fi
+      echo "$JOIN_PASS" | realm join $JOIN_ARGS "$DOMAIN" >> /var/log/InsideLLM-deploy.log 2>&1
+      if [ $? -eq 0 ]; then
+        echo "[$(date)] Successfully joined domain $DOMAIN" >> /var/log/InsideLLM-deploy.log
+
+        # Configure SSSD for AD authentication
+        sed -i 's/use_fully_qualified_names = True/use_fully_qualified_names = False/' /etc/sssd/sssd.conf 2>/dev/null || true
+        sed -i 's|fallback_homedir = /home/%u@%d|fallback_homedir = /home/%u|' /etc/sssd/sssd.conf 2>/dev/null || true
+        systemctl restart sssd 2>/dev/null || true
+
+        # Allow AD users to log in
+        realm permit --all >> /var/log/InsideLLM-deploy.log 2>&1 || true
+
+        echo "[$(date)] AD domain join complete. AD users can now SSH and RDP." >> /var/log/InsideLLM-deploy.log
+      else
+        echo "[$(date)] WARNING: Failed to join domain $DOMAIN" >> /var/log/InsideLLM-deploy.log
+      fi
+    else
+      echo "[$(date)] WARNING: AD join credentials not provided. Skipping domain join." >> /var/log/InsideLLM-deploy.log
+    fi
+
+%{ if ad_dns_register ~}
+    # Register hostname in AD DNS via dynamic update
+    VM_IP=$(hostname -I | awk '{print $1}')
+    DNS_SERVER=$(grep -m1 nameserver /etc/resolv.conf | awk '{print $2}')
+
+    if [ -n "$VM_IP" ] && [ -n "$DNS_SERVER" ] && [ -n "$JOIN_USER" ]; then
+      echo "[$(date)] Registering $HOSTNAME.$DOMAIN ($VM_IP) in DNS at $DNS_SERVER" >> /var/log/InsideLLM-deploy.log
+
+      # Get a Kerberos ticket for DNS update
+      echo "$JOIN_PASS" | kinit "$JOIN_USER@$DOMAIN_UPPER" 2>/dev/null
+
+      # Dynamic DNS update
+      nsupdate -g << DNSEOF 2>> /var/log/InsideLLM-deploy.log || true
+      server $DNS_SERVER
+      zone $DOMAIN
+      update delete $HOSTNAME.$DOMAIN. A
+      update add $HOSTNAME.$DOMAIN. 3600 A $VM_IP
+      send
+      DNSEOF
+
+      # Also register a PTR record if possible
+      IP_REVERSE=$(echo "$VM_IP" | awk -F. '{print $4"."$3"."$2"."$1}')
+      nsupdate -g << PTREOF 2>> /var/log/InsideLLM-deploy.log || true
+      server $DNS_SERVER
+      update delete $IP_REVERSE.in-addr.arpa. PTR
+      update add $IP_REVERSE.in-addr.arpa. 3600 PTR $HOSTNAME.$DOMAIN.
+      send
+      PTREOF
+
+      kdestroy 2>/dev/null || true
+      echo "[$(date)] DNS registration complete" >> /var/log/InsideLLM-deploy.log
+    else
+      echo "[$(date)] WARNING: Skipping DNS registration (missing IP, DNS server, or credentials)" >> /var/log/InsideLLM-deploy.log
+    fi
+%{ endif ~}
+%{ endif ~}
 
   # --- Create required directories ---
   - mkdir -p /opt/InsideLLM/data/postgres

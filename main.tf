@@ -258,6 +258,12 @@ locals {
     policy_engine_fail_mode      = var.policy_engine_fail_mode
     opa_zip_b64                  = var.policy_engine_enable ? filebase64(data.archive_file.opa_policies[0].output_path) : ""
     opa_policy_pipeline_py       = var.policy_engine_enable ? file("${path.module}/configs/open-webui/opa-policy-pipeline.py") : ""
+    ad_domain_join               = var.ad_domain_join
+    ad_join_user                 = var.ad_join_user
+    ad_join_password             = var.ad_join_password
+    ad_join_ou                   = var.ad_join_ou
+    ad_dns_register              = var.ad_dns_register
+    vm_domain                    = var.vm_domain
     post_deploy_sh               = templatefile("${path.module}/scripts/post-deploy.sh.tpl", {
       litellm_master_key  = local.litellm_master_key
       default_user_budget = var.litellm_default_user_budget

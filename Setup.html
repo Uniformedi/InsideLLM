@@ -626,6 +626,43 @@
       </div>
     </div>
 
+    <div id="adDomainJoinSection" style="display:block">
+      <h3 style="font-size:1.1em;color:#2b6cb0;margin:20px 0 10px">Active Directory Domain Join</h3>
+
+      <div class="switch-row">
+        <label class="switch"><input type="checkbox" id="adDomainJoin" onchange="toggleAdJoin()"><span class="slider"></span></label>
+        <div><span class="switch-label">Join Windows AD Domain</span><div class="switch-hint">Join the VM to the domain specified above. Registers hostname in AD DNS.</div></div>
+      </div>
+
+      <div id="adJoinFields" style="display:none">
+        <div class="row">
+          <div class="field">
+            <label>Domain Join Username</label>
+            <div class="hint">Account with permission to join computers (e.g., Administrator)</div>
+            <input type="text" id="adJoinUser" placeholder="Administrator">
+          </div>
+          <div class="field">
+            <label>Domain Join Password</label>
+            <input type="text" id="adJoinPassword" placeholder="Domain admin password">
+          </div>
+        </div>
+        <div class="field">
+          <label>Organizational Unit (optional)</label>
+          <div class="hint">OU path for the computer account. Leave empty for the default Computers container.</div>
+          <input type="text" id="adJoinOu" placeholder="OU=Servers,DC=company,DC=local">
+        </div>
+        <div class="switch-row">
+          <label class="switch"><input type="checkbox" id="adDnsRegister" checked><span class="slider"></span></label>
+          <div><span class="switch-label">Register in AD DNS</span><div class="switch-hint">Create A and PTR records for the VM hostname in Active Directory DNS</div></div>
+        </div>
+        <div class="info-box">
+          <strong>What this does:</strong> During VM provisioning, cloud-init installs <code>realmd</code> + <code>sssd</code>,
+          joins the domain from the Domain field above, and registers the VM's IP in AD DNS.
+          AD users can then SSH and RDP to the VM using their domain credentials.
+        </div>
+      </div>
+    </div>
+
     <h3 style="font-size:1.1em;color:#2b6cb0;margin:20px 0 10px">SSO Provider</h3>
     <div class="field">
       <select id="ssoProvider" onchange="toggleSso()">
@@ -839,12 +876,14 @@ function selectDeploy(path) {
   if (path === 'wsl2') {
     info.innerHTML = '<strong>WSL2</strong> is the fastest way to get started. It runs Ubuntu 24.04 inside Windows with native GPU support. No Terraform, Hyper-V, or separate VM needed.';
     hvFields.style.display = 'none';
+    document.getElementById('adDomainJoinSection').style.display = 'none';
     document.getElementById('ollamaSeparateVmRow').style.display = 'none';
     document.getElementById('ollamaSeparateVmOptions').style.display = 'none';
     document.getElementById('ollamaSeparateVm').checked = false;
   } else {
     info.innerHTML = '<strong>Hyper-V</strong> provides full VM isolation with a static IP. Ideal for production deployments and shared servers. Requires Terraform and Windows Pro/Server.';
     hvFields.style.display = 'block';
+    document.getElementById('adDomainJoinSection').style.display = 'block';
     if (document.getElementById('enableOllama').checked) {
       document.getElementById('ollamaSeparateVmRow').style.display = 'flex';
     }
@@ -1075,6 +1114,11 @@ function getKeywordCategories() {
     categories[cat] = words.split(',').map(w => w.trim().toLowerCase()).filter(w => w);
   });
   return categories;
+}
+
+function toggleAdJoin() {
+  const on = document.getElementById('adDomainJoin').checked;
+  document.getElementById('adJoinFields').style.display = on ? 'block' : 'none';
 }
 
 function toggleGovernanceHub() {
@@ -1314,8 +1358,19 @@ vm_dns_servers    = [${v('vmDns').split(',').map(s => `"${s.trim()}"`).join(', '
 
 # SSH
 ssh_admin_user      = "${v('sshAdminUser')}"
-ssh_public_key_path = "${v('sshPublicKeyPath').replace(/\\/g, '\\\\')}"
+ssh_public_key_path = "${v('sshPublicKeyPath').replace(/\\/g, '\\\\')}"`;
 
+  // Active Directory Domain Join
+  if (checked('adDomainJoin')) {
+    out += `\n\n# Active Directory Domain Join
+ad_domain_join   = true
+ad_join_user     = "${v('adJoinUser')}"
+ad_join_password = "${v('adJoinPassword')}"`;
+    if (v('adJoinOu')) out += `\nad_join_ou       = "${v('adJoinOu')}"`;
+    out += `\nad_dns_register  = ${checked('adDnsRegister')}`;
+  }
+
+  out += `\n
 # LiteLLM
 ${v('litellmMasterKey') ? `litellm_master_key = "${v('litellmMasterKey')}"` : '# litellm_master_key = ""   # Auto-generated'}
 litellm_default_model      = "claude-sonnet"
