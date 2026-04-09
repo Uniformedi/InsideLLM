@@ -235,7 +235,7 @@ Write-Host "  VM Directory: $VmDir"
 Write-Host "  VHD Directory: $VhdDir"
 Write-Host ""
 Write-Host "  Next steps:" -ForegroundColor Yellow
-$setupHtmlPath = Join-Path $PSScriptRoot "Setup.html"
+$setupHtmlPath = Join-Path $PSScriptRoot "..\web\Setup.html"
 Write-Host "  1. Open $setupHtmlPath and save the output file to this directory"
 Write-Host "     (Or manually: copy terraform.tfvars.example to terraform.tfvars" -ForegroundColor DarkGray
 Write-Host "      and edit it with your values)" -ForegroundColor DarkGray

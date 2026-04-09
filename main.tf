@@ -164,7 +164,7 @@ locals {
 
 # --- Docker Compose ---
 locals {
-  docker_compose = templatefile("${path.module}/scripts/docker-compose.yml.tpl", {
+  docker_compose = templatefile("${path.module}/templates/docker-compose.yml.tpl", {
     postgres_password  = local.postgres_password
     litellm_master_key = local.litellm_master_key
     anthropic_api_key  = var.anthropic_api_key
@@ -228,7 +228,7 @@ locals {
     tls_cert           = local.tls_cert
     tls_key            = local.tls_key
     dlp_pipeline_py    = file("${path.module}/configs/open-webui/dlp-pipeline.py")
-    admin_html         = file("${path.module}/admin.html")
+    admin_html         = file("${path.module}/web/admin.html")
     xrdp_password      = local.xrdp_password
     docforge_enable          = var.docforge_enable
     docforge_zip_b64         = var.docforge_enable ? filebase64(data.archive_file.docforge[0].output_path) : ""
@@ -264,7 +264,7 @@ locals {
     ad_join_ou                   = var.ad_join_ou
     ad_dns_register              = var.ad_dns_register
     vm_domain                    = var.vm_domain
-    post_deploy_sh               = templatefile("${path.module}/scripts/post-deploy.sh.tpl", {
+    post_deploy_sh               = templatefile("${path.module}/templates/post-deploy.sh.tpl", {
       litellm_master_key  = local.litellm_master_key
       default_user_budget = var.litellm_default_user_budget
       vm_fqdn             = local.vm_fqdn

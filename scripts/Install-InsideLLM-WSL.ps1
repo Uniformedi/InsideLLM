@@ -962,7 +962,7 @@ Write-WslFile -Path "$InstallPath/docker-compose.yml" -Content $dockerCompose
 Write-Ok "Docker Compose"
 
 # --- DLP Pipeline ---
-$dlpSource = Join-Path $PSScriptRoot "configs\open-webui\dlp-pipeline.py"
+$dlpSource = Join-Path $PSScriptRoot "..\configs\open-webui\dlp-pipeline.py"
 if (Test-Path $dlpSource) {
     $dlpContent = Get-Content $dlpSource -Raw
     Write-WslFile -Path "$InstallPath/pipelines/dlp-pipeline.py" -Content $dlpContent -Permissions "0644"
@@ -972,7 +972,7 @@ if (Test-Path $dlpSource) {
 }
 
 # --- Admin Portal ---
-$adminSource = Join-Path $PSScriptRoot "admin.html"
+$adminSource = Join-Path $PSScriptRoot "..\web\admin.html"
 if (Test-Path $adminSource) {
     $adminContent = Get-Content $adminSource -Raw
     Write-WslFile -Path "$InstallPath/admin.html" -Content $adminContent -Permissions "0644"

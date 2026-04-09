@@ -3,7 +3,7 @@
 **Version:** 3.0 | **Author:** Dan Medina, Uniformedi LLC | **Date:** April 2026
 **Source:** [github.com/Uniformedi/InsideLLM](https://github.com/Uniformedi/InsideLLM) | **License:** MIT
 
-> **Ready to deploy?** Open the [Setup Wizard (Setup.html)](Setup.html) for a guided, step-by-step configuration experience.
+> **Ready to deploy?** Open the [Setup Wizard](web/Setup.html) for a guided, step-by-step configuration experience.
 
 ### What's New in 3.0
 
@@ -24,13 +24,13 @@
 
 ### What Was New in 2.0
 
-- **WSL2 deployment path** -- single PowerShell script, no Terraform or Hyper-V required (`Install-InsideLLM-WSL.ps1`)
-- **Standalone initialization script** -- provision WSL2, Docker, SCFW, and TLS separately (`Initialize-InsideLLM.ps1`)
+- **WSL2 deployment path** -- single PowerShell script, no Terraform or Hyper-V required (`scripts/Install-InsideLLM-WSL.ps1`)
+- **Standalone initialization script** -- provision WSL2, Docker, SCFW, and TLS separately (`scripts/Initialize-InsideLLM.ps1`)
 - **Supply Chain Firewall (SCFW)** -- Datadog's [supply-chain-firewall](https://github.com/DataDog/supply-chain-firewall) wraps `pip` to block known-malicious PyPI packages before installation
 - **Local LLM support (Ollama)** -- run open-source models locally alongside Claude (Qwen 2.5 Coder 14B + Qwen 2.5 14B by default)
-- **GPU acceleration** -- native GPU via WSL2, or GPU-PV/DDA passthrough for Hyper-V (`Setup-GPU-Passthrough.ps1`)
+- **GPU acceleration** -- native GPU via WSL2, or GPU-PV/DDA passthrough for Hyper-V (`scripts/Setup-GPU-Passthrough.ps1`)
 - **Setup Wizard** -- interactive HTML form that generates your config file (`Setup.html`)
-- **Port forwarding script** -- expose all services to LAN clients (`Port-Forward-InsideLLM.ps1`)
+- **Port forwarding script** -- expose all services to LAN clients (`scripts/Port-Forward-InsideLLM.ps1`)
 - **Renamed from claude-wrapper to InsideLLM** -- all paths, services, and defaults updated
 - **VM sizing updated** -- 8 vCPU / 32 GB RAM default (sized for Ollama), with guidance for lighter deployments
 - **Correct Claude Code CLI env vars** -- `ANTHROPIC_AUTH_TOKEN` on port 4000
@@ -925,13 +925,13 @@ This is the **recommended path for GPU-accelerated local models**.
 
 #### Hyper-V
 
-GPU passthrough on Hyper-V is handled by a companion script (`Setup-GPU-Passthrough.ps1`)
+GPU passthrough on Hyper-V is handled by a companion script (`scripts/Setup-GPU-Passthrough.ps1`)
 that runs **after** `terraform apply`. Two modes are available:
 
 | Mode | Command | Host GPU Access | Complexity |
 |------|---------|----------------|------------|
-| **GPU-PV** (default) | `.\Setup-GPU-Passthrough.ps1` | Shared (host keeps display) | Simple |
-| **DDA** | `.\Setup-GPU-Passthrough.ps1 -Mode DDA` | Exclusive (host loses GPU) | Advanced |
+| **GPU-PV** (default) | `.\scripts\Setup-GPU-Passthrough.ps1` | Shared (host keeps display) | Simple |
+| **DDA** | `.\scripts\Setup-GPU-Passthrough.ps1 -Mode DDA` | Exclusive (host loses GPU) | Advanced |
 
 **GPU-PV (recommended)** shares the GPU between Windows and the VM. The host
 keeps using the GPU for display while the VM gets compute access:
@@ -1508,7 +1508,7 @@ already completed by `Initialize-InsideLLM.ps1`.
 
 - **WSL2 IP changes on restart** -- a scheduled task automatically refreshes port
   forwarding rules on login. If LAN access breaks after a reboot, run
-  `.\Install-InsideLLM-WSL.ps1 -AnthropicApiKey "..." -SkipPortForwarding:$false`
+  `.\scripts\Install-InsideLLM-WSL.ps1 -AnthropicApiKey "..." -SkipPortForwarding:$false`
   to refresh manually.
 - **Shared kernel** -- WSL2 shares the Windows kernel, so it is less isolated
   than a full Hyper-V VM. For production or compliance-sensitive environments,
