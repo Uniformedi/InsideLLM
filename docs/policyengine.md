@@ -28,11 +28,52 @@ All requirements herein are normative unless explicitly marked OPTIONAL.
 | Term | Definition |
 |-----|------------|
 | InsideLLM | Runtime system that invokes LLMs and tools |
-| OPA | Open Policy Agent used for evaluations only |
+| OPA | Open Policy Agent — a pure, side‑effect‑free policy evaluation engine (see Section 1.1) |
+| Pure evaluation | OPA receives input, evaluates rules, returns a decision. It never logs, persists, filters, queues, or calls external systems. |
 | Humility | Mandatory alignment constraints ensuring AI outputs remain humble, transparent, and human‑centered |
-| Obligation | Mandatory enforcement action |
+| Obligation | Mandatory enforcement action executed by InsideLLM (not OPA) after a policy decision |
 | Fail‑Closed | Any error results in denial |
 | PHI | Protected Health Information |
+
+---
+
+## 1.1 Why OPA (Open Policy Agent)
+
+OPA is the only mature, FOSS, language‑agnostic policy engine that enforces a critical architectural constraint: **policy evaluation must be pure and side‑effect free.**
+
+This specification requires that policy rules never log, persist, filter, queue, or call external systems. OPA is purpose‑built for exactly this — rules are written in Rego, the engine receives input as JSON, and it returns a structured decision (`allow`, `deny_reasons`, `obligations`). It never touches a database, never writes a file, never makes an HTTP call. It is a **pure function evaluator**.
+
+### Why not alternatives?
+
+| Option | Why it does not fit |
+|--------|---------------------|
+| Hardcoded rules in Python | Mixes policy logic with enforcement code. Cannot test policies independently. Cannot version or audit rules separately from application code. |
+| Casbin | Primarily RBAC/ABAC access control. Does not support the obligation model (returning structured actions for the host to execute). |
+| Cedar (AWS) | New, AWS‑coupled, limited ecosystem. No obligation return type. |
+| Custom rules engine | Reinvents what OPA already provides. No community, no tooling, no built‑in test framework. |
+| DLP pipeline only | DLP scans content patterns. Policy decisions are about context — who is asking, what governance tier applies, what data classification, whether attestation is needed. Different concern. |
+
+### What "pure evaluation" means in practice
+
+- **Testable offline:** `opa test ./policies/` — unit test every rule without Docker, without a database, without network access.
+- **Replayable:** Feed the same input JSON, get the same decision. No hidden state.
+- **Auditable:** Prove to regulators exactly what the policy evaluated, with no side effects muddying the result.
+- **Fast:** OPA evaluates in‑memory in under 5 ms. The heavy lifting (logging, redacting, blocking, queueing for supervisor review) happens in the InsideLLM enforcement pipeline *after* OPA returns its decision.
+- **Separation of concerns:** Rules (Rego files) are versioned and deployed independently from application code. Updating a policy does not require redeploying InsideLLM.
+
+### Architecture summary
+
+```
+Request → InsideLLM Pipeline → OPA (pure decision) → InsideLLM Pipeline (side effects)
+                                    │                         │
+                              Receives JSON input       Executes obligations:
+                              Returns: allow/deny        - filter.fields
+                                       deny_reasons      - audit.log
+                                       obligations       - audit.break_glass
+                              Never writes, logs,        - audit.tag
+                              or calls anything.         - require.attestation
+                                                         - review.queue
+```
 
 ---
 

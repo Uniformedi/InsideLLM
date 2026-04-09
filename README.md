@@ -1768,7 +1768,9 @@ Open WebUI Tool for planning deployments:
 
 ## 16. OPA Policy Engine
 
-Open Policy Agent enforcement based on the `policyengine.md` normative specification. Enabled via `policy_engine_enable = true`.
+Open Policy Agent (OPA) enforcement based on the `docs/policyengine.md` normative specification. Enabled via `policy_engine_enable = true`.
+
+OPA is a **pure, side-effect-free policy evaluation engine**. It receives input, evaluates Rego rules, and returns a structured decision — it never logs, persists, filters, or calls external systems. This separation ensures policy rules are testable offline (`opa test`), replayable, auditable, and fast (<5ms). All side effects (logging, redacting, blocking, queueing) are executed by the InsideLLM enforcement pipeline *after* OPA returns its decision. See `docs/policyengine.md` Section 1.1 for the full rationale.
 
 ### Architecture
 
