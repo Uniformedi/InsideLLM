@@ -121,21 +121,21 @@ locals {
 data "archive_file" "docforge" {
   count       = var.docforge_enable ? 1 : 0
   type        = "zip"
-  source_dir  = "${path.module}/configs/docforge"
+  source_dir  = "${path.module}/../configs/docforge"
   output_path = "${path.module}/.terraform/tmp/docforge.zip"
 }
 
 data "archive_file" "opa_policies" {
   count       = var.policy_engine_enable ? 1 : 0
   type        = "zip"
-  source_dir  = "${path.module}/configs/opa"
+  source_dir  = "${path.module}/../configs/opa"
   output_path = "${path.module}/.terraform/tmp/opa-policies.zip"
 }
 
 data "archive_file" "governance_hub" {
   count       = var.governance_hub_enable ? 1 : 0
   type        = "zip"
-  source_dir  = "${path.module}/configs/governance-hub"
+  source_dir  = "${path.module}/../configs/governance-hub"
   output_path = "${path.module}/.terraform/tmp/governance-hub.zip"
 }
 
@@ -145,7 +145,7 @@ data "archive_file" "governance_hub" {
 
 # --- LiteLLM config ---
 locals {
-  litellm_config = templatefile("${path.module}/configs/litellm/config.yaml.tpl", {
+  litellm_config = templatefile("${path.module}/../configs/litellm/config.yaml.tpl", {
     anthropic_api_key       = var.anthropic_api_key
     enable_haiku            = var.litellm_enable_haiku
     enable_opus             = var.litellm_enable_opus
@@ -164,7 +164,7 @@ locals {
 
 # --- Docker Compose ---
 locals {
-  docker_compose = templatefile("${path.module}/templates/docker-compose.yml.tpl", {
+  docker_compose = templatefile("${path.module}/../templates/docker-compose.yml.tpl", {
     postgres_password  = local.postgres_password
     litellm_master_key = local.litellm_master_key
     anthropic_api_key  = var.anthropic_api_key
@@ -204,7 +204,7 @@ locals {
 
 # --- Nginx config ---
 locals {
-  nginx_conf = templatefile("${path.module}/configs/nginx/nginx.conf.tpl", {
+  nginx_conf = templatefile("${path.module}/../configs/nginx/nginx.conf.tpl", {
     server_name            = local.vm_fqdn
     vm_hostname            = var.vm_hostname
     docforge_enable        = var.docforge_enable
@@ -217,7 +217,7 @@ locals {
 
 # --- Cloud-init user-data ---
 locals {
-  cloud_init_userdata = templatefile("${path.module}/configs/cloud-init/user-data.yaml.tpl", {
+  cloud_init_userdata = templatefile("${path.module}/../configs/cloud-init/user-data.yaml.tpl", {
     hostname           = var.vm_hostname
     fqdn               = local.vm_fqdn
     ssh_admin_user     = var.ssh_admin_user
@@ -227,44 +227,44 @@ locals {
     nginx_conf         = local.nginx_conf
     tls_cert           = local.tls_cert
     tls_key            = local.tls_key
-    dlp_pipeline_py    = file("${path.module}/configs/open-webui/dlp-pipeline.py")
-    admin_html         = file("${path.module}/web/admin.html")
+    dlp_pipeline_py    = file("${path.module}/../configs/open-webui/dlp-pipeline.py")
+    admin_html         = file("${path.module}/../html/admin.html")
     xrdp_password      = local.xrdp_password
     docforge_enable          = var.docforge_enable
     docforge_zip_b64         = var.docforge_enable ? filebase64(data.archive_file.docforge[0].output_path) : ""
-    docforge_tool_py         = var.docforge_enable ? file("${path.module}/configs/open-webui/docforge-tool.py") : ""
+    docforge_tool_py         = var.docforge_enable ? file("${path.module}/../configs/open-webui/docforge-tool.py") : ""
     ops_grafana_enable       = var.ops_grafana_enable
     ops_uptime_kuma_enable   = var.ops_uptime_kuma_enable
     ops_trivy_enable         = var.ops_trivy_enable
     ops_backup_schedule      = var.ops_backup_schedule
-    grafana_datasources_yml  = var.ops_grafana_enable ? templatefile("${path.module}/configs/grafana/provisioning/datasources.yml", { postgres_password = local.postgres_password }) : ""
-    grafana_dashboards_yml   = var.ops_grafana_enable ? file("${path.module}/configs/grafana/provisioning/dashboards.yml") : ""
-    grafana_compliance_json  = var.ops_grafana_enable ? file("${path.module}/configs/grafana/dashboards/compliance.json") : ""
-    grafana_fleet_json       = var.ops_grafana_enable && var.governance_hub_enable ? file("${path.module}/configs/grafana/dashboards/fleet.json") : ""
-    loki_config              = var.ops_grafana_enable ? file("${path.module}/configs/loki/loki-config.yml") : ""
-    promtail_config          = var.ops_grafana_enable ? file("${path.module}/configs/promtail/promtail-config.yml") : ""
-    trivy_scan_sh            = var.ops_trivy_enable ? file("${path.module}/configs/trivy/scan.sh") : ""
+    grafana_datasources_yml  = var.ops_grafana_enable ? templatefile("${path.module}/../configs/grafana/provisioning/datasources.yml", { postgres_password = local.postgres_password }) : ""
+    grafana_dashboards_yml   = var.ops_grafana_enable ? file("${path.module}/../configs/grafana/provisioning/dashboards.yml") : ""
+    grafana_compliance_json  = var.ops_grafana_enable ? file("${path.module}/../configs/grafana/dashboards/compliance.json") : ""
+    grafana_fleet_json       = var.ops_grafana_enable && var.governance_hub_enable ? file("${path.module}/../configs/grafana/dashboards/fleet.json") : ""
+    loki_config              = var.ops_grafana_enable ? file("${path.module}/../configs/loki/loki-config.yml") : ""
+    promtail_config          = var.ops_grafana_enable ? file("${path.module}/../configs/promtail/promtail-config.yml") : ""
+    trivy_scan_sh            = var.ops_trivy_enable ? file("${path.module}/../configs/trivy/scan.sh") : ""
     governance_tier              = var.governance_tier
     data_classification          = var.data_classification
     ai_ethics_officer            = var.ai_ethics_officer
     ai_ethics_officer_email      = var.ai_ethics_officer_email
     governance_hub_enable        = var.governance_hub_enable
     governance_hub_zip_b64       = var.governance_hub_enable ? filebase64(data.archive_file.governance_hub[0].output_path) : ""
-    governance_advisor_tool_py   = var.governance_hub_enable ? file("${path.module}/configs/open-webui/governance-advisor-tool.py") : ""
-    fleet_management_tool_py     = var.governance_hub_enable ? file("${path.module}/configs/open-webui/fleet-management-tool.py") : ""
-    system_designer_tool_py      = var.governance_hub_enable ? file("${path.module}/configs/open-webui/system-designer-tool.py") : ""
-    data_connector_tool_py       = var.governance_hub_enable ? file("${path.module}/configs/open-webui/data-connector-tool.py") : ""
+    governance_advisor_tool_py   = var.governance_hub_enable ? file("${path.module}/../configs/open-webui/governance-advisor-tool.py") : ""
+    fleet_management_tool_py     = var.governance_hub_enable ? file("${path.module}/../configs/open-webui/fleet-management-tool.py") : ""
+    system_designer_tool_py      = var.governance_hub_enable ? file("${path.module}/../configs/open-webui/system-designer-tool.py") : ""
+    data_connector_tool_py       = var.governance_hub_enable ? file("${path.module}/../configs/open-webui/data-connector-tool.py") : ""
     policy_engine_enable         = var.policy_engine_enable
     policy_engine_fail_mode      = var.policy_engine_fail_mode
     opa_zip_b64                  = var.policy_engine_enable ? filebase64(data.archive_file.opa_policies[0].output_path) : ""
-    opa_policy_pipeline_py       = var.policy_engine_enable ? file("${path.module}/configs/open-webui/opa-policy-pipeline.py") : ""
+    opa_policy_pipeline_py       = var.policy_engine_enable ? file("${path.module}/../configs/open-webui/opa-policy-pipeline.py") : ""
     ad_domain_join               = var.ad_domain_join
     ad_join_user                 = var.ad_join_user
     ad_join_password             = var.ad_join_password
     ad_join_ou                   = var.ad_join_ou
     ad_dns_register              = var.ad_dns_register
     vm_domain                    = var.vm_domain
-    post_deploy_sh               = templatefile("${path.module}/templates/post-deploy.sh.tpl", {
+    post_deploy_sh               = templatefile("${path.module}/../templates/post-deploy.sh.tpl", {
       litellm_master_key  = local.litellm_master_key
       default_user_budget = var.litellm_default_user_budget
       vm_fqdn             = local.vm_fqdn
@@ -280,12 +280,12 @@ locals {
     })
   })
 
-  cloud_init_metadata = templatefile("${path.module}/configs/cloud-init/meta-data.yaml.tpl", {
+  cloud_init_metadata = templatefile("${path.module}/../configs/cloud-init/meta-data.yaml.tpl", {
     instance_id = var.vm_name
     hostname    = var.vm_hostname
   })
 
-  cloud_init_network = var.vm_static_ip != "" ? templatefile("${path.module}/configs/cloud-init/network-config.yaml.tpl", {
+  cloud_init_network = var.vm_static_ip != "" ? templatefile("${path.module}/../configs/cloud-init/network-config.yaml.tpl", {
     ip_address  = var.vm_static_ip
     gateway     = var.vm_gateway
     dns_servers = var.vm_dns_servers
@@ -373,7 +373,7 @@ resource "null_resource" "create_cloud_init_iso" {
       $isoFile = Join-Path "${var.vm_path}" "${var.vm_name}-cloud-init.iso"
 
       # Build cloud-init ISO (tries: oscdimg > WSL genisoimage > PowerShell native)
-      & "${path.module}\New-CloudInitIso.ps1" -SourceDir $isoDir -OutputIso $isoFile -VolumeLabel "cidata"
+      & "${path.module}\..\New-CloudInitIso.ps1" -SourceDir $isoDir -OutputIso $isoFile -VolumeLabel "cidata"
     EOT
     interpreter = ["PowerShell", "-Command"]
   }
@@ -457,7 +457,7 @@ locals {
   ollama_vm_name = "${var.vm_name}-Ollama"
   ollama_vm_fqdn = "${var.vm_hostname}-ollama.${var.vm_domain}"
 
-  ollama_cloud_init_userdata = var.ollama_separate_vm ? templatefile("${path.module}/configs/cloud-init/ollama-user-data.yaml.tpl", {
+  ollama_cloud_init_userdata = var.ollama_separate_vm ? templatefile("${path.module}/../configs/cloud-init/ollama-user-data.yaml.tpl", {
     hostname       = "${var.vm_hostname}-ollama"
     fqdn           = local.ollama_vm_fqdn
     ssh_admin_user = var.ssh_admin_user
@@ -466,12 +466,12 @@ locals {
     ollama_gpu     = var.ollama_gpu
   }) : ""
 
-  ollama_cloud_init_metadata = var.ollama_separate_vm ? templatefile("${path.module}/configs/cloud-init/meta-data.yaml.tpl", {
+  ollama_cloud_init_metadata = var.ollama_separate_vm ? templatefile("${path.module}/../configs/cloud-init/meta-data.yaml.tpl", {
     instance_id = local.ollama_vm_name
     hostname    = "${var.vm_hostname}-ollama"
   }) : ""
 
-  ollama_cloud_init_network = var.ollama_separate_vm && var.ollama_vm_static_ip != "" ? templatefile("${path.module}/configs/cloud-init/network-config.yaml.tpl", {
+  ollama_cloud_init_network = var.ollama_separate_vm && var.ollama_vm_static_ip != "" ? templatefile("${path.module}/../configs/cloud-init/network-config.yaml.tpl", {
     ip_address  = var.ollama_vm_static_ip
     gateway     = var.vm_gateway
     dns_servers = var.vm_dns_servers
@@ -524,7 +524,7 @@ ${local.ollama_cloud_init_network}
       $isoPath = "${var.vm_path}\${local.ollama_vm_name}-cloud-init.iso"
 
       # Build cloud-init ISO (tries: oscdimg > WSL genisoimage > PowerShell native)
-      & "${path.module}\New-CloudInitIso.ps1" -SourceDir $ciDir -OutputIso $isoPath -VolumeLabel "cidata"
+      & "${path.module}\..\New-CloudInitIso.ps1" -SourceDir $ciDir -OutputIso $isoPath -VolumeLabel "cidata"
     EOT
     interpreter = ["PowerShell", "-Command"]
   }

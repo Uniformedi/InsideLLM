@@ -234,12 +234,94 @@ Write-Host "  Ubuntu VHDX:  $vhdxPath"
 Write-Host "  VM Directory: $VmDir"
 Write-Host "  VHD Directory: $VhdDir"
 Write-Host ""
-Write-Host "  Next steps:" -ForegroundColor Yellow
-$setupHtmlPath = Join-Path $PSScriptRoot "..\web\Setup.html"
-Write-Host "  1. Open $setupHtmlPath and save the output file to this directory"
-Write-Host "     (Or manually: copy terraform.tfvars.example to terraform.tfvars" -ForegroundColor DarkGray
-Write-Host "      and edit it with your values)" -ForegroundColor DarkGray
-Write-Host "  2. Powershell (Run as Admin): terraform init"
-Write-Host "  3. Powershell (Run as Admin): terraform plan -out=tfplan"
-Write-Host "  4. Powershell (Run as Admin): terraform apply tfplan"
+
+$setupHtmlPath = Join-Path $PSScriptRoot "..\html\Setup.html"
+$terraformDir  = Join-Path $PSScriptRoot "..\terraform"
+$tfvarsPath    = Join-Path $terraformDir "terraform.tfvars"
+
+# Check if terraform.tfvars exists — if not, prompt to create it first
+if (-not (Test-Path $tfvarsPath)) {
+    Write-Host "  Next step:" -ForegroundColor Yellow
+    Write-Host "  Open $setupHtmlPath and save the output as:" -ForegroundColor White
+    Write-Host "    $tfvarsPath" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "  (Or manually: copy terraform.tfvars.example to terraform.tfvars" -ForegroundColor DarkGray
+    Write-Host "   and edit it with your values)" -ForegroundColor DarkGray
+    Write-Host ""
+    Write-Host "  After creating terraform.tfvars, re-run this script to deploy." -ForegroundColor Yellow
+    Write-Host ""
+    Read-Host "  Press Enter to exit"
+    return
+}
+
+Write-Host "  terraform.tfvars found — ready to deploy!" -ForegroundColor Green
 Write-Host ""
+Write-Host "  Press Enter to run Terraform and deploy InsideLLM," -ForegroundColor Yellow
+Write-Host "  or Ctrl+C to exit and deploy manually later." -ForegroundColor Yellow
+Write-Host ""
+Read-Host "  Press Enter to continue"
+
+# --- Terraform Init ---
+Write-Host ""
+Write-Host "================================================================" -ForegroundColor Cyan
+Write-Host "  Running: terraform init" -ForegroundColor Cyan
+Write-Host "================================================================" -ForegroundColor Cyan
+Write-Host ""
+
+Push-Location $terraformDir
+try {
+    terraform init
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host ""
+        Write-Host "  terraform init failed. Fix the errors above and retry." -ForegroundColor Red
+        Read-Host "  Press Enter to exit"
+        return
+    }
+    Write-Host ""
+    Write-Host "  [OK] terraform init succeeded" -ForegroundColor Green
+
+    # --- Terraform Plan ---
+    Write-Host ""
+    Write-Host "================================================================" -ForegroundColor Cyan
+    Write-Host "  Running: terraform plan -out=tfplan" -ForegroundColor Cyan
+    Write-Host "================================================================" -ForegroundColor Cyan
+    Write-Host ""
+
+    terraform plan -out=tfplan
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host ""
+        Write-Host "  terraform plan failed. Fix the errors above and retry." -ForegroundColor Red
+        Read-Host "  Press Enter to exit"
+        return
+    }
+    Write-Host ""
+    Write-Host "  [OK] terraform plan succeeded" -ForegroundColor Green
+
+    # --- Terraform Apply ---
+    Write-Host ""
+    Write-Host "================================================================" -ForegroundColor Cyan
+    Write-Host "  Running: terraform apply tfplan" -ForegroundColor Cyan
+    Write-Host "================================================================" -ForegroundColor Cyan
+    Write-Host ""
+
+    terraform apply tfplan
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host ""
+        Write-Host "  terraform apply failed. Check the errors above." -ForegroundColor Red
+        Read-Host "  Press Enter to exit"
+        return
+    }
+
+    Write-Host ""
+    Write-Host "================================================================" -ForegroundColor Green
+    Write-Host "  InsideLLM Deployed Successfully!" -ForegroundColor Green
+    Write-Host "================================================================" -ForegroundColor Green
+    Write-Host ""
+    terraform output -no-color 2>$null | ForEach-Object { Write-Host "  $_" }
+    Write-Host ""
+}
+finally {
+    Pop-Location
+}
+
+Read-Host "  Press Enter to exit"

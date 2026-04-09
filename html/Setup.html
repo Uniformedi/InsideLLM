@@ -1618,16 +1618,12 @@ function generateNextSteps() {
     <code>powershell -ExecutionPolicy Bypass -File .\\scripts\\Initialize-InsideLLM.ps1</code> first. Both scripts are idempotent.</p>`;
   } else {
     el.innerHTML = `<h3>Next Steps</h3><ol>
-      <li>Save the downloaded <code>terraform.tfvars</code> to the project directory</li>
+      <li>Save the downloaded <code>terraform.tfvars</code> to the <code>terraform\\</code> folder in the project directory</li>
       <li>Open <strong>PowerShell as Administrator</strong> and run:<br>
         <code>.\\scripts\\Setup-Prerequisites.ps1</code><br>
-        <em>(one-time setup: enables Hyper-V, downloads Ubuntu image, configures WinRM)</em></li>
+        <em>(enables Hyper-V, downloads Ubuntu image, configures WinRM, then automatically runs terraform init &rarr; plan &rarr; apply)</em></li>
       <li>If prompted, <strong>reboot</strong> and re-run scripts\\Setup-Prerequisites.ps1</li>
-      <li>Deploy with Terraform:<br>
-        <code>terraform init</code><br>
-        <code>terraform plan -out tfplan</code><br>
-        <code>terraform apply tfplan</code></li>
-      <li>Set up port forwarding:<br>
+      <li>Optionally set up port forwarding:<br>
         <code>.\\scripts\\Port-Forward-InsideLLM.ps1</code></li>
       ${gpu ? `<li>Configure GPU passthrough:<br><code>.\\scripts\\Setup-GPU-Passthrough.ps1</code></li>` : ''}
       <li>Open <code>https://&lt;vm-ip&gt;</code> in your browser</li>

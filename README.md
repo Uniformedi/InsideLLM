@@ -3,7 +3,7 @@
 **Version:** 3.0 | **Author:** Dan Medina, Uniformedi LLC | **Date:** April 2026
 **Source:** [github.com/Uniformedi/InsideLLM](https://github.com/Uniformedi/InsideLLM) | **License:** MIT
 
-> **Ready to deploy?** Open the [Setup Wizard](web/Setup.html) for a guided, step-by-step configuration experience.
+> **Ready to deploy?** Open the [Setup Wizard](html/Setup.html) for a guided, step-by-step configuration experience.
 
 ### What's New in 3.0
 

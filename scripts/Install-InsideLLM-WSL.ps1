@@ -972,7 +972,7 @@ if (Test-Path $dlpSource) {
 }
 
 # --- Admin Portal ---
-$adminSource = Join-Path $PSScriptRoot "..\web\admin.html"
+$adminSource = Join-Path $PSScriptRoot "..\html\admin.html"
 if (Test-Path $adminSource) {
     $adminContent = Get-Content $adminSource -Raw
     Write-WslFile -Path "$InstallPath/admin.html" -Content $adminContent -Permissions "0644"
