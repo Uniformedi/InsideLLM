@@ -457,7 +457,7 @@ else:
         name='OPA Policy Enforcement',
         content=code,
         meta=FunctionMeta(
-            description='Enforces SAIVAS and industry policies via Open Policy Agent. Fail-closed on errors.',
+            description='Enforces Humility alignment and industry policies via Open Policy Agent. Fail-closed on errors.',
             manifest={}
         )
     )

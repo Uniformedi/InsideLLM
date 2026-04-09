@@ -576,7 +576,7 @@ variable "keyword_refresh_schedule" {
 # =============================================================================
 
 variable "policy_engine_enable" {
-  description = "Enable the OPA policy enforcement engine (SAIVAS + industry policies)"
+  description = "Enable the OPA policy enforcement engine (Humility alignment + industry policies)"
   type        = bool
   default     = false
 }

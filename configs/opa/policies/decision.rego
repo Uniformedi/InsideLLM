@@ -1,16 +1,16 @@
 # =============================================================================
 # Decision Aggregation Policy
-# Merges SAIVAS (mandatory) + Industry (optional) into a single decision.
-# Precedence: SAIVAS denials override everything.
+# Merges Humility (mandatory) + Industry (optional) into a single decision.
+# Precedence: Humility denials override everything.
 # =============================================================================
 package insidellm.policy
 
 import rego.v1
 
-import data.insidellm.saivas
+import data.insidellm.humility
 
 # Aggregate deny reasons from all layers
-all_deny_reasons := saivas.deny_reasons | industry_deny_reasons
+all_deny_reasons := humility.deny_reasons | industry_deny_reasons
 
 # Industry deny reasons come from any loaded industry packages
 industry_deny_reasons contains reason if {
@@ -18,7 +18,7 @@ industry_deny_reasons contains reason if {
 }
 
 # Aggregate obligations from all layers
-all_obligations := saivas.obligations | industry_obligations
+all_obligations := humility.obligations | industry_obligations
 
 industry_obligations contains obligation if {
     some obligation in data.insidellm.industry[_].obligations

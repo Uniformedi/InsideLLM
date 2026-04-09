@@ -1,9 +1,9 @@
 # =============================================================================
-# SAIVAS — Sentient AI Value Alignment Standard
-# MANDATORY: Always loaded, cannot be disabled.
-# Precedence: Highest (overrides all other policies)
+# Humility — Mandatory AI Alignment Policy
+# Always loaded, cannot be disabled. Highest precedence.
+# Ensures AI outputs remain humble, transparent, and human-centered.
 # =============================================================================
-package insidellm.saivas
+package insidellm.humility
 
 import rego.v1
 
@@ -14,14 +14,14 @@ deny_reasons contains reason if {
     some msg in input.messages
     msg.role == "user"
     contains_directive_from_metaphysical(msg.content)
-    reason := "SAIVAS 3.2.1: Metaphysical context must not produce directives"
+    reason := "Humility 1: Metaphysical context must not produce directives"
 }
 
 # 3.2.2: Block high-confidence output lacking uncertainty declaration
 deny_reasons contains reason if {
     input.request_type == "high_impact"
     not input.uncertainty_declared
-    reason := "SAIVAS 3.2.2: High-confidence output requires explicit uncertainty declaration"
+    reason := "Humility 2: High-confidence output requires explicit uncertainty declaration"
 }
 
 # 3.2.3: Block authority or superiority claims
@@ -29,14 +29,14 @@ deny_reasons contains reason if {
     some msg in input.messages
     msg.role == "user"
     claims_authority(msg.content)
-    reason := "SAIVAS 3.2.3: System must not claim authority or superiority"
+    reason := "Humility 3: System must not claim authority or superiority"
 }
 
 # 3.2.5: Block high-impact output without documented human consensus
 deny_reasons contains reason if {
     input.data_classification == "restricted"
     not input.has_human_consensus
-    reason := "SAIVAS 3.2.5: Restricted data requires documented human consensus"
+    reason := "Humility 4: Restricted data requires documented human consensus"
 }
 
 # 3.2.6: Block asymmetric persuasion
@@ -44,14 +44,14 @@ deny_reasons contains reason if {
     some msg in input.messages
     msg.role == "user"
     asymmetric_persuasion(msg.content)
-    reason := "SAIVAS 3.2.6: Asymmetric persuasion patterns detected"
+    reason := "Humility 5: Asymmetric persuasion patterns detected"
 }
 
 # 3.3: Epistemic constraint — block extrapolation beyond validated domains
 deny_reasons contains reason if {
     input.request_type == "prediction"
     not input.within_validated_domain
-    reason := "SAIVAS 3.3: Extrapolation beyond validated domains is prohibited"
+    reason := "Humility 6: Extrapolation beyond validated domains is prohibited"
 }
 
 # ---- Obligations (always required) ----
@@ -61,9 +61,9 @@ obligations contains obligation if {
         "type": "audit.log",
         "priority": 2,
         "params": {
-            "event_type": "saivas_evaluation",
+            "event_type": "humility_evaluation",
             "severity": "info",
-            "policy": "saivas",
+            "policy": "humility",
         },
     }
 }
@@ -75,7 +75,7 @@ obligations contains obligation if {
         "type": "audit.tag",
         "priority": 2,
         "params": {
-            "tags": ["restricted_access", "saivas_flagged"],
+            "tags": ["restricted_access", "humility_flagged"],
         },
     }
 }

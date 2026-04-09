@@ -16,7 +16,7 @@
 - **Enterprise Governance Hub** -- FastAPI service for central repository sync (PostgreSQL/MariaDB/MSSQL), change management with supervisor approval, AI-powered governance advisor
 - **Hash-Chained Audit Integrity** -- SHA-256 chain on all governance events (sync, proposals, approvals, snapshots) with verification endpoint
 - **Fleet Management** -- cross-instance visibility, config snapshot restore, terraform.tfvars generation from any instance's snapshot
-- **OPA Policy Engine** -- Open Policy Agent with SAIVAS mandatory alignment + 6 industry policies (HIPAA, FDCPA, SOX, PCI-DSS, FERPA, GLBA), obligation execution pipeline
+- **OPA Policy Engine** -- Open Policy Agent with Humility mandatory alignment + 6 industry policies (HIPAA, FDCPA, SOX, PCI-DSS, FERPA, GLBA), obligation execution pipeline
 - **External Data Connectors** -- query PostgreSQL, MySQL, MSSQL, REST APIs with team-based RBAC, row filtering, field masking, and full audit logging
 - **Interactive Admin Hub** -- command center SPA replacing static admin.html with governance dashboard, change management UI, fleet overview, and service status
 - **AI System Designer** -- Open WebUI Tool that designs deployments, estimates costs, recommends configs, and plans multi-instance fleet architectures
@@ -80,7 +80,7 @@ services that deliver:
 - **Admin portal** — interactive command center with governance dashboard, change management UI, fleet overview (`/admin`)
 - **Full audit trail** of every API call with hash-chained integrity verification
 - **File generation** — create DOCX, XLSX, PPTX, PDF from chat via DocForge
-- **AI governance compliance** — industry keyword analysis, OPA policy enforcement, SAIVAS alignment
+- **AI governance compliance** — industry keyword analysis, OPA policy enforcement, Humility alignment
 - **Enterprise fleet management** — central repository sync, cross-instance restore, multi-DB support (PostgreSQL/MariaDB/MSSQL)
 - **Automated operations** — container patching (Watchtower), CVE scanning (Trivy), centralized logging (Grafana+Loki), health monitoring (Uptime Kuma)
 - **External data connectors** — query external databases and APIs with team-based RBAC and audit logging
@@ -1777,14 +1777,14 @@ User Message → DLP Pipeline → OPA Pipeline → LiteLLM → Claude
                                     │
                               ┌─────▼─────┐
                               │ OPA :8181  │
-                              │ SAIVAS     │  (always on)
+                              │ Humility   │  (always on)
                               │ + Industry │  (toggled)
                               └─────┬─────┘
                                     │
                               Decision + Obligations
 ```
 
-### SAIVAS (Mandatory)
+### Humility Policy (Mandatory)
 
 Always loaded, cannot be disabled. Denies when:
 - Metaphysical context produces directives

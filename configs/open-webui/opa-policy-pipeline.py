@@ -2,7 +2,7 @@
 title: OPA Policy Enforcement
 author: InsideLLM
 version: 1.0.0
-description: Enforces SAIVAS and industry policies via Open Policy Agent. Executes obligations in strict order. Fail-closed on any error.
+description: Enforces Humility alignment and industry policies via Open Policy Agent. Executes obligations in strict order. Fail-closed on any error.
 """
 
 import hashlib
