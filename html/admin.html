@@ -309,6 +309,28 @@
     /* Footer */
     .footer { text-align: center; padding: 32px; color: var(--text-muted); font-size: 12px; font-family: var(--font-mono); border-top: 1px solid var(--border); margin-top: 40px; }
     .footer a { color: var(--cyan); text-decoration: none; }
+
+    /* Governance sub-views */
+    .gov-view { display: none; }
+    .gov-view.active { display: block; }
+
+    /* Framework tree */
+    .fw-node { padding: 6px 10px; cursor: pointer; border-radius: 4px; font-size: 12px; margin-bottom: 2px; display: flex; align-items: center; gap: 6px; }
+    .fw-node:hover { background: rgba(255,255,255,0.03); }
+    .fw-node.selected { background: rgba(34,211,238,0.1); color: var(--cyan); }
+    .fw-node .fw-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+    .fw-children { margin-left: 16px; }
+    .fw-section-title { font-size: 18px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+    .fw-section-meta { display: flex; gap: 10px; margin-bottom: 16px; align-items: center; }
+    .fw-section-body { font-size: 13px; color: var(--text-dim); line-height: 1.8; white-space: pre-wrap; font-family: var(--font-body); }
+    .fw-section-body table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+    .fw-section-body th, .fw-section-body td { padding: 6px 10px; border: 1px solid var(--border); font-size: 12px; text-align: left; }
+    .fw-section-body th { background: var(--bg-elevated); color: var(--text-muted); font-family: var(--font-mono); font-size: 11px; }
+    .fw-section-body code { font-family: var(--font-mono); font-size: 12px; color: var(--cyan); background: rgba(34,211,238,0.1); padding: 1px 5px; border-radius: 3px; }
+    .fw-section-body pre { background: var(--bg-deep); border: 1px solid var(--border); border-radius: 6px; padding: 12px; overflow-x: auto; margin: 10px 0; font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
+
+    /* Attestation form */
+    .attest-box { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-top: 16px; }
   </style>
 </head>
 <body>
@@ -337,7 +359,6 @@
 <div class="tab-bar">
   <div class="tab active" onclick="switchTab('overview')">Overview</div>
   <div class="tab" onclick="switchTab('governance')">Governance</div>
-  <div class="tab" onclick="switchTab('changes')">Changes</div>
   <div class="tab" onclick="switchTab('fleet')">Fleet</div>
   <div class="tab" onclick="switchTab('services')">Services</div>
   <div class="tab" onclick="switchTab('specs')">Specifications</div>
@@ -371,23 +392,60 @@
 
   <!-- ======================== GOVERNANCE ======================== -->
   <div class="panel" id="panel-governance">
-    <div class="tile-grid" id="govTiles"></div>
-    <div class="section-head">Sync History <span class="accent">// central repository</span></div>
-    <div id="syncHistory" class="loading">Loading...</div>
-    <div class="section-head">Audit Chain <span class="accent">// tamper-evident integrity</span></div>
-    <div id="auditChain" class="loading">Loading...</div>
-  </div>
-
-  <!-- ======================== CHANGES ======================== -->
-  <div class="panel" id="panel-changes">
-    <div style="display:flex;gap:10px;margin-bottom:16px;align-items:center">
-      <span style="font-family:var(--font-mono);font-size:12px;color:var(--text-muted)">FILTER:</span>
-      <button class="btn btn-action" onclick="loadChanges('pending')">Pending</button>
-      <button class="btn btn-action" onclick="loadChanges('')">All</button>
-      <button class="btn btn-action" onclick="loadChanges('approved')">Approved</button>
-      <button class="btn btn-action" onclick="loadChanges('implemented')">Implemented</button>
+    <!-- Sub-navigation -->
+    <div style="display:flex;gap:0;margin-bottom:20px;border-bottom:1px solid var(--border)">
+      <div class="tab active" onclick="switchGovView('framework',this)" style="padding:10px 16px;font-size:11px">Framework</div>
+      <div class="tab" onclick="switchGovView('compliance',this)" style="padding:10px 16px;font-size:11px">Compliance</div>
+      <div class="tab" onclick="switchGovView('changes',this)" style="padding:10px 16px;font-size:11px">Changes</div>
+      <div class="tab" onclick="switchGovView('syncaudit',this)" style="padding:10px 16px;font-size:11px">Sync &amp; Audit</div>
     </div>
-    <div id="changesTable" class="loading">Loading...</div>
+
+    <!-- Framework Viewer -->
+    <div class="gov-view active" id="gov-framework">
+      <div style="display:flex;gap:16px">
+        <!-- Sidebar: section tree -->
+        <div style="flex:0 0 280px;max-height:70vh;overflow-y:auto;border-right:1px solid var(--border);padding-right:14px" id="frameworkTree">
+          <div class="loading">Loading framework...</div>
+        </div>
+        <!-- Main content -->
+        <div style="flex:1;max-height:70vh;overflow-y:auto;padding:0 8px" id="frameworkContent">
+          <div style="color:var(--text-muted);font-family:var(--font-mono);font-size:12px;padding:20px;text-align:center">
+            Select a section from the tree to view its content and compliance status.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Compliance Dashboard -->
+    <div class="gov-view" id="gov-compliance" style="display:none">
+      <div class="tile-grid" id="complianceTiles"></div>
+      <div class="section-head">
+        Compliance Status by Section
+        <span style="margin-left:auto"><button class="btn btn-action" onclick="runComplianceChecks()">Run All Checks</button></span>
+      </div>
+      <div id="complianceTable" class="loading">Loading...</div>
+    </div>
+
+    <!-- Changes (merged from standalone tab) -->
+    <div class="gov-view" id="gov-changes" style="display:none">
+      <div style="display:flex;gap:10px;margin-bottom:16px;align-items:center">
+        <span style="font-family:var(--font-mono);font-size:12px;color:var(--text-muted)">FILTER:</span>
+        <button class="btn btn-action" onclick="loadChanges('pending')">Pending</button>
+        <button class="btn btn-action" onclick="loadChanges('')">All</button>
+        <button class="btn btn-action" onclick="loadChanges('approved')">Approved</button>
+        <button class="btn btn-action" onclick="loadChanges('implemented')">Implemented</button>
+      </div>
+      <div id="changesTable" class="loading">Loading...</div>
+    </div>
+
+    <!-- Sync & Audit -->
+    <div class="gov-view" id="gov-syncaudit" style="display:none">
+      <div class="tile-grid" id="govTiles"></div>
+      <div class="section-head">Sync History <span class="accent">// central repository</span></div>
+      <div id="syncHistory" class="loading">Loading...</div>
+      <div class="section-head">Audit Chain <span class="accent">// tamper-evident integrity</span></div>
+      <div id="auditChain" class="loading">Loading...</div>
+    </div>
   </div>
 
   <!-- ======================== FLEET ======================== -->
@@ -698,8 +756,7 @@ function switchTab(name) {
   document.getElementById(`panel-${name}`).classList.add('active');
 
   if (name === 'overview') loadOverview();
-  if (name === 'governance') loadGovernance();
-  if (name === 'changes') loadChanges('pending');
+  if (name === 'governance') { govViewLoaded = {}; switchGovView('framework', document.querySelector('#panel-governance .tab')); }
   if (name === 'fleet') loadFleet();
   if (name === 'services') buildServiceCards();
   if (name === 'chat') {
@@ -827,9 +884,227 @@ function buildQuickAccessCards() {
 }
 
 // ================================================================
-// GOVERNANCE panel
+// GOVERNANCE panel — sub-navigation
 // ================================================================
-async function loadGovernance() {
+let govViewLoaded = {};
+
+function switchGovView(name, el) {
+  document.querySelectorAll('#panel-governance .gov-view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('#panel-governance .tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(`gov-${name}`).classList.add('active');
+  if (el) el.classList.add('active');
+
+  if (name === 'framework' && !govViewLoaded.framework) { loadFrameworkTree(); govViewLoaded.framework = true; }
+  if (name === 'compliance' && !govViewLoaded.compliance) { loadComplianceDashboard(); govViewLoaded.compliance = true; }
+  if (name === 'changes') loadChanges('pending');
+  if (name === 'syncaudit' && !govViewLoaded.syncaudit) { loadSyncAudit(); govViewLoaded.syncaudit = true; }
+}
+
+// ================================================================
+// GOVERNANCE — Framework Viewer
+// ================================================================
+let frameworkSections = [];
+
+async function loadFrameworkTree() {
+  const data = await api('/api/v1/framework/tree');
+  const tree = document.getElementById('frameworkTree');
+  if (!data?.tree?.length) {
+    tree.innerHTML = '<div class="loading">No framework loaded. <button class="btn btn-action" onclick="seedFramework()">Seed Framework</button></div>';
+    return;
+  }
+  let html = '';
+  for (const parent of data.tree) {
+    const dotColor = _complianceDotColor(parent.compliance_status);
+    html += `<div class="fw-node" data-sn="${parent.section_number}" onclick="selectSection('${parent.section_number}')">
+      <span class="fw-dot" style="background:${dotColor}"></span>
+      <strong>${parent.section_number}.</strong> ${parent.title}
+    </div>`;
+    if (parent.children?.length) {
+      html += '<div class="fw-children">';
+      for (const child of parent.children) {
+        const childDot = _complianceDotColor(child.compliance_status);
+        html += `<div class="fw-node" data-sn="${child.section_number}" onclick="selectSection('${child.section_number}')">
+          <span class="fw-dot" style="background:${childDot}"></span>
+          ${child.section_number} ${child.title}
+        </div>`;
+      }
+      html += '</div>';
+    }
+  }
+  tree.innerHTML = html;
+}
+
+function _complianceDotColor(status) {
+  if (status === 'compliant') return 'var(--green)';
+  if (status === 'non_compliant') return 'var(--red)';
+  if (status === 'partial') return 'var(--amber)';
+  if (status === 'check_failed') return 'var(--red)';
+  return 'var(--text-muted)'; // not_assessed
+}
+
+async function selectSection(sn) {
+  // Highlight selected node
+  document.querySelectorAll('.fw-node').forEach(n => n.classList.remove('selected'));
+  const node = document.querySelector(`.fw-node[data-sn="${sn}"]`);
+  if (node) node.classList.add('selected');
+
+  const content = document.getElementById('frameworkContent');
+  content.innerHTML = '<div class="loading">Loading...</div>';
+
+  const section = await api(`/api/v1/framework/sections/${sn}`);
+  if (!section) { content.innerHTML = '<div class="loading">Section not found</div>'; return; }
+
+  const statusBadge = _complianceBadge(section.compliance_history?.[0]?.status);
+  const typeBadge = section.compliance_type === 'automated' ? '<span class="badge badge-info">AUTOMATED</span>' :
+                    section.compliance_type === 'manual_attestation' ? '<span class="badge badge-pending">ATTESTATION REQUIRED</span>' :
+                    '<span class="badge" style="background:rgba(255,255,255,0.05);color:var(--text-muted)">INFORMATIONAL</span>';
+
+  let html = `
+    <div class="fw-section-title">${section.section_number}. ${section.title}</div>
+    <div class="fw-section-meta">${typeBadge} ${statusBadge}</div>
+    <div class="fw-section-body">${_renderMarkdown(section.content_markdown || '')}</div>
+  `;
+
+  // Show attestation form for manual sections
+  if (section.compliance_type === 'manual_attestation') {
+    html += `
+    <div class="attest-box">
+      <div style="font-size:13px;font-weight:600;margin-bottom:10px;color:var(--text)">Submit Attestation</div>
+      <div class="wiz-row">
+        <div class="wiz-field"><label>Name</label><input type="text" id="attestName" placeholder="Your full name"></div>
+        <div class="wiz-field"><label>Email</label><input type="text" id="attestEmail" placeholder="email@company.com"></div>
+        <div class="wiz-field"><label>Role</label><input type="text" id="attestRole" placeholder="e.g., AI Ethics Officer"></div>
+      </div>
+      <div class="wiz-field"><label>Attestation</label><input type="text" id="attestText" placeholder="I confirm this section is implemented and operational..." style="width:100%"></div>
+      <div class="wiz-actions" style="margin-top:8px">
+        <button class="btn btn-approve" onclick="submitAttestation(${section.id})">Submit Attestation</button>
+        <span class="wiz-result" id="attestResult"></span>
+      </div>
+    </div>`;
+  }
+
+  // Show compliance history
+  if (section.compliance_history?.length) {
+    html += '<div style="margin-top:20px;font-size:13px;font-weight:600;color:var(--text)">Compliance History</div>';
+    html += '<table class="data-table" style="margin-top:8px"><thead><tr><th>Status</th><th>Type</th><th>Assessed By</th><th>Date</th><th>Notes</th></tr></thead><tbody>';
+    for (const h of section.compliance_history) {
+      html += `<tr><td>${_complianceBadge(h.status)}</td><td>${h.evidence_type || '--'}</td><td>${h.assessed_by || '--'}</td><td>${h.assessed_at?.slice(0,16).replace('T',' ') || '--'}</td><td>${h.notes || '--'}</td></tr>`;
+    }
+    html += '</tbody></table>';
+  }
+
+  content.innerHTML = html;
+}
+
+function _complianceBadge(status) {
+  if (status === 'compliant') return '<span class="badge badge-ok">COMPLIANT</span>';
+  if (status === 'non_compliant') return '<span class="badge badge-err">NON-COMPLIANT</span>';
+  if (status === 'partial') return '<span class="badge badge-warn">PARTIAL</span>';
+  if (status === 'check_failed') return '<span class="badge badge-err">CHECK FAILED</span>';
+  return '<span class="badge" style="background:rgba(255,255,255,0.05);color:var(--text-muted)">NOT ASSESSED</span>';
+}
+
+function _renderMarkdown(md) {
+  // Lightweight markdown rendering (tables, bold, code, lists, headers)
+  return md
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/^#### (.+)$/gm, '<h4 style="color:var(--text);margin:14px 0 6px;font-size:14px">$1</h4>')
+    .replace(/^### (.+)$/gm, '<h3 style="color:var(--cyan);margin:16px 0 8px;font-size:15px">$1</h3>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/`(.+?)`/g, '<code>$1</code>')
+    .replace(/^\- (.+)$/gm, '<li style="margin-left:20px">$1</li>')
+    .replace(/^\d+\. (.+)$/gm, '<li style="margin-left:20px;list-style-type:decimal">$1</li>')
+    .replace(/```[\s\S]*?```/g, m => '<pre>' + m.slice(3, -3) + '</pre>')
+    .replace(/\|(.+)\|/g, (m) => {
+      const cells = m.split('|').filter(c => c.trim());
+      if (cells.every(c => /^[\-:]+$/.test(c.trim()))) return '';
+      return '<tr>' + cells.map(c => `<td>${c.trim()}</td>`).join('') + '</tr>';
+    });
+}
+
+async function submitAttestation(sectionId) {
+  const result = document.getElementById('attestResult');
+  const name = document.getElementById('attestName')?.value?.trim();
+  const email = document.getElementById('attestEmail')?.value?.trim();
+  const role = document.getElementById('attestRole')?.value?.trim();
+  const text = document.getElementById('attestText')?.value?.trim();
+  if (!name || !email || !text) { result.innerHTML = '<span style="color:var(--red)">Name, email, and attestation text required</span>'; return; }
+
+  result.innerHTML = '<span style="color:var(--amber)">Submitting...</span>';
+  try {
+    const resp = await fetch(`${GOV()}/api/v1/framework/compliance/attest`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({section_id: sectionId, attester_name: name, attester_email: email, attester_role: role, attestation_text: text}),
+    });
+    const res = await resp.json();
+    if (res.success) {
+      result.innerHTML = `<span style="color:var(--green)">${res.message}</span>`;
+      loadFrameworkTree(); // refresh dots
+    } else {
+      result.innerHTML = `<span style="color:var(--red)">${res.detail || 'Failed'}</span>`;
+    }
+  } catch(e) { result.innerHTML = `<span style="color:var(--red)">Error: ${e.message}</span>`; }
+}
+
+async function seedFramework() {
+  const tree = document.getElementById('frameworkTree');
+  tree.innerHTML = '<div class="loading">Seeding framework...</div>';
+  const res = await api('/api/v1/framework/seed');
+  if (res?.success) {
+    loadFrameworkTree();
+  } else {
+    tree.innerHTML = `<div class="loading" style="color:var(--red)">Seed failed: ${res?.message || 'Unknown error'}</div>`;
+  }
+}
+
+// ================================================================
+// GOVERNANCE — Compliance Dashboard
+// ================================================================
+async function loadComplianceDashboard() {
+  const [summary, sections] = await Promise.all([
+    api('/api/v1/framework/compliance/summary'),
+    api('/api/v1/framework/sections'),
+  ]);
+
+  const tiles = document.getElementById('complianceTiles');
+  if (summary) {
+    const pct = summary.compliance_percentage || 0;
+    const pctColor = pct >= 95 ? 'green' : pct >= 70 ? 'amber' : 'red';
+    tiles.innerHTML = `
+      <div class="tile"><div class="label">Overall Compliance</div><div class="value ${pctColor}">${pct}%</div><div class="sub">${summary.compliant}/${summary.assessable_sections} sections</div></div>
+      <div class="tile"><div class="label">Automated Checks</div><div class="value cyan">${summary.automated_count}</div><div class="sub">auto-verified sections</div></div>
+      <div class="tile"><div class="label">Manual Attestations</div><div class="value">${summary.manual_count}</div><div class="sub">require human verification</div></div>
+      <div class="tile"><div class="label">Compliant</div><div class="value green">${summary.compliant}</div></div>
+      <div class="tile"><div class="label">Non-Compliant</div><div class="value red">${summary.non_compliant}</div></div>
+      <div class="tile"><div class="label">Not Assessed</div><div class="value amber">${summary.not_assessed}</div></div>
+    `;
+  }
+
+  const table = document.getElementById('complianceTable');
+  if (sections?.sections?.length) {
+    table.innerHTML = `<table class="data-table"><thead><tr><th>Section</th><th>Title</th><th>Type</th><th>Status</th><th>Last Assessed</th></tr></thead><tbody>` +
+      sections.sections.filter(s => s.compliance_type !== 'informational').map(s => {
+        const badge = _complianceBadge(s.compliance_status);
+        const typeBadge = s.compliance_type === 'automated' ? '<span class="badge badge-info">Auto</span>' : '<span class="badge badge-pending">Manual</span>';
+        return `<tr><td><code>${s.section_number}</code></td><td>${s.title}</td><td>${typeBadge}</td><td>${badge}</td><td>${s.assessed_at?.slice(0,16).replace('T',' ') || '--'}</td></tr>`;
+      }).join('') +
+      `</tbody></table>`;
+  } else {
+    table.innerHTML = '<div class="loading">No framework sections loaded. <button class="btn btn-action" onclick="seedFramework()">Seed Framework</button></div>';
+  }
+}
+
+async function runComplianceChecks() {
+  const table = document.getElementById('complianceTable');
+  table.innerHTML = '<div class="loading">Running compliance checks...</div>';
+  // For Phase 2, this will call POST /compliance/check. For now, just reload.
+  await loadComplianceDashboard();
+}
+
+// ================================================================
+// GOVERNANCE — Sync & Audit
+// ================================================================
+async function loadSyncAudit() {
   const [sync, chain, chainEntries] = await Promise.all([
     api('/api/v1/sync/history?limit=10'),
     api('/api/v1/audit/chain/stats'),

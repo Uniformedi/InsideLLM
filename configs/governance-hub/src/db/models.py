@@ -245,3 +245,67 @@ class ConnectorQueryLog(Base):
     status = Column(String(50))  # success, denied, error
     error_message = Column(Text)
     queried_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+
+
+# =========================================================================
+# Settings Overrides — DB-backed config (replaces .env file approach)
+# =========================================================================
+
+class SettingsOverride(Base):
+    """Runtime configuration overrides stored in DB instead of .env files."""
+    __tablename__ = "governance_settings_overrides"
+
+    id = Column(Integer, primary_key=True)
+    key = Column(String(255), nullable=False, unique=True)  # e.g., "central_db_host"
+    value = Column(Text, nullable=False)
+    updated_by = Column(String(255), default="system")
+    updated_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+
+
+# =========================================================================
+# Framework Sections & Compliance Tracking
+# =========================================================================
+
+class FrameworkSection(Base):
+    """Parsed sections from the AI Governance Framework document."""
+    __tablename__ = "governance_framework_sections"
+
+    id = Column(Integer, primary_key=True)
+    section_number = Column(String(30), nullable=False)  # "1", "4.2", "12.3"
+    title = Column(String(500), nullable=False)
+    parent_section = Column(String(30))  # null for top-level
+    content_markdown = Column(Text, nullable=False)
+    compliance_type = Column(String(50), nullable=False)  # automated, manual_attestation, informational
+    automated_check_key = Column(String(100))  # maps to a check function
+    framework_version = Column(Integer, default=1)
+    sort_order = Column(Integer, default=0)
+
+
+class ComplianceStatus(Base):
+    """Per-section compliance status from automated checks or attestations."""
+    __tablename__ = "governance_compliance_status"
+
+    id = Column(Integer, primary_key=True)
+    section_id = Column(Integer, nullable=False)
+    status = Column(String(50), nullable=False)  # compliant, non_compliant, partial, not_assessed, check_failed
+    evidence_type = Column(String(50))  # automated_check, manual_attestation, external_audit
+    evidence_details = Column(JSONB)
+    assessed_by = Column(String(255), default="system")
+    assessed_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    expires_at = Column(DateTime(timezone=True))  # attestations expire
+    notes = Column(Text)
+
+
+class ComplianceAttestation(Base):
+    """Manual attestation records for non-automated framework sections."""
+    __tablename__ = "governance_compliance_attestations"
+
+    id = Column(Integer, primary_key=True)
+    section_id = Column(Integer, nullable=False)
+    attester_name = Column(String(255), nullable=False)
+    attester_email = Column(String(255), nullable=False)
+    attester_role = Column(String(100))
+    attestation_text = Column(Text, nullable=False)
+    status = Column(String(50), default="active")  # active, expired, revoked
+    attested_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    expires_at = Column(DateTime(timezone=True))

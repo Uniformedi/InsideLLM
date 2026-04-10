@@ -395,6 +395,7 @@ services:
 %{ endif }
     volumes:
       - /opt/InsideLLM/data/governance-hub:/app/data
+      - /opt/InsideLLM/governance-hub/framework:/app/framework:ro
     depends_on:
       postgres:
         condition: service_healthy

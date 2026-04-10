@@ -261,21 +261,76 @@ def get_db_config() -> dict:
 
 
 def save_db_config(config: dict) -> dict:
-    """Save central DB config to an env override file for next restart."""
-    env_path = Path("/app/data/.env.central-db")
+    """Save central DB config to the local database (settings overrides table)."""
+    from ..db.local_db import SyncSessionLocal
+    from ..db.models import SettingsOverride
+
+    mapping = {
+        "central_db_type": config["db_type"],
+        "central_db_host": config["host"],
+        "central_db_port": str(config["port"]),
+        "central_db_name": config["db_name"],
+        "central_db_user": config["username"],
+        "central_db_password": config["password"],
+    }
+
     try:
-        lines = [
-            f"GOVERNANCE_HUB_CENTRAL_DB_TYPE={config['db_type']}",
-            f"GOVERNANCE_HUB_CENTRAL_DB_HOST={config['host']}",
-            f"GOVERNANCE_HUB_CENTRAL_DB_PORT={config['port']}",
-            f"GOVERNANCE_HUB_CENTRAL_DB_NAME={config['db_name']}",
-            f"GOVERNANCE_HUB_CENTRAL_DB_USER={config['username']}",
-            f"GOVERNANCE_HUB_CENTRAL_DB_PASSWORD={config['password']}",
-        ]
-        env_path.write_text("\n".join(lines) + "\n")
-        return {"success": True, "message": f"Saved to {env_path}. Restart the Governance Hub container to apply."}
+        with SyncSessionLocal() as db:
+            for key, value in mapping.items():
+                existing = db.execute(
+                    text("SELECT id FROM governance_settings_overrides WHERE key = :k"),
+                    {"k": key},
+                ).first()
+                if existing:
+                    db.execute(
+                        text("UPDATE governance_settings_overrides SET value = :v, updated_at = NOW() WHERE key = :k"),
+                        {"k": key, "v": value},
+                    )
+                else:
+                    override = SettingsOverride(key=key, value=value)
+                    db.add(override)
+            db.commit()
+
+        # Hot-reload settings in memory
+        _apply_overrides_to_settings(mapping)
+
+        return {"success": True, "message": "Configuration saved to database. Applied immediately (no restart needed)."}
     except Exception as e:
         return {"success": False, "message": str(e)}
+
+
+def _apply_overrides_to_settings(overrides: dict) -> None:
+    """Hot-reload config overrides into the running settings singleton."""
+    for key, value in overrides.items():
+        if hasattr(settings, key):
+            field_type = type(getattr(settings, key))
+            if field_type == int:
+                value = int(value)
+            elif field_type == bool:
+                value = value.lower() in ("true", "1", "yes")
+            object.__setattr__(settings, key, value)
+
+    # Reset central DB engine to pick up new config
+    import importlib
+    from ..db import central_db
+    central_db._central_engine = None
+    central_db._CentralSession = None
+
+
+def load_settings_overrides() -> None:
+    """Load settings overrides from the database on startup."""
+    from ..db.local_db import SyncSessionLocal
+
+    try:
+        with SyncSessionLocal() as db:
+            result = db.execute(text("SELECT key, value FROM governance_settings_overrides"))
+            overrides = {row[0]: row[1] for row in result}
+            if overrides:
+                _apply_overrides_to_settings(overrides)
+                import logging
+                logging.getLogger("governance-hub").info(f"Loaded {len(overrides)} settings overrides from DB")
+    except Exception:
+        pass  # Table may not exist yet on first startup
 
 
 # =========================================================================

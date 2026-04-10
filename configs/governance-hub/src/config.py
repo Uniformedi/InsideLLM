@@ -40,6 +40,15 @@ class Settings(BaseSettings):
     governance_tier: str = "tier3"
     data_classification: str = "internal"
 
+    # Framework & Compliance
+    framework_path: str = "/app/framework/AI_Governance_Framework.md"
+    compliance_check_schedule: str = "0 */6 * * *"
+
+    # Tiered approval roles (comma-separated)
+    tier1_roles: str = "executive,cto,cio,ai_ethics_officer"
+    tier2_roles: str = "department_head,director,senior_manager"
+    tier3_roles: str = "manager,team_lead"
+
     # Admin authentication (oidc / ldap / none)
     admin_auth_mode: str = "none"
     auth_secret: str = ""  # JWT signing key for session cookies

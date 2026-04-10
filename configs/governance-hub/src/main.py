@@ -5,11 +5,12 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
+from sqlalchemy import text
 
 from .config import settings
 from .db.local_db import AsyncSessionLocal, engine
 from .db.models import Base
-from .routers import advisor, audit, auth, changes, config_snapshots, connectors, fleet, obligations, restore, schema, sync
+from .routers import advisor, audit, auth, changes, config_snapshots, connectors, fleet, framework, obligations, restore, schema, sync
 from .services.config_service import capture_snapshot
 from .services.sync_service import collect_telemetry, export_to_central
 
@@ -47,6 +48,7 @@ app.include_router(fleet.router)
 app.include_router(restore.router)
 app.include_router(connectors.router)
 app.include_router(obligations.router)
+app.include_router(framework.router)
 
 scheduler = AsyncIOScheduler()
 
@@ -147,6 +149,27 @@ async def startup():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     logger.info("Governance tables created/verified")
+
+    # Load settings overrides from DB (replaces .env file approach)
+    try:
+        from .services.fleet_service import load_settings_overrides
+        load_settings_overrides()
+    except Exception as e:
+        logger.warning(f"Failed to load settings overrides: {e}")
+
+    # Seed governance framework sections if not already done
+    try:
+        from .db.local_db import SyncSessionLocal
+        from .services.framework_parser import seed_framework_sections
+        with SyncSessionLocal() as sync_db:
+            count = sync_db.execute(text("SELECT COUNT(*) FROM governance_framework_sections")).scalar()
+            if count == 0:
+                result = seed_framework_sections(sync_db)
+                logger.info(f"Framework seeded: {result}")
+            else:
+                logger.info(f"Framework already seeded ({count} sections)")
+    except Exception as e:
+        logger.warning(f"Framework seeding skipped: {e}")
 
     # Initial config snapshot
     try:
