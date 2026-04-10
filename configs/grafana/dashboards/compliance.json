@@ -1,313 +1,643 @@
 {
-  "dashboard": {
-    "id": null,
-    "uid": "insidellm-compliance",
-    "title": "InsideLLM — AI Governance Compliance",
-    "tags": ["insidellm", "governance", "compliance"],
-    "timezone": "browser",
-    "refresh": "5m",
-    "time": { "from": "now-30d", "to": "now" },
-    "panels": [
-      {
-        "id": 1,
-        "title": "Active Users (Approved AI Tools)",
-        "description": "Framework target: >70% of employees using approved tools",
-        "type": "stat",
-        "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
-        "datasource": { "type": "postgres", "uid": "PostgreSQL" },
-        "targets": [{
+  "id": null,
+  "uid": "insidellm-compliance",
+  "title": "InsideLLM \u00e2\u20ac\u201d AI Governance Compliance",
+  "tags": [
+    "insidellm",
+    "governance",
+    "compliance"
+  ],
+  "timezone": "browser",
+  "refresh": "5m",
+  "time": {
+    "from": "now-30d",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Active Users (Approved AI Tools)",
+      "description": "Framework target: >70% of employees using approved tools",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "targets": [
+        {
           "rawSql": "SELECT COUNT(DISTINCT \"user\") AS active_users FROM \"LiteLLM_SpendLogs\" WHERE \"startTime\" > NOW() - INTERVAL '30 days'",
           "format": "table"
-        }],
-        "fieldConfig": {
-          "defaults": { "thresholds": { "steps": [{"color": "red", "value": 0}, {"color": "yellow", "value": 5}, {"color": "green", "value": 10}] } }
         }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [
+              {
+                "color": "red",
+                "value": 0
+              },
+              {
+                "color": "yellow",
+                "value": 5
+              },
+              {
+                "color": "green",
+                "value": 10
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "Total API Spend (30d)",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 0
       },
-      {
-        "id": 2,
-        "title": "Total API Spend (30d)",
-        "type": "stat",
-        "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
-        "datasource": { "type": "postgres", "uid": "PostgreSQL" },
-        "targets": [{
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "targets": [
+        {
           "rawSql": "SELECT COALESCE(SUM(spend), 0) AS total_spend FROM \"LiteLLM_SpendLogs\" WHERE \"startTime\" > NOW() - INTERVAL '30 days'",
           "format": "table"
-        }],
-        "fieldConfig": {
-          "defaults": { "unit": "currencyUSD", "thresholds": { "steps": [{"color": "green", "value": 0}, {"color": "yellow", "value": 75}, {"color": "red", "value": 100}] } }
         }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "thresholds": {
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "yellow",
+                "value": 75
+              },
+              {
+                "color": "red",
+                "value": 100
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "DLP Blocks (30d)",
+      "description": "Data Loss Prevention policy enforcement \u00e2\u20ac\u201d higher is more protective",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 0
       },
-      {
-        "id": 3,
-        "title": "DLP Blocks (30d)",
-        "description": "Data Loss Prevention policy enforcement — higher is more protective",
-        "type": "stat",
-        "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
-        "datasource": { "type": "loki", "uid": "Loki" },
-        "targets": [{
+      "datasource": {
+        "type": "loki",
+        "uid": "Loki"
+      },
+      "targets": [
+        {
           "expr": "count_over_time({service=\"open-webui\"} |= \"DLP\" |= \"blocked\" [30d])",
           "legendFormat": "DLP Blocks"
-        }]
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Service Health",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 0
       },
-      {
-        "id": 4,
-        "title": "Service Health",
-        "type": "stat",
-        "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
-        "datasource": { "type": "loki", "uid": "Loki" },
-        "targets": [{
+      "datasource": {
+        "type": "loki",
+        "uid": "Loki"
+      },
+      "targets": [
+        {
           "expr": "count(count_over_time({service=~\".+\"} [5m]) > 0)",
           "legendFormat": "Healthy Services"
-        }]
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "title": "Daily Spend by Team",
+      "description": "Budget compliance \u00e2\u20ac\u201d tracks team spend against allocated budgets",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 4
       },
-      {
-        "id": 10,
-        "title": "Daily Spend by Team",
-        "description": "Budget compliance — tracks team spend against allocated budgets",
-        "type": "timeseries",
-        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
-        "datasource": { "type": "postgres", "uid": "PostgreSQL" },
-        "targets": [{
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "targets": [
+        {
           "rawSql": "SELECT date AS time, team_id, COALESCE(SUM(spend), 0) AS spend FROM \"LiteLLM_DailyTeamSpend\" WHERE date > NOW() - INTERVAL '30 days' GROUP BY date, team_id ORDER BY date",
           "format": "time_series"
-        }],
-        "fieldConfig": { "defaults": { "unit": "currencyUSD" } }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD"
+        }
+      }
+    },
+    {
+      "id": 11,
+      "title": "Daily Spend by User",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 4
       },
-      {
-        "id": 11,
-        "title": "Daily Spend by User",
-        "type": "timeseries",
-        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
-        "datasource": { "type": "postgres", "uid": "PostgreSQL" },
-        "targets": [{
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "targets": [
+        {
           "rawSql": "SELECT date AS time, api_key, COALESCE(SUM(spend), 0) AS spend FROM \"LiteLLM_DailyUserSpend\" WHERE date > NOW() - INTERVAL '30 days' GROUP BY date, api_key ORDER BY date",
           "format": "time_series"
-        }],
-        "fieldConfig": { "defaults": { "unit": "currencyUSD" } }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD"
+        }
+      }
+    },
+    {
+      "id": 20,
+      "title": "Model Usage Distribution",
+      "description": "Which models are being used \u00e2\u20ac\u201d verify approved model compliance",
+      "type": "piechart",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 12
       },
-      {
-        "id": 20,
-        "title": "Model Usage Distribution",
-        "description": "Which models are being used — verify approved model compliance",
-        "type": "piechart",
-        "gridPos": { "h": 8, "w": 8, "x": 0, "y": 12 },
-        "datasource": { "type": "postgres", "uid": "PostgreSQL" },
-        "targets": [{
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "targets": [
+        {
           "rawSql": "SELECT model, COUNT(*) AS requests FROM \"LiteLLM_SpendLogs\" WHERE \"startTime\" > NOW() - INTERVAL '30 days' GROUP BY model ORDER BY requests DESC LIMIT 10",
           "format": "table"
-        }]
+        }
+      ]
+    },
+    {
+      "id": 21,
+      "title": "Request Volume (24h)",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 12
       },
-      {
-        "id": 21,
-        "title": "Request Volume (24h)",
-        "type": "timeseries",
-        "gridPos": { "h": 8, "w": 8, "x": 8, "y": 12 },
-        "datasource": { "type": "postgres", "uid": "PostgreSQL" },
-        "targets": [{
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "targets": [
+        {
           "rawSql": "SELECT date_trunc('hour', \"startTime\") AS time, COUNT(*) AS requests FROM \"LiteLLM_SpendLogs\" WHERE \"startTime\" > NOW() - INTERVAL '24 hours' GROUP BY 1 ORDER BY 1",
           "format": "time_series"
-        }]
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "title": "Error Rate",
+      "description": "Track API errors \u00e2\u20ac\u201d framework target: >95% success rate",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 12
       },
-      {
-        "id": 22,
-        "title": "Error Rate",
-        "description": "Track API errors — framework target: >95% success rate",
-        "type": "timeseries",
-        "gridPos": { "h": 8, "w": 8, "x": 16, "y": 12 },
-        "datasource": { "type": "postgres", "uid": "PostgreSQL" },
-        "targets": [{
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "targets": [
+        {
           "rawSql": "SELECT date_trunc('hour', \"startTime\") AS time, COUNT(*) FILTER (WHERE status != 'success') AS errors, COUNT(*) AS total FROM \"LiteLLM_SpendLogs\" WHERE \"startTime\" > NOW() - INTERVAL '7 days' GROUP BY 1 ORDER BY 1",
           "format": "time_series"
-        }]
+        }
+      ]
+    },
+    {
+      "id": 30,
+      "title": "Top Users by Spend (30d)",
+      "type": "table",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 20
       },
-      {
-        "id": 30,
-        "title": "Top Users by Spend (30d)",
-        "type": "table",
-        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
-        "datasource": { "type": "postgres", "uid": "PostgreSQL" },
-        "targets": [{
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "targets": [
+        {
           "rawSql": "SELECT \"user\" AS username, COUNT(*) AS requests, SUM(total_tokens) AS total_tokens, ROUND(SUM(spend)::numeric, 4) AS total_spend FROM \"LiteLLM_SpendLogs\" WHERE \"startTime\" > NOW() - INTERVAL '30 days' AND \"user\" IS NOT NULL GROUP BY \"user\" ORDER BY total_spend DESC LIMIT 20",
           "format": "table"
-        }]
+        }
+      ]
+    },
+    {
+      "id": 31,
+      "title": "Audit Log (Recent)",
+      "description": "Accountability \u00e2\u20ac\u201d all admin actions logged",
+      "type": "table",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 20
       },
-      {
-        "id": 31,
-        "title": "Audit Log (Recent)",
-        "description": "Accountability — all admin actions logged",
-        "type": "table",
-        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
-        "datasource": { "type": "postgres", "uid": "PostgreSQL" },
-        "targets": [{
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "targets": [
+        {
           "rawSql": "SELECT * FROM \"LiteLLM_AuditLog\" ORDER BY updated_at DESC LIMIT 50",
           "format": "table"
-        }]
+        }
+      ]
+    },
+    {
+      "id": 50,
+      "title": "Topic Distribution (30d)",
+      "description": "What are users asking AI about? Categories from keyword analysis.",
+      "type": "piechart",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 28
       },
-      {
-        "id": 50,
-        "title": "Topic Distribution (30d)",
-        "description": "What are users asking AI about? Categories from keyword analysis.",
-        "type": "piechart",
-        "gridPos": { "h": 8, "w": 8, "x": 0, "y": 28 },
-        "datasource": { "type": "postgres", "uid": "PostgreSQL" },
-        "targets": [{
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "targets": [
+        {
           "rawSql": "SELECT category, total_matches FROM topic_distribution ORDER BY total_matches DESC",
           "format": "table"
-        }]
+        }
+      ]
+    },
+    {
+      "id": 51,
+      "title": "Keyword Trends (30d)",
+      "description": "Daily keyword category match volume \u00e2\u20ac\u201d detect shifts in AI usage patterns",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 16,
+        "x": 8,
+        "y": 28
       },
-      {
-        "id": 51,
-        "title": "Keyword Trends (30d)",
-        "description": "Daily keyword category match volume — detect shifts in AI usage patterns",
-        "type": "timeseries",
-        "gridPos": { "h": 8, "w": 16, "x": 8, "y": 28 },
-        "datasource": { "type": "postgres", "uid": "PostgreSQL" },
-        "targets": [{
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "targets": [
+        {
           "rawSql": "SELECT day AS time, category, SUM(match_count) AS matches FROM keyword_daily_summary WHERE day > NOW() - INTERVAL '30 days' GROUP BY day, category ORDER BY day",
           "format": "time_series"
-        }]
+        }
+      ]
+    },
+    {
+      "id": 52,
+      "title": "Flagged Requests (Critical/High)",
+      "description": "Requests matching critical or high-severity keywords \u00e2\u20ac\u201d requires compliance review",
+      "type": "table",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 36
       },
-      {
-        "id": 52,
-        "title": "Flagged Requests (Critical/High)",
-        "description": "Requests matching critical or high-severity keywords — requires compliance review",
-        "type": "table",
-        "gridPos": { "h": 8, "w": 24, "x": 0, "y": 36 },
-        "datasource": { "type": "postgres", "uid": "PostgreSQL" },
-        "targets": [{
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "targets": [
+        {
           "rawSql": "SELECT request_time, username, team_id, model, category, keyword, severity, spend, LEFT(message_text, 200) AS message_preview FROM flagged_requests WHERE request_time > NOW() - INTERVAL '7 days' LIMIT 100",
           "format": "table"
-        }],
-        "fieldConfig": {
-          "overrides": [
-            { "matcher": { "id": "byName", "options": "severity" }, "properties": [{ "id": "custom.displayMode", "value": "color-text" }, { "id": "mappings", "value": [{ "type": "value", "options": { "critical": { "color": "red", "text": "CRITICAL" }, "high": { "color": "orange", "text": "HIGH" } } }] }] }
-          ]
         }
+      ],
+      "fieldConfig": {
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "severity"
+            },
+            "properties": [
+              {
+                "id": "custom.displayMode",
+                "value": "color-text"
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "critical": {
+                        "color": "red",
+                        "text": "CRITICAL"
+                      },
+                      "high": {
+                        "color": "orange",
+                        "text": "HIGH"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 53,
+      "title": "Top Keywords (30d)",
+      "description": "Most frequently matched keywords across all requests",
+      "type": "barchart",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 44
       },
-      {
-        "id": 53,
-        "title": "Top Keywords (30d)",
-        "description": "Most frequently matched keywords across all requests",
-        "type": "barchart",
-        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 44 },
-        "datasource": { "type": "postgres", "uid": "PostgreSQL" },
-        "targets": [{
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "targets": [
+        {
           "rawSql": "SELECT keyword, category, SUM(match_count) AS total_matches FROM keyword_daily_summary WHERE day > NOW() - INTERVAL '30 days' GROUP BY keyword, category ORDER BY total_matches DESC LIMIT 20",
           "format": "table"
-        }],
-        "options": { "orientation": "horizontal" }
+        }
+      ],
+      "options": {
+        "orientation": "horizontal"
+      }
+    },
+    {
+      "id": 54,
+      "title": "Flagged Keywords by Team (30d)",
+      "description": "Which teams trigger high/critical keyword flags \u00e2\u20ac\u201d governance tier alignment check",
+      "type": "table",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 44
       },
-      {
-        "id": 54,
-        "title": "Flagged Keywords by Team (30d)",
-        "description": "Which teams trigger high/critical keyword flags — governance tier alignment check",
-        "type": "table",
-        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 44 },
-        "datasource": { "type": "postgres", "uid": "PostgreSQL" },
-        "targets": [{
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "targets": [
+        {
           "rawSql": "SELECT team_id, category, keyword, severity, SUM(match_count) AS total_matches, SUM(unique_users) AS unique_users, SUM(total_spend) AS spend FROM keyword_daily_summary WHERE day > NOW() - INTERVAL '30 days' AND severity IN ('critical', 'high') GROUP BY team_id, category, keyword, severity ORDER BY total_matches DESC LIMIT 50",
           "format": "table"
-        }]
+        }
+      ]
+    },
+    {
+      "id": 60,
+      "title": "Change Management Pipeline",
+      "description": "Governance change proposals by status \u00e2\u20ac\u201d tracks the approval workflow",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 52
       },
-      {
-      {
-        "id": 60,
-        "title": "Change Management Pipeline",
-        "description": "Governance change proposals by status — tracks the approval workflow",
-        "type": "stat",
-        "gridPos": { "h": 4, "w": 6, "x": 0, "y": 52 },
-        "datasource": { "type": "postgres", "uid": "PostgreSQL" },
-        "targets": [{
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "targets": [
+        {
           "rawSql": "SELECT status, COUNT(*) AS count FROM governance_changes GROUP BY status ORDER BY count DESC",
           "format": "table"
-        }],
-        "options": { "reduceOptions": { "calcs": ["lastNotNull"] } }
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "id": 61,
+      "title": "AI Advisor Suggestions (30d)",
+      "description": "AI-generated governance improvement proposals by category",
+      "type": "piechart",
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 6,
+        "y": 52
       },
-      {
-        "id": 61,
-        "title": "AI Advisor Suggestions (30d)",
-        "description": "AI-generated governance improvement proposals by category",
-        "type": "piechart",
-        "gridPos": { "h": 8, "w": 6, "x": 6, "y": 52 },
-        "datasource": { "type": "postgres", "uid": "PostgreSQL" },
-        "targets": [{
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "targets": [
+        {
           "rawSql": "SELECT category, COUNT(*) AS count FROM governance_changes WHERE source = 'ai_advisor' AND proposed_at > NOW() - INTERVAL '30 days' GROUP BY category",
           "format": "table"
-        }]
+        }
+      ]
+    },
+    {
+      "id": 62,
+      "title": "Sync History",
+      "description": "Central repository sync status over time",
+      "type": "table",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 52
       },
-      {
-        "id": 62,
-        "title": "Sync History",
-        "description": "Central repository sync status over time",
-        "type": "table",
-        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 52 },
-        "datasource": { "type": "postgres", "uid": "PostgreSQL" },
-        "targets": [{
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "targets": [
+        {
           "rawSql": "SELECT sync_at, status, records_exported, duration_ms, error_message FROM governance_sync_log ORDER BY sync_at DESC LIMIT 20",
           "format": "table"
-        }]
+        }
+      ]
+    },
+    {
+      "id": 63,
+      "title": "Framework Version History",
+      "description": "Approved and implemented governance framework changes with full audit trail",
+      "type": "table",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 60
       },
-      {
-        "id": 63,
-        "title": "Framework Version History",
-        "description": "Approved and implemented governance framework changes with full audit trail",
-        "type": "table",
-        "gridPos": { "h": 8, "w": 24, "x": 0, "y": 60 },
-        "datasource": { "type": "postgres", "uid": "PostgreSQL" },
-        "targets": [{
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "targets": [
+        {
           "rawSql": "SELECT gc.id, gc.title, gc.category, gc.source, gc.proposed_by, gc.proposed_at, gc.status, gc.reviewed_by, gc.reviewed_at, gc.framework_version, gc.implemented_at FROM governance_changes gc WHERE gc.status IN ('approved', 'implemented') ORDER BY gc.proposed_at DESC LIMIT 50",
           "format": "table"
-        }]
+        }
+      ]
+    },
+    {
+      "id": 70,
+      "title": "Audit Chain Entries",
+      "description": "Hash-chained audit trail \u00e2\u20ac\u201d tamper-evident record of all governance events",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 0,
+        "y": 68
       },
-      {
-      {
-        "id": 70,
-        "title": "Audit Chain Entries",
-        "description": "Hash-chained audit trail — tamper-evident record of all governance events",
-        "type": "timeseries",
-        "gridPos": { "h": 6, "w": 12, "x": 0, "y": 68 },
-        "datasource": { "type": "postgres", "uid": "PostgreSQL" },
-        "targets": [{
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "targets": [
+        {
           "rawSql": "SELECT date_trunc('hour', created_at) AS time, event_type, COUNT(*) AS events FROM governance_audit_chain WHERE created_at > NOW() - INTERVAL '7 days' GROUP BY 1, 2 ORDER BY 1",
           "format": "time_series"
-        }]
+        }
+      ]
+    },
+    {
+      "id": 71,
+      "title": "Chain Integrity",
+      "description": "Latest chain hash and entry count \u00e2\u20ac\u201d verify at /governance/api/v1/audit/chain/verify",
+      "type": "stat",
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 12,
+        "y": 68
       },
-      {
-        "id": 71,
-        "title": "Chain Integrity",
-        "description": "Latest chain hash and entry count — verify at /governance/api/v1/audit/chain/verify",
-        "type": "stat",
-        "gridPos": { "h": 6, "w": 6, "x": 12, "y": 68 },
-        "datasource": { "type": "postgres", "uid": "PostgreSQL" },
-        "targets": [{
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "targets": [
+        {
           "rawSql": "SELECT COUNT(*) AS total_entries, MAX(sequence) AS latest_sequence FROM governance_audit_chain",
           "format": "table"
-        }]
+        }
+      ]
+    },
+    {
+      "id": 72,
+      "title": "Recent Audit Events",
+      "type": "table",
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 18,
+        "y": 68
       },
-      {
-        "id": 72,
-        "title": "Recent Audit Events",
-        "type": "table",
-        "gridPos": { "h": 6, "w": 6, "x": 18, "y": 68 },
-        "datasource": { "type": "postgres", "uid": "PostgreSQL" },
-        "targets": [{
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "targets": [
+        {
           "rawSql": "SELECT sequence, event_type, LEFT(chain_hash, 16) AS hash_prefix, created_at FROM governance_audit_chain ORDER BY sequence DESC LIMIT 10",
           "format": "table"
-        }]
+        }
+      ]
+    },
+    {
+      "id": 40,
+      "title": "Container Logs",
+      "type": "logs",
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 74
       },
-      {
-        "id": 40,
-        "title": "Container Logs",
-        "type": "logs",
-        "gridPos": { "h": 10, "w": 24, "x": 0, "y": 74 },
-        "datasource": { "type": "loki", "uid": "Loki" },
-        "targets": [{
+      "datasource": {
+        "type": "loki",
+        "uid": "Loki"
+      },
+      "targets": [
+        {
           "expr": "{service=~\".+\"} |= ``",
           "legendFormat": "{{service}}"
-        }],
-        "options": { "showTime": true, "showLabels": true, "showCommonLabels": false, "wrapLogMessage": true, "prettifyLogMessage": false, "enableLogDetails": true, "sortOrder": "Descending" }
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": true,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "sortOrder": "Descending"
       }
-    ]
-  },
-  "overwrite": true
+    }
+  ]
 }

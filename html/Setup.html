@@ -290,13 +290,6 @@
       </div>
     </div>
 
-    <h3 style="font-size:1.1em;color:#2b6cb0;margin:24px 0 10px">Additional Services</h3>
-
-    <div class="switch-row">
-      <label class="switch"><input type="checkbox" id="enableDocforge" checked><span class="slider"></span></label>
-      <div><span class="switch-label">DocForge (File Generation &amp; Conversion)</span><div class="switch-hint">Generate DOCX, XLSX, PPTX, PDF, and more from chat. Convert between formats via LibreOffice.</div></div>
-    </div>
-
     <div class="btn-row">
       <button class="btn btn-secondary" onclick="prevStep()">Back</button>
       <button class="btn btn-primary" onclick="nextStep()">Next</button>
@@ -418,45 +411,6 @@
       </select>
     </div>
 
-    <h3 style="font-size:1.1em;color:#2b6cb0;margin:24px 0 10px">Automated Operations</h3>
-    <p class="desc" style="margin-bottom:14px">FOSS tools for daily IT administration — container patching, CVE scanning, centralized logging, and compliance dashboards.</p>
-
-    <div class="switch-row">
-      <label class="switch"><input type="checkbox" id="opsWatchtower" checked><span class="slider"></span></label>
-      <div><span class="switch-label">Watchtower (Auto-Patching)</span><div class="switch-hint">Automatically pulls updated container images daily at 4 AM. Rolls restarts safely.</div></div>
-    </div>
-
-    <div class="switch-row">
-      <label class="switch"><input type="checkbox" id="opsTrivy" checked><span class="slider"></span></label>
-      <div><span class="switch-label">Trivy (CVE Scanning)</span><div class="switch-hint">Daily vulnerability scan of all running container images. Reports HIGH/CRITICAL CVEs.</div></div>
-    </div>
-
-    <div class="switch-row">
-      <label class="switch"><input type="checkbox" id="opsGrafana" checked><span class="slider"></span></label>
-      <div><span class="switch-label">Grafana + Loki (Compliance Dashboard)</span><div class="switch-hint">Centralized logging, spend tracking, DLP metrics, audit trails. Pre-built governance dashboard.</div></div>
-    </div>
-
-    <div class="switch-row">
-      <label class="switch"><input type="checkbox" id="opsUptimeKuma" checked><span class="slider"></span></label>
-      <div><span class="switch-label">Uptime Kuma (Health Monitoring)</span><div class="switch-hint">Service health checks with alerting. Tracks uptime SLA for all components.</div></div>
-    </div>
-
-    <div class="row">
-      <div class="field">
-        <label>Backup Schedule</label>
-        <select id="opsBackupSchedule">
-          <option value="daily" selected>Daily (2 AM)</option>
-          <option value="weekly">Weekly (Sunday 2 AM)</option>
-          <option value="none">None</option>
-        </select>
-      </div>
-      <div class="field">
-        <label>Alert Webhook (optional)</label>
-        <div class="hint">Slack, Teams, or Discord webhook URL for operational alerts</div>
-        <input type="text" id="opsAlertWebhook" placeholder="https://hooks.slack.com/services/...">
-      </div>
-    </div>
-
     <h3 style="font-size:1.1em;color:#2b6cb0;margin:24px 0 10px">Keyword Analysis</h3>
     <p class="desc" style="margin-bottom:12px">
       API requests are analyzed for keyword patterns to track usage topics, flag compliance-sensitive content, and report on governance tier activity.
@@ -473,14 +427,52 @@
       + Add Category
     </button>
 
-    <h3 style="font-size:1.1em;color:#2b6cb0;margin:24px 0 10px">Enterprise Governance Hub</h3>
-    <p class="desc" style="margin-bottom:12px">
-      Sync governance data to a central repository, manage framework changes with supervisor approval, and get AI-powered improvement suggestions.
-    </p>
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="prevStep()">Back</button>
+      <button class="btn btn-primary" onclick="nextStep()">Next</button>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- STEP 6: Optional Services                                     -->
+  <!-- ============================================================ -->
+  <div class="step" data-step="6">
+    <h2><span class="step-num">6</span> Optional Services</h2>
+    <p class="desc">Enable or disable add-on services. All are optional — core chat and API functionality works without them.</p>
+
+    <h3 style="font-size:1.1em;color:#2b6cb0;margin:16px 0 10px">Add-On Services</h3>
+    <p class="desc" style="margin-bottom:14px">Each service adds a dedicated route on your deployment (e.g., <code>/docforge/</code>, <code>/grafana/</code>).</p>
+
+    <div class="switch-row">
+      <label class="switch"><input type="checkbox" id="enableDocforge" checked><span class="slider"></span></label>
+      <div>
+        <span class="switch-label">DocForge &mdash; File Generation &amp; Conversion</span>
+        <div class="switch-hint">Generate DOCX, XLSX, PPTX, PDF, and more from chat. Convert between formats via LibreOffice. <strong>Route: /docforge/</strong></div>
+      </div>
+    </div>
+
+    <div class="switch-row">
+      <label class="switch"><input type="checkbox" id="opsGrafana" checked><span class="slider"></span></label>
+      <div>
+        <span class="switch-label">Grafana + Loki &mdash; Compliance Dashboard</span>
+        <div class="switch-hint">Centralized logging, spend tracking, DLP metrics, audit trails. Pre-built governance dashboard. <strong>Route: /grafana/</strong></div>
+      </div>
+    </div>
+
+    <div class="switch-row">
+      <label class="switch"><input type="checkbox" id="opsUptimeKuma" checked><span class="slider"></span></label>
+      <div>
+        <span class="switch-label">Uptime Kuma &mdash; Health Monitoring</span>
+        <div class="switch-hint">Service health checks with alerting. Tracks uptime SLA for all components. <strong>Route: /status/</strong></div>
+      </div>
+    </div>
 
     <div class="switch-row">
       <label class="switch"><input type="checkbox" id="enableGovernanceHub" onchange="toggleGovernanceHub()"><span class="slider"></span></label>
-      <div><span class="switch-label">Enable Governance Hub</span><div class="switch-hint">Central sync, change management, AI advisor. Requires a central database.</div></div>
+      <div>
+        <span class="switch-label">Governance Hub &mdash; Enterprise Fleet Sync</span>
+        <div class="switch-hint">Central sync, change management, AI advisor. Requires a central database. <strong>Route: /governance/</strong></div>
+      </div>
     </div>
 
     <div id="governanceHubOptions" style="display:none">
@@ -559,6 +551,35 @@
       </div>
     </div>
 
+    <h3 style="font-size:1.1em;color:#2b6cb0;margin:24px 0 10px">Automated Operations</h3>
+    <p class="desc" style="margin-bottom:14px">Background maintenance tasks that run on schedule.</p>
+
+    <div class="switch-row">
+      <label class="switch"><input type="checkbox" id="opsWatchtower" checked><span class="slider"></span></label>
+      <div><span class="switch-label">Watchtower (Auto-Patching)</span><div class="switch-hint">Automatically pulls updated container images daily at 4 AM. Rolls restarts safely.</div></div>
+    </div>
+
+    <div class="switch-row">
+      <label class="switch"><input type="checkbox" id="opsTrivy" checked><span class="slider"></span></label>
+      <div><span class="switch-label">Trivy (CVE Scanning)</span><div class="switch-hint">Daily vulnerability scan of all running container images. Reports HIGH/CRITICAL CVEs.</div></div>
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label>Backup Schedule</label>
+        <select id="opsBackupSchedule">
+          <option value="daily" selected>Daily (2 AM)</option>
+          <option value="weekly">Weekly (Sunday 2 AM)</option>
+          <option value="none">None</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Alert Webhook (optional)</label>
+        <div class="hint">Slack, Teams, or Discord webhook URL for operational alerts</div>
+        <input type="text" id="opsAlertWebhook" placeholder="https://hooks.slack.com/services/...">
+      </div>
+    </div>
+
     <div class="btn-row">
       <button class="btn btn-secondary" onclick="prevStep()">Back</button>
       <button class="btn btn-primary" onclick="nextStep()">Next</button>
@@ -566,10 +587,10 @@
   </div>
 
   <!-- ============================================================ -->
-  <!-- STEP 6: Network & Identity                                    -->
+  <!-- STEP 7: Network & Identity                                    -->
   <!-- ============================================================ -->
-  <div class="step" data-step="6">
-    <h2><span class="step-num">6</span> Network &amp; Identity</h2>
+  <div class="step" data-step="7">
+    <h2><span class="step-num">7</span> Network &amp; Identity</h2>
     <p class="desc">Configure hostname, TLS, and SSO.</p>
 
     <div class="row">
@@ -715,10 +736,10 @@
   </div>
 
   <!-- ============================================================ -->
-  <!-- STEP 7: Hyper-V VM Settings (conditional)                     -->
+  <!-- STEP 8: Hyper-V VM Settings (conditional)                     -->
   <!-- ============================================================ -->
-  <div class="step" data-step="7" id="stepHypervVm">
-    <h2><span class="step-num">7</span> VM Configuration</h2>
+  <div class="step" data-step="8" id="stepHypervVm">
+    <h2><span class="step-num">8</span> VM Configuration</h2>
     <p class="desc">Hyper-V virtual machine sizing and paths.</p>
 
     <div class="row">
@@ -772,10 +793,10 @@
   </div>
 
   <!-- ============================================================ -->
-  <!-- STEP 8: Review & Download                                     -->
+  <!-- STEP 9: Review & Download                                     -->
   <!-- ============================================================ -->
-  <div class="step" data-step="8">
-    <h2><span class="step-num" id="reviewStepNum">8</span> Review &amp; Download</h2>
+  <div class="step" data-step="9">
+    <h2><span class="step-num" id="reviewStepNum">9</span> Review &amp; Download</h2>
     <p class="desc">Review your configuration, download the file, then follow the remaining steps.</p>
 
     <div id="outputContainer">
@@ -807,8 +828,8 @@
 // ================================================================
 let currentStep = 1;
 let deployPath = 'hyperv';
-const totalStepsHyperv = 8;
-const totalStepsWsl2 = 7; // skip VM config step
+const totalStepsHyperv = 9;
+const totalStepsWsl2 = 8; // skip VM config step
 
 function getTotalSteps() { return deployPath === 'hyperv' ? totalStepsHyperv : totalStepsWsl2; }
 
@@ -831,15 +852,15 @@ function showStep(n) {
 
   // Map logical step to actual step element
   let targetStep = n;
-  if (deployPath === 'wsl2' && n >= 7) {
-    targetStep = 8; // skip step 7 (VM config), go to review
+  if (deployPath === 'wsl2' && n >= 8) {
+    targetStep = 9; // skip step 8 (VM config), go to review
   }
 
   const el = document.querySelector(`.step[data-step="${targetStep}"]`);
   if (el) el.classList.add('active');
 
   // Update review step number display
-  if (targetStep === 8) {
+  if (targetStep === 9) {
     document.getElementById('reviewStepNum').textContent = getTotalSteps();
     generateOutput();
   }
