@@ -276,3 +276,268 @@ def save_db_config(config: dict) -> dict:
         return {"success": True, "message": f"Saved to {env_path}. Restart the Governance Hub container to apply."}
     except Exception as e:
         return {"success": False, "message": str(e)}
+
+
+# =========================================================================
+# Central DB schema initialization
+# =========================================================================
+
+# DDL statements use IF NOT EXISTS (PostgreSQL/MariaDB) or
+# conditional checks (MSSQL) to be safely re-runnable.
+
+_TABLES_POSTGRESQL = [
+    """CREATE TABLE IF NOT EXISTS governance_instances (
+        instance_id VARCHAR(100) PRIMARY KEY,
+        instance_name VARCHAR(200),
+        industry VARCHAR(50),
+        governance_tier VARCHAR(20),
+        data_classification VARCHAR(30),
+        schema_version INTEGER DEFAULT 1,
+        platform_version VARCHAR(20) DEFAULT 'unknown',
+        last_sync_at TIMESTAMP,
+        status VARCHAR(20) DEFAULT 'active',
+        created_at TIMESTAMP DEFAULT NOW()
+    )""",
+    """CREATE TABLE IF NOT EXISTS governance_telemetry (
+        id SERIAL PRIMARY KEY,
+        instance_id VARCHAR(100) REFERENCES governance_instances(instance_id),
+        instance_name VARCHAR(200),
+        schema_version INTEGER,
+        platform_version VARCHAR(20) DEFAULT 'unknown',
+        period_start TIMESTAMP,
+        period_end TIMESTAMP,
+        total_requests BIGINT DEFAULT 0,
+        total_spend NUMERIC(12,4) DEFAULT 0,
+        unique_users INTEGER DEFAULT 0,
+        dlp_blocks INTEGER DEFAULT 0,
+        error_count INTEGER DEFAULT 0,
+        keyword_flags_critical INTEGER DEFAULT 0,
+        keyword_flags_high INTEGER DEFAULT 0,
+        compliance_score NUMERIC(5,1),
+        industry VARCHAR(50),
+        governance_tier VARCHAR(20),
+        metrics_json TEXT,
+        synced_at TIMESTAMP DEFAULT NOW()
+    )""",
+    """CREATE TABLE IF NOT EXISTS governance_config_snapshots (
+        id INTEGER,
+        instance_id VARCHAR(100),
+        schema_version INTEGER,
+        config_json JSONB,
+        diff_from_previous JSONB,
+        snapshot_at TIMESTAMP,
+        created_by VARCHAR(100),
+        PRIMARY KEY (id, instance_id)
+    )""",
+    """CREATE TABLE IF NOT EXISTS governance_changes (
+        id SERIAL PRIMARY KEY,
+        instance_id VARCHAR(100),
+        title VARCHAR(300),
+        category VARCHAR(50),
+        description TEXT,
+        source VARCHAR(30),
+        proposed_by VARCHAR(100),
+        proposed_at TIMESTAMP DEFAULT NOW(),
+        status VARCHAR(20) DEFAULT 'pending',
+        reviewed_by VARCHAR(100),
+        reviewed_at TIMESTAMP,
+        reviewer_comments TEXT,
+        framework_version INTEGER,
+        implemented_at TIMESTAMP
+    )""",
+]
+
+_TABLES_MSSQL = [
+    """IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'governance_instances')
+    CREATE TABLE governance_instances (
+        instance_id VARCHAR(100) PRIMARY KEY,
+        instance_name VARCHAR(200),
+        industry VARCHAR(50),
+        governance_tier VARCHAR(20),
+        data_classification VARCHAR(30),
+        schema_version INT DEFAULT 1,
+        platform_version VARCHAR(20) DEFAULT 'unknown',
+        last_sync_at DATETIME2,
+        status VARCHAR(20) DEFAULT 'active',
+        created_at DATETIME2 DEFAULT GETDATE()
+    )""",
+    """IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'governance_telemetry')
+    CREATE TABLE governance_telemetry (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        instance_id VARCHAR(100),
+        instance_name VARCHAR(200),
+        schema_version INT,
+        platform_version VARCHAR(20) DEFAULT 'unknown',
+        period_start DATETIME2,
+        period_end DATETIME2,
+        total_requests BIGINT DEFAULT 0,
+        total_spend DECIMAL(12,4) DEFAULT 0,
+        unique_users INT DEFAULT 0,
+        dlp_blocks INT DEFAULT 0,
+        error_count INT DEFAULT 0,
+        keyword_flags_critical INT DEFAULT 0,
+        keyword_flags_high INT DEFAULT 0,
+        compliance_score DECIMAL(5,1),
+        industry VARCHAR(50),
+        governance_tier VARCHAR(20),
+        metrics_json NVARCHAR(MAX),
+        synced_at DATETIME2 DEFAULT GETDATE()
+    )""",
+    """IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'governance_config_snapshots')
+    CREATE TABLE governance_config_snapshots (
+        id INT,
+        instance_id VARCHAR(100),
+        schema_version INT,
+        config_json NVARCHAR(MAX),
+        diff_from_previous NVARCHAR(MAX),
+        snapshot_at DATETIME2,
+        created_by VARCHAR(100),
+        PRIMARY KEY (id, instance_id)
+    )""",
+    """IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'governance_changes')
+    CREATE TABLE governance_changes (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        instance_id VARCHAR(100),
+        title VARCHAR(300),
+        category VARCHAR(50),
+        description NVARCHAR(MAX),
+        source VARCHAR(30),
+        proposed_by VARCHAR(100),
+        proposed_at DATETIME2 DEFAULT GETDATE(),
+        status VARCHAR(20) DEFAULT 'pending',
+        reviewed_by VARCHAR(100),
+        reviewed_at DATETIME2,
+        reviewer_comments NVARCHAR(MAX),
+        framework_version INT,
+        implemented_at DATETIME2
+    )""",
+]
+
+_TABLES_MARIADB = [
+    """CREATE TABLE IF NOT EXISTS governance_instances (
+        instance_id VARCHAR(100) PRIMARY KEY,
+        instance_name VARCHAR(200),
+        industry VARCHAR(50),
+        governance_tier VARCHAR(20),
+        data_classification VARCHAR(30),
+        schema_version INT DEFAULT 1,
+        platform_version VARCHAR(20) DEFAULT 'unknown',
+        last_sync_at DATETIME,
+        status VARCHAR(20) DEFAULT 'active',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )""",
+    """CREATE TABLE IF NOT EXISTS governance_telemetry (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        instance_id VARCHAR(100),
+        instance_name VARCHAR(200),
+        schema_version INT,
+        platform_version VARCHAR(20) DEFAULT 'unknown',
+        period_start DATETIME,
+        period_end DATETIME,
+        total_requests BIGINT DEFAULT 0,
+        total_spend DECIMAL(12,4) DEFAULT 0,
+        unique_users INT DEFAULT 0,
+        dlp_blocks INT DEFAULT 0,
+        error_count INT DEFAULT 0,
+        keyword_flags_critical INT DEFAULT 0,
+        keyword_flags_high INT DEFAULT 0,
+        compliance_score DECIMAL(5,1),
+        industry VARCHAR(50),
+        governance_tier VARCHAR(20),
+        metrics_json LONGTEXT,
+        synced_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )""",
+    """CREATE TABLE IF NOT EXISTS governance_config_snapshots (
+        id INT,
+        instance_id VARCHAR(100),
+        schema_version INT,
+        config_json LONGTEXT,
+        diff_from_previous LONGTEXT,
+        snapshot_at DATETIME,
+        created_by VARCHAR(100),
+        PRIMARY KEY (id, instance_id)
+    )""",
+    """CREATE TABLE IF NOT EXISTS governance_changes (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        instance_id VARCHAR(100),
+        title VARCHAR(300),
+        category VARCHAR(50),
+        description TEXT,
+        source VARCHAR(30),
+        proposed_by VARCHAR(100),
+        proposed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        status VARCHAR(20) DEFAULT 'pending',
+        reviewed_by VARCHAR(100),
+        reviewed_at DATETIME,
+        reviewer_comments TEXT,
+        framework_version INT,
+        implemented_at DATETIME
+    )""",
+]
+
+
+async def initialize_central_db(config: dict) -> dict:
+    """Create governance tables in the central database if they don't exist."""
+    import asyncio
+    from concurrent.futures import ThreadPoolExecutor
+
+    try:
+        url = _build_sync_url(config)
+    except ValueError as e:
+        return {"success": False, "message": str(e), "tables_created": []}
+
+    db_type = config["db_type"]
+    if db_type == "mssql":
+        ddl_list = _TABLES_MSSQL
+    elif db_type in ("mariadb", "mysql"):
+        ddl_list = _TABLES_MARIADB
+    else:
+        ddl_list = _TABLES_POSTGRESQL
+
+    def _init_sync() -> dict:
+        engine = None
+        try:
+            connect_args: dict = {}
+            if "psycopg2" in url:
+                connect_args = {"connect_timeout": 10}
+            elif "pymssql" in url:
+                connect_args = {"login_timeout": 10, "tds_version": "7.3"}
+
+            engine = create_engine(url, pool_size=1, max_overflow=0, connect_args=connect_args)
+            created = []
+            skipped = []
+            with engine.connect() as conn:
+                for ddl in ddl_list:
+                    # Extract table name for reporting
+                    table_name = "unknown"
+                    for word in ddl.split():
+                        if word.startswith("governance_"):
+                            table_name = word.rstrip("(")
+                            break
+                    try:
+                        conn.execute(text(ddl))
+                        created.append(table_name)
+                    except Exception as e:
+                        err = str(e)
+                        if "already exists" in err.lower():
+                            skipped.append(table_name)
+                        else:
+                            return {"success": False, "message": f"Failed on {table_name}: {err[:200]}",
+                                    "tables_created": created, "tables_skipped": skipped}
+                conn.commit()
+            return {
+                "success": True,
+                "message": f"Initialized {len(created)} tables ({len(skipped)} already existed)",
+                "tables_created": created,
+                "tables_skipped": skipped,
+            }
+        except Exception as e:
+            msg = str(e)[:200]
+            return {"success": False, "message": msg, "tables_created": [], "tables_skipped": []}
+        finally:
+            if engine:
+                engine.dispose()
+
+    loop = asyncio.get_event_loop()
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        return await loop.run_in_executor(pool, _init_sync)

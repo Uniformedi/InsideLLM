@@ -441,6 +441,7 @@
       </div>
       <div class="wiz-actions">
         <button class="btn btn-action" onclick="testFleetDb()">Test Connection</button>
+        <button class="btn btn-approve" id="fleetDbInitBtn" onclick="initializeFleetDb()" style="display:none">Initialize Database</button>
         <button class="btn btn-approve" onclick="saveFleetDb()">Save Configuration</button>
         <span class="wiz-result" id="fleetDbResult"></span>
       </div>
@@ -979,6 +980,8 @@ function getFleetDbFormData() {
 
 async function testFleetDb() {
   const result = document.getElementById('fleetDbResult');
+  const initBtn = document.getElementById('fleetDbInitBtn');
+  initBtn.style.display = 'none';
   const data = getFleetDbFormData();
   if (!data.host) { result.innerHTML = `<span style="color:var(--red)">Host is required</span>`; return; }
 
@@ -993,6 +996,33 @@ async function testFleetDb() {
     const res = await resp.json();
     if (res.success) {
       result.innerHTML = `<span style="color:var(--green)">Connected (${res.latency_ms}ms)</span>`;
+      initBtn.style.display = 'inline-block';
+    } else {
+      result.innerHTML = `<span style="color:var(--red)">Failed: ${res.message}</span>`;
+    }
+  } catch (e) {
+    result.innerHTML = `<span style="color:var(--red)">Error: ${e.message}</span>`;
+  }
+}
+
+async function initializeFleetDb() {
+  const result = document.getElementById('fleetDbResult');
+  const data = getFleetDbFormData();
+  result.innerHTML = `<span style="color:var(--amber)">Creating tables...</span>`;
+
+  try {
+    const resp = await fetch(`${GOV()}/api/v1/fleet/db/initialize`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+      signal: AbortSignal.timeout(30000),
+    });
+    const res = await resp.json();
+    if (res.success) {
+      const created = res.tables_created?.join(', ') || 'none';
+      const skipped = res.tables_skipped?.length ? ` (${res.tables_skipped.length} already existed)` : '';
+      result.innerHTML = `<span style="color:var(--green)">${res.message}</span><br>` +
+        `<span style="color:var(--text-muted);font-size:11px">Created: ${created}${skipped}</span>`;
     } else {
       result.innerHTML = `<span style="color:var(--red)">Failed: ${res.message}</span>`;
     }

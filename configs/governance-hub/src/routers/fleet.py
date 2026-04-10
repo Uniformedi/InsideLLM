@@ -6,6 +6,7 @@ from ..services.fleet_service import (
     compare_instances,
     get_fleet_summary,
     get_instance_detail,
+    initialize_central_db,
     list_instances,
     test_db_connection,
     get_db_config,
@@ -74,3 +75,9 @@ async def test_fleet_db(config: FleetDbConfig):
 async def save_fleet_db_config(config: FleetDbConfig):
     """Save central database configuration to env override file."""
     return save_db_config(config.model_dump())
+
+
+@router.post("/db/initialize")
+async def initialize_fleet_db(config: FleetDbConfig):
+    """Create governance tables in the central database if they don't exist."""
+    return await initialize_central_db(config.model_dump())
