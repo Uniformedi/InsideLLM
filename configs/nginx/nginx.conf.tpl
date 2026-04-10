@@ -224,6 +224,8 @@ http {
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
             proxy_buffering off;
+            # Rewrite Uptime Kuma redirects to include the /status/ prefix
+            proxy_redirect / /status/;
         }
 
 %{ endif ~}
