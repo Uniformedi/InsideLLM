@@ -4,6 +4,7 @@ import logging
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from fastapi import FastAPI
+from fastapi.responses import HTMLResponse
 
 from .config import settings
 from .db.local_db import AsyncSessionLocal, engine
@@ -48,6 +49,70 @@ app.include_router(connectors.router)
 app.include_router(obligations.router)
 
 scheduler = AsyncIOScheduler()
+
+
+@app.get("/", response_class=HTMLResponse)
+async def landing():
+    """Governance Hub landing page with links to admin UI and API docs."""
+    return f"""<!DOCTYPE html>
+<html><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>InsideLLM — Governance Hub</title>
+<style>
+  * {{ margin:0; padding:0; box-sizing:border-box; }}
+  body {{ font-family:'Segoe UI',system-ui,sans-serif; background:#0a0e1a; color:#e2e8f0; min-height:100vh;
+         display:flex; align-items:center; justify-content:center; }}
+  .card {{ background:#1a2234; border:1px solid #2a3650; border-radius:12px; padding:48px; max-width:560px; width:90vw; }}
+  h1 {{ font-size:24px; color:#22d3ee; font-family:monospace; margin-bottom:4px; }}
+  .sub {{ color:#94a3b8; font-size:14px; margin-bottom:32px; }}
+  .meta {{ display:flex; gap:16px; flex-wrap:wrap; margin-bottom:28px; }}
+  .meta span {{ font-family:monospace; font-size:12px; background:#111827; border:1px solid #2a3650;
+                padding:4px 10px; border-radius:4px; color:#94a3b8; }}
+  .meta span strong {{ color:#22d3ee; }}
+  .links {{ display:flex; flex-direction:column; gap:10px; }}
+  a {{ display:flex; align-items:center; gap:12px; padding:14px 18px; background:#111827; border:1px solid #2a3650;
+       border-radius:8px; text-decoration:none; color:#e2e8f0; transition:border-color 0.2s; }}
+  a:hover {{ border-color:#22d3ee; }}
+  a .icon {{ width:36px; height:36px; border-radius:8px; display:flex; align-items:center; justify-content:center;
+             font-size:14px; font-weight:700; color:#fff; font-family:monospace; flex-shrink:0; }}
+  a .label {{ font-weight:600; font-size:14px; }}
+  a .desc {{ font-size:12px; color:#94a3b8; margin-top:2px; }}
+  .dot {{ width:8px; height:8px; border-radius:50%; background:#34d399; display:inline-block; margin-right:6px; }}
+</style>
+</head><body>
+<div class="card">
+  <h1>InsideLLM Governance Hub</h1>
+  <div class="sub"><span class="dot"></span>Running &mdash; v{settings.platform_version}</div>
+  <div class="meta">
+    <span><strong>Instance:</strong> {settings.instance_name or settings.instance_id or 'local'}</span>
+    <span><strong>Industry:</strong> {settings.industry}</span>
+    <span><strong>Tier:</strong> {settings.governance_tier}</span>
+    <span><strong>Classification:</strong> {settings.data_classification}</span>
+  </div>
+  <div class="links">
+    <a href="/admin">
+      <span class="icon" style="background:#2563eb">CC</span>
+      <div><div class="label">Command Center</div><div class="desc">Governance dashboard, change management, fleet overview, monitoring</div></div>
+    </a>
+    <a href="/governance/docs">
+      <span class="icon" style="background:#059669">API</span>
+      <div><div class="label">API Documentation</div><div class="desc">Swagger UI — all governance, fleet, sync, and restore endpoints</div></div>
+    </a>
+    <a href="/governance/redoc">
+      <span class="icon" style="background:#7c3aed">RD</span>
+      <div><div class="label">ReDoc</div><div class="desc">Alternative API reference with schema details</div></div>
+    </a>
+    <a href="/governance/health">
+      <span class="icon" style="background:#0891b2">HC</span>
+      <div><div class="label">Health Check</div><div class="desc">JSON status, version, instance identity, governance metadata</div></div>
+    </a>
+    <a href="/grafana/">
+      <span class="icon" style="background:#d97706">GR</span>
+      <div><div class="label">Compliance Dashboards</div><div class="desc">Grafana — spend tracking, keyword analysis, audit trails, fleet overview</div></div>
+    </a>
+  </div>
+</div>
+</body></html>"""
 
 
 @app.get("/health")
