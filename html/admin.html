@@ -971,20 +971,23 @@ async function loadFleetDbConfig() {
     if (config.connected) {
       fleetDbConnected = true;
       status.innerHTML = `<span class="dot dot-ok"></span><span style="color:var(--green)">Connected</span>` +
-        `<span style="color:var(--text-muted);margin-left:8px">${config.db_type} @ ${config.host}:${config.port}/${config.db_name}</span>`;
+        `<span style="color:var(--text-muted);margin-left:8px">${config.db_type} @ ${config.host}:${config.port}/${config.db_name}</span>` +
+        `<span style="color:var(--cyan);margin-left:8px">Fleet Mode: Active</span>`;
       // Collapse fields when connected
       fields.style.display = 'none';
       toggle.textContent = 'EXPAND';
     } else {
       fleetDbConnected = false;
-      status.innerHTML = `<span class="dot dot-warn"></span><span style="color:var(--amber)">Configured but not connected</span>`;
+      status.innerHTML = `<span class="dot dot-warn"></span><span style="color:var(--amber)">Configured but not connected</span>` +
+        `<span style="color:var(--text-muted);margin-left:8px">Fleet Mode: Local</span>`;
       // Expand fields so user can fix the config
       fields.style.display = 'block';
       toggle.textContent = 'COLLAPSE';
     }
   } else {
     fleetDbConnected = false;
-    status.innerHTML = `<span class="dot dot-err"></span><span style="color:var(--text-muted)">No central database configured</span>`;
+    status.innerHTML = `<span class="dot dot-err"></span><span style="color:var(--text-muted)">No central database configured</span>` +
+      `<span style="color:var(--text-muted);margin-left:8px">Fleet Mode: Local</span>`;
     // Expand fields for initial setup
     fields.style.display = 'block';
     toggle.textContent = 'COLLAPSE';
@@ -1101,8 +1104,9 @@ async function loadFleet() {
   const hasFleetData = summary && !summary.error && summary.total_instances > 0;
 
   if (fleetDbConnected && hasFleetData) {
+    // Show fleet summary tiles (no redundant "Fleet Mode" tile — status is in the DB wizard box)
     ft.innerHTML = `
-      <div class="tile"><div class="label">Fleet Mode</div><div class="value green">Connected</div><div class="sub">${summary.total_instances} instance${summary.total_instances !== 1 ? 's' : ''} in fleet</div></div>
+      <div class="tile"><div class="label">Instances</div><div class="value cyan">${summary.total_instances}</div><div class="sub">in fleet</div></div>
       <div class="tile"><div class="label">Reporting</div><div class="value green">${summary.reporting_instances}</div></div>
       <div class="tile"><div class="label">Stale (24h)</div><div class="value ${summary.stale_instances > 0 ? 'red' : 'green'}">${summary.stale_instances}</div></div>
       <div class="tile"><div class="label">Fleet Spend</div><div class="value">$${(summary.fleet_total_spend || 0).toFixed(2)}</div></div>
@@ -1110,9 +1114,16 @@ async function loadFleet() {
       <div class="tile"><div class="label">Avg Compliance</div><div class="value green">${(summary.avg_compliance_score || 0).toFixed(1)}%</div></div>
     `;
   } else if (fleetDbConnected) {
-    ft.innerHTML = '<div class="tile"><div class="label">Fleet Mode</div><div class="value cyan">Connected</div><div class="sub">Database connected — awaiting first sync</div></div>';
+    // Connected but no data yet — update wizard box status, no tiles
+    ft.innerHTML = '';
+    const statusEl = document.getElementById('fleetDbStatus');
+    if (statusEl && !statusEl.innerHTML.includes('awaiting')) {
+      // Append sync status to the existing connected message
+      statusEl.innerHTML = statusEl.innerHTML.replace('Fleet Mode: Active',
+        'Fleet Mode: Active &mdash; <span style="color:var(--amber)">awaiting first sync</span>');
+    }
   } else {
-    ft.innerHTML = '<div class="tile"><div class="label">Fleet Mode</div><div class="value amber">Local</div><div class="sub">Configure a central DB above to enable multi-instance fleet</div></div>';
+    ft.innerHTML = '';
   }
 
   const table = document.getElementById('fleetTable');
