@@ -327,6 +327,11 @@
     <label>HOST</label>
     <input type="text" id="hostInput" oninput="onHostChange()">
   </div>
+  <div id="authUser" style="display:none;align-items:center;gap:8px;font-family:var(--font-mono);font-size:11px">
+    <span style="color:var(--text-muted)">USER</span>
+    <span id="authUsername" style="color:var(--cyan)"></span>
+    <a href="/auth/logout" style="color:var(--text-muted);text-decoration:none;font-size:10px;padding:2px 8px;border:1px solid var(--border);border-radius:3px" title="Sign out">LOGOUT</a>
+  </div>
 </div>
 
 <div class="tab-bar">
@@ -1206,13 +1211,24 @@ async function downloadCloneTfvars() {
 onHostChange();
 checkHealth();
 loadOverview();
-// Load platform version badge
+// Load platform version badge + auth status
 (async function() {
   try {
     const r = await fetch(`${GOV()}/health`, { signal: AbortSignal.timeout(5000) });
     if (r.ok) {
       const h = await r.json();
       if (h.platform_version) document.getElementById('platformVersion').textContent = `v${h.platform_version}`;
+    }
+  } catch(e) {}
+  // Check if user is authenticated (auth may not be configured)
+  try {
+    const r = await fetch(`${P()}//${H()}/auth/whoami`, { signal: AbortSignal.timeout(3000) });
+    if (r.ok) {
+      const u = await r.json();
+      if (u.authenticated) {
+        document.getElementById('authUsername').textContent = u.username;
+        document.getElementById('authUser').style.display = 'flex';
+      }
     }
   } catch(e) {}
 })();

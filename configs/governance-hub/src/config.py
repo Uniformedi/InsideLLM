@@ -40,6 +40,19 @@ class Settings(BaseSettings):
     governance_tier: str = "tier3"
     data_classification: str = "internal"
 
+    # Admin authentication (oidc / ldap / none)
+    admin_auth_mode: str = "none"
+    auth_secret: str = ""  # JWT signing key for session cookies
+
+    # LDAP / Active Directory (when admin_auth_mode = "ldap")
+    ad_domain: str = ""
+    ad_admin_groups: str = "Domain Admins"  # comma-separated groups allowed access
+
+    # OIDC (when admin_auth_mode = "oidc")
+    oidc_issuer_url: str = ""
+    oidc_client_id: str = ""
+    oidc_client_secret: str = ""
+
     model_config = {"env_prefix": "GOVERNANCE_HUB_"}
 
     @property

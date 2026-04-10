@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from .config import settings
 from .db.local_db import AsyncSessionLocal, engine
 from .db.models import Base
-from .routers import advisor, audit, changes, config_snapshots, connectors, fleet, obligations, restore, schema, sync
+from .routers import advisor, audit, auth, changes, config_snapshots, connectors, fleet, obligations, restore, schema, sync
 from .services.config_service import capture_snapshot
 from .services.sync_service import collect_telemetry, export_to_central
 
@@ -32,6 +32,9 @@ def custom_openapi():
     return app.openapi_schema
 
 app.openapi = custom_openapi
+
+if settings.admin_auth_mode != "none":
+    app.include_router(auth.router)
 
 app.include_router(sync.router)
 app.include_router(changes.router)

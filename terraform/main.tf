@@ -175,6 +175,10 @@ locals {
     sso_client_secret  = var.sso_provider == "azure_ad" ? var.azure_ad_client_secret : var.sso_provider == "okta" ? var.okta_client_secret : ""
     sso_tenant_id      = var.sso_provider == "azure_ad" ? var.azure_ad_tenant_id : ""
     sso_okta_domain    = var.sso_provider == "okta" ? var.okta_domain : ""
+    admin_auth_mode    = var.sso_provider != "none" ? "oidc" : var.ad_domain_join ? "ldap" : "none"
+    ad_domain          = var.vm_domain
+    ad_admin_groups    = var.ad_admin_groups
+    oidc_issuer_url    = var.sso_provider == "azure_ad" ? "https://login.microsoftonline.com/${var.azure_ad_tenant_id}/v2.0" : var.sso_provider == "okta" ? "https://${var.okta_domain}" : ""
     ollama_enable      = var.ollama_enable && !var.ollama_separate_vm
     ollama_models      = var.ollama_models
     ollama_gpu               = var.ollama_gpu
@@ -217,6 +221,7 @@ locals {
     ops_grafana_enable      = var.ops_grafana_enable
     ops_uptime_kuma_enable  = var.ops_uptime_kuma_enable
     governance_hub_enable   = var.governance_hub_enable
+    admin_auth_mode        = var.sso_provider != "none" ? "oidc" : var.ad_domain_join ? "ldap" : "none"
   })
 }
 

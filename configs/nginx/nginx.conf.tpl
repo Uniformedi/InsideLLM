@@ -227,8 +227,34 @@ http {
         }
 
 %{ endif ~}
+%{ if admin_auth_mode != "none" ~}
+        # --- Auth subrequest target ---
+        location = /auth/validate {
+            internal;
+            proxy_pass http://governance-hub:8090/auth/validate;
+            proxy_pass_request_body off;
+            proxy_set_header Content-Length "";
+            proxy_set_header X-Original-URI $request_uri;
+            proxy_set_header Cookie $http_cookie;
+        }
+
+        # --- Auth endpoints (login, callback, logout, whoami) ---
+        location /auth/ {
+            proxy_pass http://governance-hub:8090/auth/;
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+%{ endif ~}
+
         # --- Admin Portal ---
         location /admin {
+%{ if admin_auth_mode != "none" ~}
+            auth_request /auth/validate;
+            error_page 401 = /auth/login;
+%{ endif ~}
             alias /opt/InsideLLM/admin.html;
             default_type text/html;
         }

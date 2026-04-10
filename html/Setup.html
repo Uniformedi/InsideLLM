@@ -714,7 +714,14 @@
         <li><code>https://&lt;your-host&gt;/oauth/oidc/callback</code> (Open WebUI)</li>
         <li><code>https://&lt;your-host&gt;/grafana/login/generic_oauth</code> (Grafana)</li>
         <li><code>https://&lt;your-host&gt;/litellm/sso/callback</code> (LiteLLM)</li>
+        <li><code>https://&lt;your-host&gt;/auth/callback</code> (Admin Command Center)</li>
       </ul>
+    </div>
+
+    <div class="info-box" id="adAuthHint" style="display:none">
+      <strong>Admin Portal Authentication:</strong> When AD domain join is enabled without a cloud SSO provider,
+      the Admin Command Center is protected by Active Directory credentials. Users sign in with their AD username
+      and password. Access is restricted to members of the configured admin groups (default: Domain Admins).
     </div>
 
     <!-- SSO Group-to-Team Mapping -->
@@ -1153,6 +1160,14 @@ function getKeywordCategories() {
 function toggleAdJoin() {
   const on = document.getElementById('adDomainJoin').checked;
   document.getElementById('adJoinFields').style.display = on ? 'block' : 'none';
+  updateAdAuthHint();
+}
+
+function updateAdAuthHint() {
+  const adOn = document.getElementById('adDomainJoin') && document.getElementById('adDomainJoin').checked;
+  const sso = document.getElementById('ssoProvider') ? document.getElementById('ssoProvider').value : 'none';
+  const hint = document.getElementById('adAuthHint');
+  if (hint) hint.style.display = (adOn && sso === 'none') ? 'block' : 'none';
 }
 
 function toggleGovernanceHub() {
@@ -1185,6 +1200,7 @@ function toggleSso() {
   document.getElementById('azureFields').style.display = val === 'azure_ad' ? 'block' : 'none';
   document.getElementById('oktaFields').style.display = val === 'okta' ? 'block' : 'none';
   document.getElementById('ssoRedirectUris').style.display = val !== 'none' ? 'block' : 'none';
+  updateAdAuthHint();
 
   const groupSection = document.getElementById('groupMappingSection');
   const hintEl = document.getElementById('groupClaimHint');

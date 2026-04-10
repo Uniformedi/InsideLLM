@@ -186,6 +186,12 @@ variable "ad_dns_register" {
   default     = true
 }
 
+variable "ad_admin_groups" {
+  description = "Comma-separated AD groups allowed to access the Admin Command Center (e.g., 'Domain Admins,IT Administrators')"
+  type        = string
+  default     = "Domain Admins"
+}
+
 # =============================================================================
 # SSH ACCESS
 # =============================================================================

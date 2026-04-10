@@ -382,6 +382,17 @@ services:
       GOVERNANCE_HUB_INDUSTRY: "${governance_hub_industry}"
       GOVERNANCE_HUB_GOVERNANCE_TIER: "${governance_hub_tier}"
       GOVERNANCE_HUB_DATA_CLASSIFICATION: "${governance_hub_classification}"
+      GOVERNANCE_HUB_ADMIN_AUTH_MODE: "${admin_auth_mode}"
+      GOVERNANCE_HUB_AUTH_SECRET: "${governance_hub_secret}"
+%{ if admin_auth_mode == "ldap" }
+      GOVERNANCE_HUB_AD_DOMAIN: "${ad_domain}"
+      GOVERNANCE_HUB_AD_ADMIN_GROUPS: "${ad_admin_groups}"
+%{ endif }
+%{ if admin_auth_mode == "oidc" }
+      GOVERNANCE_HUB_OIDC_ISSUER_URL: "${oidc_issuer_url}"
+      GOVERNANCE_HUB_OIDC_CLIENT_ID: "${sso_client_id}"
+      GOVERNANCE_HUB_OIDC_CLIENT_SECRET: "${sso_client_secret}"
+%{ endif }
     volumes:
       - /opt/InsideLLM/data/governance-hub:/app/data
     depends_on:
