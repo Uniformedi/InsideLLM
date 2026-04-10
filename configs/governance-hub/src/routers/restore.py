@@ -29,7 +29,7 @@ class CloneRequest(BaseModel):
     snapshot_id: int | None = None  # None = latest
 
 
-@router.post("/generate-tfvars", dependencies=[Depends(verify_api_key)])
+@router.post("/generate-tfvars")
 async def restore_tfvars(req: RestoreRequest):
     """
     Generate a terraform.tfvars file from a config snapshot.
@@ -59,7 +59,7 @@ async def restore_tfvars(req: RestoreRequest):
     )
 
 
-@router.get("/snapshots/{instance_id}", dependencies=[Depends(verify_api_key)])
+@router.get("/snapshots/{instance_id}")
 async def get_snapshots(instance_id: str, limit: int = 20):
     """List available config snapshots for an instance from the central DB."""
     snapshots = await list_instance_snapshots(instance_id, limit)

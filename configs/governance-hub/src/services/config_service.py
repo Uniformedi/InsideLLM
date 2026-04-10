@@ -86,11 +86,12 @@ async def _gather_config(db: AsyncSession) -> dict:
         "captured_at": datetime.now(timezone.utc).isoformat(),
     }
 
-    # Teams
+    # Teams (table may not exist yet — rollback on error to keep transaction clean)
     try:
         result = await db.execute(text('SELECT team_alias, max_budget, tpm_limit, rpm_limit FROM "LiteLLM_TeamTable"'))
         config["teams"] = [dict(r._mapping) for r in result]
     except Exception:
+        await db.rollback()
         config["teams"] = []
 
     # Models
@@ -98,6 +99,7 @@ async def _gather_config(db: AsyncSession) -> dict:
         result = await db.execute(text('SELECT model_name FROM "LiteLLM_ModelTable"'))
         config["models"] = [r[0] for r in result]
     except Exception:
+        await db.rollback()
         config["models"] = []
 
     # Keyword categories
@@ -105,6 +107,7 @@ async def _gather_config(db: AsyncSession) -> dict:
         result = await db.execute(text("SELECT category, keyword, severity FROM keyword_categories ORDER BY category, keyword"))
         config["keyword_categories"] = [dict(r._mapping) for r in result]
     except Exception:
+        await db.rollback()
         config["keyword_categories"] = []
 
     return config

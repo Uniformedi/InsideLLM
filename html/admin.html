@@ -518,6 +518,7 @@
       Instance Registry <span class="accent">// all deployments</span>
       <span style="margin-left:auto;display:flex;gap:8px;align-items:center">
         <span id="syncResult" class="wiz-result"></span>
+        <button class="btn btn-action" onclick="takeSnapshot()">Take Snapshot</button>
         <button class="btn btn-action" onclick="triggerSync()">Sync Now</button>
       </span>
     </div>
@@ -1392,6 +1393,28 @@ async function saveFleetDb() {
   }
 }
 
+async function takeSnapshot() {
+  const result = document.getElementById('syncResult');
+  result.innerHTML = `<span style="color:var(--amber)">Taking snapshot...</span>`;
+  try {
+    const resp = await fetch(`${GOV()}/api/v1/config/snapshot`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ created_by: 'admin-ui' }),
+      signal: AbortSignal.timeout(15000),
+    });
+    if (resp.ok) {
+      const res = await resp.json();
+      result.innerHTML = `<span style="color:var(--green)">Snapshot #${res.id} created</span>`;
+    } else {
+      const err = await resp.text();
+      result.innerHTML = `<span style="color:var(--red)">Failed: ${err.slice(0, 100)}</span>`;
+    }
+  } catch (e) {
+    result.innerHTML = `<span style="color:var(--red)">Error: ${e.message}</span>`;
+  }
+}
+
 async function triggerSync() {
   const result = document.getElementById('syncResult');
   result.innerHTML = `<span style="color:var(--amber)">Syncing...</span>`;
@@ -1602,7 +1625,7 @@ async function downloadCloneTfvars() {
   try {
     const resp = await fetch(`${GOV()}/api/v1/restore/generate-tfvars`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': 'admin' },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ instance_id: sourceId, snapshot_id: snapshotId ? parseInt(snapshotId) : null }),
       signal: AbortSignal.timeout(10000),
     });

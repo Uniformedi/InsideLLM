@@ -9,7 +9,7 @@ from ..services.config_service import capture_snapshot, diff_snapshots, get_snap
 router = APIRouter(prefix="/api/v1/config", tags=["config"])
 
 
-@router.post("/snapshot", dependencies=[Depends(verify_api_key)])
+@router.post("/snapshot")
 async def create_snapshot(
     data: SnapshotCreate | None = None,
     db: AsyncSession = Depends(get_local_db),
