@@ -247,7 +247,7 @@
   <div style="margin-top:20px;text-align:center">
     <a href="Setup.html" style="display:block;background:#38a169;color:#fff;padding:10px 16px;border-radius:6px;font-size:0.88em;font-weight:700;text-decoration:none;transition:background 0.2s;" onmouseover="this.style.background='#2f855a'" onmouseout="this.style.background='#38a169'">Launch Setup Wizard</a>
   </div>
-  <div class="sidebar-footer">Dan Medina, Uniformedi LLC<br>Version 2.0 &mdash; Mar 2026</div>
+  <div class="sidebar-footer">Dan Medina, Uniformedi LLC<br>Version 3.1.0 &mdash; April 2026</div>
 </nav>
 
 <!-- ================================================================ -->
@@ -257,7 +257,7 @@
 <header class="hero">
   <h1>Inside LLM</h1>
   <p class="subtitle">Architecture &amp; Product Use Case</p>
-  <span class="version-badge">Version 2.0 &mdash; March 2026 &mdash; Dan Medina, Uniformedi LLC</span>
+  <span class="version-badge">Version 3.1.0 &mdash; April 2026 &mdash; Dan Medina, Uniformedi LLC</span>
   <br>
   <span class="version-badge"><a href="https://github.com/Uniformedi/InsideLLM" style="color: inherit; text-decoration: underline;">GitHub</a> &mdash; MIT License</span>
   <br><br>
@@ -271,18 +271,17 @@
 <!-- ================================================================ -->
 <section style="margin-top:30px">
   <div class="highlight-box" style="background:#ebf8ff;border-left-color:#38a169">
-    <h3 style="color:#38a169;margin-bottom:8px">What's New in 2.0</h3>
+    <h3 style="color:#38a169;margin-bottom:8px">What's New in 3.1</h3>
     <ul style="list-style:none;margin:0">
-      <li><strong>WSL2 deployment path</strong> &mdash; single PowerShell script, no Terraform or Hyper-V required</li>
-      <li><strong>Standalone initialization script</strong> &mdash; provision WSL2, Docker, SCFW, and TLS separately (<code>Initialize-InsideLLM.ps1</code>)</li>
-      <li><strong>Supply Chain Firewall (SCFW)</strong> &mdash; Datadog's supply-chain-firewall wraps <code>pip</code> to block known-malicious PyPI packages</li>
-      <li><strong>Local LLM support (Ollama)</strong> &mdash; run open-source models locally alongside Claude</li>
-      <li><strong>GPU acceleration</strong> &mdash; native GPU via WSL2, or GPU-PV/DDA for Hyper-V</li>
-      <li><strong>Setup Wizard</strong> &mdash; interactive HTML form that generates your config file</li>
-      <li><strong>Port forwarding script</strong> &mdash; expose all services to LAN clients</li>
-      <li><strong>Renamed to InsideLLM</strong> &mdash; all paths, services, and defaults updated</li>
-      <li><strong>VM sizing updated</strong> &mdash; 8 vCPU / 32 GB RAM default, with lighter deployment guidance</li>
-      <li><strong>Correct Claude Code CLI env vars</strong> &mdash; ANTHROPIC_AUTH_TOKEN on port 4000</li>
+      <li><strong>Platform Versioning</strong> &mdash; VERSION file, admin badge, fleet-wide version tracking with outdated detection</li>
+      <li><strong>Unified SSO</strong> &mdash; single IdP app (Azure AD / Okta) shared by Open WebUI, Grafana, LiteLLM, and Admin Center</li>
+      <li><strong>AD/LDAP Auth</strong> &mdash; admin portal protected by Active Directory credentials when domain-joined (no cloud IdP needed)</li>
+      <li><strong>Color Themes</strong> &mdash; Dark, Light, Midnight, High Contrast with localStorage persistence</li>
+      <li><strong>Specifications Tab</strong> &mdash; all technical specs the stack relies on (OpenAI, OpenAPI, OAuth, TLS, etc.)</li>
+      <li><strong>Fleet DB Wizard</strong> &mdash; configure central fleet database (MSSQL, MariaDB, PostgreSQL) from the admin UI</li>
+      <li><strong>Fleet Config Clone</strong> &mdash; clone governance config from any node for node replacement</li>
+      <li><strong>Monitoring Script</strong> &mdash; <code>provision-monitoring.sh</code> configures Grafana, Uptime Kuma, and alerts</li>
+      <li><strong>Setup Wizard Restructure</strong> &mdash; 9 steps with dedicated Optional Services step</li>
     </ul>
   </div>
 </section>
@@ -1269,11 +1268,24 @@ vm_memory_startup_bytes = 8589934592    # 8 GB (down from 32 GB)</pre>
 <section id="s9">
   <h2><span class="section-num">09</span> Identity &amp; Access Management</h2>
 
+  <h3>Unified SSO (Single App Registration)</h3>
+  <p>All services share <strong>one IdP app registration</strong> (Azure AD or Okta). When SSO is configured, users authenticate once and are recognized across all services: Open WebUI, LiteLLM, Grafana, and the Admin Command Center.</p>
+
+  <h3>Admin Center Authentication (3 Modes)</h3>
+  <div class="highlight-box">
+    <ul>
+      <li><strong>OIDC:</strong> Cloud SSO (Azure AD / Okta) &mdash; nginx <code>auth_request</code> validates JWT session cookie. Login redirects to IdP.</li>
+      <li><strong>LDAP:</strong> AD domain join, no cloud SSO &mdash; login form authenticates via LDAP bind. Access restricted to <code>ad_admin_groups</code>.</li>
+      <li><strong>Open:</strong> Neither configured &mdash; admin page has no authentication.</li>
+    </ul>
+  </div>
+
   <h3>Authentication Layers</h3>
   <div class="layer-stack">
-    <div class="layer"><span class="layer-num">Layer 1</span><span class="layer-name">Nginx (TLS)</span><span class="layer-desc">HTTPS required for all access. Self-signed or organization CA cert.</span></div>
-    <div class="layer"><span class="layer-num">Layer 2</span><span class="layer-name">Open WebUI</span><span class="layer-desc">Self-registration with email + password. First registrant becomes admin. Role-based access: admin / user.</span></div>
-    <div class="layer"><span class="layer-num">Layer 3</span><span class="layer-name">LiteLLM (SSO)</span><span class="layer-desc">Master key (admin), per-user API keys (team-scoped), Azure AD SSO (OIDC), Okta SSO (OIDC).</span></div>
+    <div class="layer"><span class="layer-num">Layer 1</span><span class="layer-name">Nginx (TLS + Admin Auth)</span><span class="layer-desc">HTTPS required. Self-signed or CA cert. auth_request for /admin (OIDC or LDAP).</span></div>
+    <div class="layer"><span class="layer-num">Layer 2</span><span class="layer-name">Open WebUI (OIDC)</span><span class="layer-desc">Self-registration or Azure AD / Okta SSO. First registrant becomes admin.</span></div>
+    <div class="layer"><span class="layer-num">Layer 3</span><span class="layer-name">LiteLLM (SSO)</span><span class="layer-desc">Master key (admin), per-user API keys (team-scoped), Azure AD / Okta OIDC.</span></div>
+    <div class="layer"><span class="layer-num">Layer 4</span><span class="layer-name">Grafana (OAuth)</span><span class="layer-desc">Admin password (auto-generated), Azure AD / Okta via Generic OAuth.</span></div>
   </div>
 
   <h3>Azure Active Directory (Microsoft Entra ID) Integration</h3>

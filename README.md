@@ -1,9 +1,26 @@
 # Inside LLM — Architecture & Product Use Case
 
-**Version:** 3.0 | **Author:** Dan Medina, Uniformedi LLC | **Date:** April 2026
+**Version:** 3.1.0 | **Author:** Dan Medina, Uniformedi LLC | **Date:** April 2026
 **Source:** [github.com/Uniformedi/InsideLLM](https://github.com/Uniformedi/InsideLLM) | **License:** MIT
 
 > **Ready to deploy?** Open the [Setup Wizard](html/Setup.html) for a guided, step-by-step configuration experience.
+
+### What's New in 3.1
+
+- **Platform Versioning** -- `VERSION` file at project root (currently `3.1.0`), wired through Terraform/Docker/Governance Hub. Admin topbar shows version badge. Fleet tracks per-node versions with outdated detection.
+- **Unified SSO Across All Services** -- single IdP app registration (Azure AD or Okta) shared by Open WebUI, Grafana, LiteLLM, and the Admin Command Center. OIDC env vars auto-injected per service.
+- **Active Directory Authentication** -- when domain-joined without a cloud IdP, the Admin Center uses LDAP bind against AD with group-based access control (`ad_admin_groups`). Uses `ldap3` pure Python library.
+- **Admin Center Auth (3 modes)** -- OIDC (cloud SSO), LDAP (on-prem AD), or open (no auth). Determined automatically from deployment config. nginx `auth_request` delegates to Governance Hub JWT validation.
+- **Color Theme Selector** -- 4 themes (Dark, Light, Midnight, High Contrast) with topbar picker, persisted in localStorage, no flash on load.
+- **Specifications Tab** -- new admin tab listing all technical specifications the stack relies on (OpenAI v1, OpenAPI 3.0.3, OAuth 2.0, TLS 1.3, Docker Compose, etc.)
+- **Fleet Database Setup Wizard** -- configure the central fleet database (MSSQL, MariaDB, PostgreSQL) from the admin UI with Test Connection and Save. MSSQL supports TrustServerCertificate and Encrypt options.
+- **Fleet Node Versioning** -- each instance reports its platform version via sync. Fleet table shows version column with outdated badges. Migration SQL included.
+- **Fleet Config Clone** -- "Clone Config" button on fleet nodes. Modal wizard to select snapshot, preview config sections, and download terraform.tfvars with the cloned configuration.
+- **Monitoring Provisioning Script** -- `scripts/provision-monitoring.sh` idempotently configures Grafana (datasources, dashboards, alerts, Slack contact point), Uptime Kuma (10 monitors + Slack), and LiteLLM Slack alerting.
+- **Setup Wizard Restructure** -- 9 steps (8 for WSL2) with dedicated "Optional Services" step grouping DocForge, Grafana, Uptime Kuma, and Governance Hub with their routes clearly labeled.
+- **Grafana Provisioning Fix** -- moved datasource/dashboard YAML into required subdirectories, fixed dashboard JSON syntax errors and API format wrapping.
+- **Admin Health Checks Fix** -- auto-detect host from `window.location.hostname`, use same-origin fetch instead of `no-cors`.
+- **OpenAPI Docs Fix** -- Governance Hub API docs render correctly (downgraded spec from 3.1.0 to 3.0.3 for Swagger UI compatibility).
 
 ### What's New in 3.0
 
@@ -18,7 +35,7 @@
 - **Fleet Management** -- cross-instance visibility, config snapshot restore, terraform.tfvars generation from any instance's snapshot
 - **OPA Policy Engine** -- Open Policy Agent with Humility mandatory alignment + 6 industry policies (HIPAA, FDCPA, SOX, PCI-DSS, FERPA, GLBA), obligation execution pipeline
 - **External Data Connectors** -- query PostgreSQL, MySQL, MSSQL, REST APIs with team-based RBAC, row filtering, field masking, and full audit logging
-- **Interactive Admin Hub** -- command center SPA replacing static admin.html with governance dashboard, change management UI, fleet overview, and service status
+- **Interactive Admin Hub** -- command center SPA with governance dashboard, change management UI, fleet overview, and service status
 - **AI System Designer** -- Open WebUI Tool that designs deployments, estimates costs, recommends configs, and plans multi-instance fleet architectures
 - **PowerShell-native ISO creation** -- cloud-init ISO creation without WSL or Windows ADK using pure .NET (`New-CloudInitIso.ps1`)
 
@@ -77,7 +94,7 @@ services that deliver:
 - **SSO integration** with Azure AD or Okta (OIDC)
 - **Per-user budgets and rate limits** with real-time enforcement
 - **Real-time monitoring** of containers, host resources, and database metrics (Netdata)
-- **Admin portal** — interactive command center with governance dashboard, change management UI, fleet overview (`/admin`)
+- **Admin portal** — interactive command center with governance dashboard, change management UI, fleet overview, specifications reference, 4 color themes, and version tracking (`/admin`)
 - **Full audit trail** of every API call with hash-chained integrity verification
 - **File generation** — create DOCX, XLSX, PPTX, PDF from chat via DocForge
 - **AI governance compliance** — industry keyword analysis, OPA policy enforcement, Humility alignment
@@ -983,6 +1000,27 @@ headroom for two models running concurrently alongside the rest of the stack
 
 ## 8. Identity & Access Management
 
+### Unified SSO (Single App Registration)
+
+All services share **one IdP app registration** (Azure AD or Okta) — same Client ID and Client Secret. When SSO is configured, users authenticate once and are recognized across all services.
+
+| Service | Protocol | Redirect URI |
+|---------|----------|-------------|
+| Open WebUI | OIDC | `https://<host>/oauth/oidc/callback` |
+| LiteLLM | OIDC | `https://<host>/litellm/sso/callback` |
+| Grafana | Generic OAuth | `https://<host>/grafana/login/generic_oauth` |
+| Admin Center | OIDC | `https://<host>/auth/callback` |
+
+### Admin Center Authentication (3 Modes)
+
+| Mode | When Active | How It Works |
+|------|-------------|-------------|
+| **OIDC** | Cloud SSO configured (Azure AD / Okta) | nginx `auth_request` validates JWT session cookie. Login redirects to IdP. |
+| **LDAP** | AD domain join enabled, no cloud SSO | Login form authenticates via LDAP bind to AD. Access restricted to `ad_admin_groups`. |
+| **Open** | Neither configured (default) | Admin page has no authentication. |
+
+The mode is determined automatically: `sso_provider != "none"` → OIDC, `ad_domain_join == true` → LDAP, neither → open.
+
 ### Authentication Layers
 
 ```
@@ -1034,7 +1072,7 @@ For organizations using Microsoft 365 / Azure AD:
 **Setup Steps:**
 
 1. In Azure Portal, go to **Azure Active Directory > App Registrations > New**
-2. Set Redirect URI to `https://<vm-ip>/litellm/sso/callback`
+2. Add all four Redirect URIs from the table above
 3. Create a Client Secret under **Certificates & Secrets**
 4. Note the Application (Client) ID, Client Secret, and Tenant ID
 
@@ -1081,7 +1119,7 @@ For organizations using Okta as their identity provider:
 
 1. In Okta Admin Console, go to **Applications > Create App Integration**
 2. Select **OIDC - OpenID Connect** and **Web Application**
-3. Set Sign-in redirect URI to `https://<vm-ip>/litellm/sso/callback`
+3. Add all four Sign-in redirect URIs from the table above
 4. Assign users or groups to the application
 5. Note the Client ID, Client Secret, and your Okta domain
 
@@ -1407,6 +1445,7 @@ External monitoring endpoints:
 InsideLLM/
 +-- README.md                           # This document
 +-- README.html                         # Visual landing page
++-- VERSION                             # Platform version (e.g., 3.1.0)
 +-- LICENSE                             # MIT License
 +-- New-CloudInitIso.ps1                # PowerShell-native ISO builder
 +-- terraform/                          # Terraform infrastructure-as-code
@@ -1423,9 +1462,10 @@ InsideLLM/
 |   +-- Port-Forward-InsideLLM.ps1      # Expose services to LAN
 |   +-- Setup-GPU-Passthrough.ps1       # GPU-PV / DDA passthrough
 |   +-- Join-ADDomain.ps1              # Active Directory domain join
+|   +-- provision-monitoring.sh         # Idempotent monitoring/alerting setup
 +-- html/                               # Browser-facing UI files
-|   +-- Setup.html                      # Interactive setup wizard
-|   +-- admin.html                      # Admin command center SPA
+|   +-- Setup.html                      # Interactive setup wizard (9 steps)
+|   +-- admin.html                      # Admin command center SPA (6 tabs, 4 themes)
 +-- markdown/                           # Documentation
 |   +-- policyengine.md                 # OPA policy engine normative spec
 |   +-- images/BlockedDLP.png           # DLP screenshot
@@ -1439,7 +1479,11 @@ InsideLLM/
     |   +-- meta-data.yaml.tpl          # Cloud-init identity
     |   +-- network-config.yaml.tpl     # Static IP configuration
     +-- docforge/                       # Node.js file generation service
-    +-- governance-hub/                 # FastAPI governance service (45 files)
+    +-- governance-hub/                 # FastAPI governance service
+    |   +-- migrations/                 # Central DB migrations (platform_version, etc.)
+    |   +-- src/routers/auth.py         # Admin auth (OIDC + LDAP + open modes)
+    |   +-- src/services/auth_service.py  # JWT sessions + LDAP bind
+    |   +-- src/services/oidc_service.py  # OIDC discovery + code exchange
     +-- grafana/                        # Dashboards + datasource provisioning
     +-- litellm/                        # API gateway config template
     +-- loki/                           # Log aggregation config
@@ -1776,14 +1820,23 @@ Tampering with any record breaks the chain. The `/audit/chain/verify` endpoint d
 
 ### Fleet Management
 
-Cross-instance visibility via the central database:
+Cross-instance visibility via the central database. Each instance syncs its `platform_version` to the central DB, enabling fleet-wide version tracking and outdated instance detection.
 
 | Endpoint | Purpose |
 |----------|---------|
-| `GET /fleet/instances` | List all registered InsideLLM deployments |
+| `GET /fleet/instances` | List all registered InsideLLM deployments (includes `platform_version`) |
 | `GET /fleet/summary` | Fleet-wide aggregate metrics |
+| `GET /fleet/db/config` | Current central DB configuration (password masked) |
+| `POST /fleet/db/test` | Test connection to a fleet database (MSSQL/MariaDB/PostgreSQL) |
+| `PUT /fleet/db/config` | Save central DB config to env override file |
 | `POST /fleet/compare` | Compare configs across instances |
 | `POST /restore/generate-tfvars` | Generate terraform.tfvars from any config snapshot |
+| `POST /restore/clone-from-node` | Fetch config snapshot from a source instance for node replacement |
+| `GET /restore/snapshots/{id}` | List available config snapshots for an instance |
+
+**Fleet Database Setup Wizard:** The Admin Command Center's Fleet tab includes a built-in wizard to configure the central fleet database. Supports MS SQL Server (with TrustServerCertificate and Encrypt options), MariaDB/MySQL, and PostgreSQL. Includes Test Connection and Save Configuration buttons.
+
+**Node Replacement:** When a new InsideLLM instance connects to the fleet, it can clone the governance configuration from the node it replaces via the "Clone Config" button in the fleet table. The wizard allows selecting a snapshot, previewing config sections, and downloading a terraform.tfvars with the cloned configuration.
 
 ### AI Governance Advisor
 
