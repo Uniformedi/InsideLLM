@@ -74,21 +74,62 @@ async def diff_snapshots(db: AsyncSession, id_a: int, id_b: int) -> ConfigDiff |
 
 
 async def _gather_config(db: AsyncSession) -> dict:
-    """Gather current instance configuration from various sources."""
+    """Gather full instance configuration for snapshot/restore.
+
+    Captures everything needed to recreate an InsideLLM deployment:
+    governance settings, models, teams, budgets, DLP, keyword categories,
+    operations config, and supervisor contacts.
+    """
+    import os
+
     config = {
+        # Instance identity
         "instance_id": settings.instance_id,
         "instance_name": settings.instance_name,
         "schema_version": settings.schema_version,
+        "platform_version": settings.platform_version,
+        "captured_at": datetime.now(timezone.utc).isoformat(),
+
+        # Governance
         "industry": settings.industry,
         "governance_tier": settings.governance_tier,
         "data_classification": settings.data_classification,
         "advisor_model": settings.advisor_model,
-        "captured_at": datetime.now(timezone.utc).isoformat(),
+        "supervisor_emails": settings.supervisor_emails,
+        "sync_schedule": settings.sync_schedule,
+
+        # DLP (from environment — set by Terraform)
+        "dlp_enable": os.environ.get("DLP_ENABLE", "true").lower() == "true",
+        "dlp_block_ssn": os.environ.get("DLP_BLOCK_SSN", "true").lower() == "true",
+        "dlp_block_credit_cards": os.environ.get("DLP_BLOCK_CREDIT_CARDS", "true").lower() == "true",
+        "dlp_block_phi": os.environ.get("DLP_BLOCK_PHI", "true").lower() == "true",
+        "dlp_block_credentials": os.environ.get("DLP_BLOCK_CREDENTIALS", "true").lower() == "true",
+    }
+
+    # LiteLLM settings (from environment)
+    config["litellm"] = {
+        "default_model": os.environ.get("LITELLM_DEFAULT_MODEL", "claude-sonnet"),
+        "global_max_budget": int(os.environ.get("LITELLM_GLOBAL_MAX_BUDGET", "100")),
+        "default_user_budget": float(os.environ.get("LITELLM_DEFAULT_USER_BUDGET", "5")),
+        "default_user_rpm": int(os.environ.get("LITELLM_DEFAULT_USER_RPM", "30")),
+        "default_user_tpm": int(os.environ.get("LITELLM_DEFAULT_USER_TPM", "100000")),
+    }
+
+    # Operations config
+    config["ops"] = {
+        "watchtower_enable": os.environ.get("OPS_WATCHTOWER_ENABLE", "true").lower() == "true",
+        "trivy_enable": os.environ.get("OPS_TRIVY_ENABLE", "true").lower() == "true",
+        "grafana_enable": os.environ.get("OPS_GRAFANA_ENABLE", "true").lower() == "true",
+        "uptime_kuma_enable": os.environ.get("OPS_UPTIME_KUMA_ENABLE", "true").lower() == "true",
+        "backup_schedule": os.environ.get("OPS_BACKUP_SCHEDULE", "daily"),
+        "alert_webhook": os.environ.get("OPS_ALERT_WEBHOOK", ""),
     }
 
     # Teams (table may not exist yet — rollback on error to keep transaction clean)
     try:
-        result = await db.execute(text('SELECT team_alias, max_budget, tpm_limit, rpm_limit FROM "LiteLLM_TeamTable"'))
+        result = await db.execute(text(
+            'SELECT team_alias, max_budget, budget_duration, tpm_limit, rpm_limit, models FROM "LiteLLM_TeamTable"'
+        ))
         config["teams"] = [dict(r._mapping) for r in result]
     except Exception:
         await db.rollback()
@@ -109,6 +150,16 @@ async def _gather_config(db: AsyncSession) -> dict:
     except Exception:
         await db.rollback()
         config["keyword_categories"] = []
+
+    # Per-user budgets
+    try:
+        result = await db.execute(text(
+            'SELECT user_id, max_budget, tpm_limit, rpm_limit FROM "LiteLLM_UserTable" WHERE max_budget IS NOT NULL LIMIT 50'
+        ))
+        config["user_budgets"] = [dict(r._mapping) for r in result]
+    except Exception:
+        await db.rollback()
+        config["user_budgets"] = []
 
     return config
 
