@@ -417,7 +417,7 @@
     </div>
 
     <!-- Compliance Dashboard -->
-    <div class="gov-view" id="gov-compliance" style="display:none">
+    <div class="gov-view" id="gov-compliance">
       <div class="tile-grid" id="complianceTiles"></div>
       <div class="section-head">
         Compliance Status by Section
@@ -427,7 +427,7 @@
     </div>
 
     <!-- Changes (merged from standalone tab) -->
-    <div class="gov-view" id="gov-changes" style="display:none">
+    <div class="gov-view" id="gov-changes">
       <div style="display:flex;gap:10px;margin-bottom:16px;align-items:center">
         <span style="font-family:var(--font-mono);font-size:12px;color:var(--text-muted)">FILTER:</span>
         <button class="btn btn-action" onclick="loadChanges('pending')">Pending</button>
@@ -439,7 +439,7 @@
     </div>
 
     <!-- Sync & Audit -->
-    <div class="gov-view" id="gov-syncaudit" style="display:none">
+    <div class="gov-view" id="gov-syncaudit">
       <div class="tile-grid" id="govTiles"></div>
       <div class="section-head">Sync History <span class="accent">// central repository</span></div>
       <div id="syncHistory" class="loading">Loading...</div>
@@ -688,6 +688,17 @@
     <div class="btn-row">
       <button class="btn" onclick="closeModal()">Cancel</button>
       <button class="btn btn-approve" onclick="submitApproval()">Submit</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="complianceModal">
+  <div class="modal" style="width:600px">
+    <h3 id="complianceModalTitle">Compliance Gaps</h3>
+    <div id="complianceModalContent" class="loading">Loading...</div>
+    <div class="btn-row" style="margin-top:16px">
+      <button class="btn" onclick="document.getElementById('complianceModal').classList.remove('show')">Close</button>
+      <button class="btn btn-action" id="complianceGoToGov" style="display:none" onclick="document.getElementById('complianceModal').classList.remove('show');goToCompliance()">View in Governance Tab</button>
     </div>
   </div>
 </div>
@@ -1509,7 +1520,9 @@ async function loadFleet() {
     table.innerHTML = `<table class="data-table"><thead><tr><th>Instance</th><th>Version</th><th>Industry</th><th>Tier</th><th>Classification</th><th>Last Sync</th><th>Compliance</th><th>Spend</th><th>Actions</th></tr></thead><tbody>` +
       allInstances.map(i => {
         const tel = i.latest_telemetry || {};
-        const score = tel.compliance_score != null ? `${tel.compliance_score}%` : '--';
+        const scoreVal = tel.compliance_score;
+        const scoreColor = scoreVal >= 95 ? 'var(--green)' : scoreVal >= 70 ? 'var(--amber)' : scoreVal != null ? 'var(--red)' : 'var(--text-muted)';
+        const score = scoreVal != null ? `<span style="cursor:pointer;color:${scoreColor};text-decoration:underline" onclick="showComplianceGaps('${i.instance_id}','${i.instance_name}',${scoreVal})">${scoreVal}%</span>` : '--';
         const spend = tel.total_spend != null ? `$${tel.total_spend.toFixed(2)}` : '--';
         const syncTime = i.last_sync_at ? i.last_sync_at.slice(0, 16).replace('T', ' ') : 'never';
         const localBadge = i._local ? ' <span class="badge badge-info">THIS INSTANCE</span>' : '';
@@ -1674,6 +1687,87 @@ async function downloadCloneTfvars() {
   } catch (e) {
     result.innerHTML = `<span style="color:var(--red)">Error: ${e.message}</span>`;
   }
+}
+
+async function showComplianceGaps(instanceId, instanceName, score) {
+  document.getElementById('complianceModalTitle').textContent = `Compliance Gaps — ${instanceName} (${score}%)`;
+  document.getElementById('complianceModal').classList.add('show');
+  const content = document.getElementById('complianceModalContent');
+  content.innerHTML = '<div class="loading">Analyzing compliance gaps...</div>';
+
+  const isLocal = instanceId === 'local' || instanceName === H();
+
+  if (isLocal) {
+    // Local instance — use the framework compliance API
+    document.getElementById('complianceGoToGov').style.display = 'inline-block';
+    const [summary, sections] = await Promise.all([
+      api('/api/v1/framework/compliance/summary'),
+      api('/api/v1/framework/sections'),
+    ]);
+
+    if (!sections?.sections) {
+      content.innerHTML = '<div class="loading">No framework sections loaded. Seed the framework first.</div>';
+      return;
+    }
+
+    const gaps = sections.sections.filter(s =>
+      s.compliance_type !== 'informational' && s.compliance_status !== 'compliant'
+    );
+
+    if (gaps.length === 0) {
+      content.innerHTML = `<div style="color:var(--green);font-family:var(--font-mono);padding:16px;text-align:center">All assessable sections are compliant.</div>`;
+      return;
+    }
+
+    let html = `<div style="margin-bottom:12px;font-size:13px;color:var(--text-dim)">
+      <strong>${gaps.length}</strong> sections need attention to reach 100% compliance.
+      ${summary ? `Currently: <strong>${summary.compliant}</strong>/${summary.assessable_sections} sections compliant.` : ''}
+    </div>`;
+    html += `<table class="data-table"><thead><tr><th>Section</th><th>Title</th><th>Type</th><th>Status</th></tr></thead><tbody>`;
+    gaps.forEach(s => {
+      const typeBadge = s.compliance_type === 'automated' ? '<span class="badge badge-info">Auto</span>' : '<span class="badge badge-pending">Manual</span>';
+      const statusBadge = s.compliance_status === 'non_compliant' ? '<span class="badge badge-err">Non-Compliant</span>' :
+                          s.compliance_status === 'check_failed' ? '<span class="badge badge-err">Check Failed</span>' :
+                          '<span class="badge" style="background:rgba(255,255,255,0.05);color:var(--text-muted)">Not Assessed</span>';
+      html += `<tr><td><code>${s.section_number}</code></td><td>${s.title}</td><td>${typeBadge}</td><td>${statusBadge}</td></tr>`;
+    });
+    html += '</tbody></table>';
+    content.innerHTML = html;
+  } else {
+    // Remote instance — show the score breakdown from telemetry
+    document.getElementById('complianceGoToGov').style.display = 'none';
+    const missing = 100 - score;
+    content.innerHTML = `
+      <div style="font-size:14px;margin-bottom:16px">
+        <strong>${instanceName}</strong> reports <strong style="color:${score >= 95 ? 'var(--green)' : 'var(--amber)'}">${score}%</strong> compliance.
+        <strong style="color:var(--red)">${missing.toFixed(1)}%</strong> gap remaining.
+      </div>
+      <div style="font-size:13px;color:var(--text-dim);margin-bottom:12px">
+        The compliance score is computed from the instance's error rate: <code>(1 - error_rate) * 100</code>.
+        To improve compliance:
+      </div>
+      <ul style="font-size:13px;color:var(--text-dim);margin-left:20px;line-height:2">
+        <li>Reduce API error rates (check LiteLLM health, model availability)</li>
+        <li>Ensure DLP pipeline is active and not blocking legitimate requests</li>
+        <li>Verify all services are healthy (Uptime Kuma monitors)</li>
+        <li>Review keyword analysis flags for false positives</li>
+        <li>Complete governance framework attestations on that instance</li>
+      </ul>
+      <div style="margin-top:14px;font-size:12px;color:var(--text-muted);font-family:var(--font-mono)">
+        For detailed gap analysis, access the Admin Command Center on that instance directly.
+      </div>
+    `;
+  }
+}
+
+function goToCompliance() {
+  document.querySelectorAll('.tab-bar > .tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  const govTab = document.querySelectorAll('.tab-bar > .tab')[1];
+  govTab.classList.add('active');
+  document.getElementById('panel-governance').classList.add('active');
+  govViewLoaded = {};
+  switchGovView('compliance', document.querySelectorAll('#panel-governance .tab')[1]);
 }
 
 function goToSyncAudit() {
