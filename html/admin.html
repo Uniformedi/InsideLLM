@@ -393,57 +393,62 @@
   <!-- ======================== FLEET ======================== -->
   <div class="panel" id="panel-fleet">
     <div class="wizard-box" id="fleetDbWizard">
-      <div class="wiz-title">Central Fleet Database <span class="accent">// connection setup</span></div>
-      <div class="wiz-desc">Connect to an external database to enable fleet management, cross-instance sync, and enterprise dashboards.</div>
+      <div class="wiz-title" style="cursor:pointer" onclick="toggleFleetDbFields()">
+        Central Fleet Database <span class="accent">// connection setup</span>
+        <span id="fleetDbToggle" style="margin-left:auto;font-size:11px;color:var(--text-muted);font-family:var(--font-mono)">EXPAND</span>
+      </div>
       <div class="wiz-status" id="fleetDbStatus">
         <span class="dot dot-spin"></span>
         <span>Checking connection...</span>
       </div>
-      <div class="wiz-row">
-        <div class="wiz-field" style="flex:0 0 200px">
-          <label>Database Type</label>
-          <select id="fleetDbType" onchange="onFleetDbTypeChange()">
-            <option value="mssql">MS SQL Server</option>
-            <option value="mariadb">MariaDB / MySQL</option>
-            <option value="postgresql">PostgreSQL</option>
-          </select>
+      <div id="fleetDbFields" style="display:none">
+        <div class="wiz-desc">Connect to an external database to enable fleet management, cross-instance sync, and enterprise dashboards.</div>
+        <div class="wiz-row">
+          <div class="wiz-field" style="flex:0 0 200px">
+            <label>Database Type</label>
+            <select id="fleetDbType" onchange="onFleetDbTypeChange()">
+              <option value="mssql">MS SQL Server</option>
+              <option value="mariadb">MariaDB / MySQL</option>
+              <option value="postgresql">PostgreSQL</option>
+            </select>
+          </div>
+          <div class="wiz-field" style="flex:2">
+            <label>Host</label>
+            <input type="text" id="fleetDbHost" placeholder="db.company.com">
+          </div>
+          <div class="wiz-field" style="flex:0 0 100px">
+            <label>Port</label>
+            <input type="number" id="fleetDbPort" value="1433">
+          </div>
         </div>
-        <div class="wiz-field" style="flex:2">
-          <label>Host</label>
-          <input type="text" id="fleetDbHost" placeholder="db.company.com">
+        <div class="wiz-row">
+          <div class="wiz-field">
+            <label>Database Name</label>
+            <input type="text" id="fleetDbName" value="insidellm_central">
+          </div>
+          <div class="wiz-field">
+            <label>Username</label>
+            <input type="text" id="fleetDbUser" placeholder="insidellm_sync">
+          </div>
+          <div class="wiz-field">
+            <label>Password</label>
+            <input type="password" id="fleetDbPass" placeholder="Enter password">
+          </div>
         </div>
-        <div class="wiz-field" style="flex:0 0 100px">
-          <label>Port</label>
-          <input type="number" id="fleetDbPort" value="1433">
+        <div id="fleetDbMssqlOpts" style="display:flex;gap:20px;margin-bottom:12px">
+          <label style="display:flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:12px;color:var(--text-dim);cursor:pointer">
+            <input type="checkbox" id="fleetDbTrustCert" checked> Trust Server Certificate
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:12px;color:var(--text-dim);cursor:pointer">
+            <input type="checkbox" id="fleetDbEncrypt" checked> Encrypt Connection
+          </label>
         </div>
-      </div>
-      <div class="wiz-row">
-        <div class="wiz-field">
-          <label>Database Name</label>
-          <input type="text" id="fleetDbName" value="insidellm_central">
+        <div class="wiz-actions">
+          <button class="btn btn-action" onclick="testFleetDb()">Test Connection</button>
+          <button class="btn btn-approve" id="fleetDbInitBtn" onclick="initializeFleetDb()" style="display:none">Initialize Database</button>
+          <button class="btn btn-approve" onclick="saveFleetDb()">Save Configuration</button>
+          <span class="wiz-result" id="fleetDbResult"></span>
         </div>
-        <div class="wiz-field">
-          <label>Username</label>
-          <input type="text" id="fleetDbUser" placeholder="insidellm_sync">
-        </div>
-        <div class="wiz-field">
-          <label>Password</label>
-          <input type="password" id="fleetDbPass" placeholder="Enter password">
-        </div>
-      </div>
-      <div id="fleetDbMssqlOpts" style="display:flex;gap:20px;margin-bottom:12px">
-        <label style="display:flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:12px;color:var(--text-dim);cursor:pointer">
-          <input type="checkbox" id="fleetDbTrustCert" checked> Trust Server Certificate
-        </label>
-        <label style="display:flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:12px;color:var(--text-dim);cursor:pointer">
-          <input type="checkbox" id="fleetDbEncrypt" checked> Encrypt Connection
-        </label>
-      </div>
-      <div class="wiz-actions">
-        <button class="btn btn-action" onclick="testFleetDb()">Test Connection</button>
-        <button class="btn btn-approve" id="fleetDbInitBtn" onclick="initializeFleetDb()" style="display:none">Initialize Database</button>
-        <button class="btn btn-approve" onclick="saveFleetDb()">Save Configuration</button>
-        <span class="wiz-result" id="fleetDbResult"></span>
       </div>
     </div>
 
@@ -932,6 +937,15 @@ async function submitApproval() {
 // FLEET panel — DB wizard
 // ================================================================
 const DB_PORTS = { mssql: 1433, mariadb: 3306, postgresql: 5432 };
+let fleetDbConnected = false;
+
+function toggleFleetDbFields() {
+  const fields = document.getElementById('fleetDbFields');
+  const toggle = document.getElementById('fleetDbToggle');
+  const visible = fields.style.display !== 'none';
+  fields.style.display = visible ? 'none' : 'block';
+  toggle.textContent = visible ? 'EXPAND' : 'COLLAPSE';
+}
 
 function onFleetDbTypeChange() {
   const type = document.getElementById('fleetDbType').value;
@@ -942,23 +956,38 @@ function onFleetDbTypeChange() {
 async function loadFleetDbConfig() {
   const config = await api('/api/v1/fleet/db/config');
   const status = document.getElementById('fleetDbStatus');
-  if (config && !config.error) {
+  const fields = document.getElementById('fleetDbFields');
+  const toggle = document.getElementById('fleetDbToggle');
+
+  if (config && config.configured) {
     // Populate form with current config
     if (config.db_type) document.getElementById('fleetDbType').value = config.db_type;
     if (config.host) document.getElementById('fleetDbHost').value = config.host;
     if (config.port) document.getElementById('fleetDbPort').value = config.port;
     if (config.db_name) document.getElementById('fleetDbName').value = config.db_name;
     if (config.username) document.getElementById('fleetDbUser').value = config.username;
-    // Don't populate password — it's masked
+    onFleetDbTypeChange();
 
     if (config.connected) {
+      fleetDbConnected = true;
       status.innerHTML = `<span class="dot dot-ok"></span><span style="color:var(--green)">Connected</span>` +
-        `<span style="color:var(--text-muted);margin-left:8px">${config.db_type} @ ${config.host}:${config.port}</span>`;
+        `<span style="color:var(--text-muted);margin-left:8px">${config.db_type} @ ${config.host}:${config.port}/${config.db_name}</span>`;
+      // Collapse fields when connected
+      fields.style.display = 'none';
+      toggle.textContent = 'EXPAND';
     } else {
+      fleetDbConnected = false;
       status.innerHTML = `<span class="dot dot-warn"></span><span style="color:var(--amber)">Configured but not connected</span>`;
+      // Expand fields so user can fix the config
+      fields.style.display = 'block';
+      toggle.textContent = 'COLLAPSE';
     }
   } else {
+    fleetDbConnected = false;
     status.innerHTML = `<span class="dot dot-err"></span><span style="color:var(--text-muted)">No central database configured</span>`;
+    // Expand fields for initial setup
+    fields.style.display = 'block';
+    toggle.textContent = 'COLLAPSE';
   }
 }
 
@@ -1060,7 +1089,7 @@ async function saveFleetDb() {
 // FLEET panel — data
 // ================================================================
 async function loadFleet() {
-  loadFleetDbConfig();
+  await loadFleetDbConfig();
   const [summary, instances, localSync, localSchema] = await Promise.all([
     api('/api/v1/fleet/summary'),
     api('/api/v1/fleet/instances'),
@@ -1069,15 +1098,19 @@ async function loadFleet() {
   ]);
 
   const ft = document.getElementById('fleetTiles');
-  if (summary && !summary.error) {
+  const hasFleetData = summary && !summary.error && summary.total_instances > 0;
+
+  if (fleetDbConnected && hasFleetData) {
     ft.innerHTML = `
-      <div class="tile"><div class="label">Total Instances</div><div class="value cyan">${summary.total_instances}</div></div>
+      <div class="tile"><div class="label">Fleet Mode</div><div class="value green">Connected</div><div class="sub">${summary.total_instances} instance${summary.total_instances !== 1 ? 's' : ''} in fleet</div></div>
       <div class="tile"><div class="label">Reporting</div><div class="value green">${summary.reporting_instances}</div></div>
       <div class="tile"><div class="label">Stale (24h)</div><div class="value ${summary.stale_instances > 0 ? 'red' : 'green'}">${summary.stale_instances}</div></div>
       <div class="tile"><div class="label">Fleet Spend</div><div class="value">$${(summary.fleet_total_spend || 0).toFixed(2)}</div></div>
       <div class="tile"><div class="label">Fleet Users</div><div class="value">${summary.fleet_total_users || 0}</div></div>
       <div class="tile"><div class="label">Avg Compliance</div><div class="value green">${(summary.avg_compliance_score || 0).toFixed(1)}%</div></div>
     `;
+  } else if (fleetDbConnected) {
+    ft.innerHTML = '<div class="tile"><div class="label">Fleet Mode</div><div class="value cyan">Connected</div><div class="sub">Database connected — awaiting first sync</div></div>';
   } else {
     ft.innerHTML = '<div class="tile"><div class="label">Fleet Mode</div><div class="value amber">Local</div><div class="sub">Configure a central DB above to enable multi-instance fleet</div></div>';
   }
