@@ -208,7 +208,7 @@
   <div id="statusPills" style="display:flex;gap:6px;flex-wrap:wrap"></div>
   <div class="host-input">
     <label>HOST</label>
-    <input type="text" id="hostInput" value="localhost" oninput="onHostChange()">
+    <input type="text" id="hostInput" oninput="onHostChange()">
   </div>
 </div>
 
@@ -355,8 +355,10 @@
 </div>
 
 <script>
-const H = () => document.getElementById('hostInput').value.trim() || 'localhost';
-const GOV = () => `https://${H()}/governance`;
+const hostInput = document.getElementById('hostInput');
+hostInput.value = window.location.hostname || 'localhost';
+const H = () => hostInput.value.trim() || window.location.hostname || 'localhost';
+const GOV = () => `${window.location.protocol}//${H()}/governance`;
 
 // ================================================================
 // Tab navigation
@@ -385,13 +387,14 @@ function onHostChange() {
 // ================================================================
 // Service health checks
 // ================================================================
+const P = () => window.location.protocol;
 const SERVICES = [
-  { name: 'Nginx', url: h => `https://${h}/nginx-health` },
-  { name: 'WebUI', url: h => `https://${h}/health` },
-  { name: 'LiteLLM', url: h => `https://${h}/litellm/health/liveliness` },
-  { name: 'Netdata', url: h => `https://${h}/netdata/api/v1/info` },
-  { name: 'Grafana', url: h => `https://${h}/grafana/api/health` },
-  { name: 'GovHub', url: h => `https://${h}/governance/health` },
+  { name: 'Nginx', url: h => `${P()}//${h}/nginx-health` },
+  { name: 'WebUI', url: h => `${P()}//${h}/health` },
+  { name: 'LiteLLM', url: h => `${P()}//${h}/litellm/health/liveliness` },
+  { name: 'Netdata', url: h => `${P()}//${h}/netdata/api/v1/info` },
+  { name: 'Grafana', url: h => `${P()}//${h}/grafana/api/health` },
+  { name: 'GovHub', url: h => `${P()}//${h}/governance/health` },
 ];
 
 let healthResults = {};
@@ -403,14 +406,23 @@ function checkHealth() {
     `<span class="dot dot-spin" id="dot-${s.name}"></span>${s.name}</span>`
   ).join('');
 
-  let ok = 0, total = SERVICES.length;
+  let ok = 0, total = SERVICES.length, done = 0;
   SERVICES.forEach(s => {
     const ctrl = new AbortController();
-    setTimeout(() => ctrl.abort(), 4000);
-    fetch(s.url(h), { mode: 'no-cors', signal: ctrl.signal, cache: 'no-store' })
-      .then(() => { healthResults[s.name] = true; document.getElementById(`dot-${s.name}`).className = 'dot dot-ok'; ok++; })
+    setTimeout(() => ctrl.abort(), 5000);
+    fetch(s.url(h), { signal: ctrl.signal, cache: 'no-store' })
+      .then(r => {
+        if (r.ok || r.status === 401 || r.status === 302) {
+          healthResults[s.name] = true;
+          document.getElementById(`dot-${s.name}`).className = 'dot dot-ok';
+          ok++;
+        } else {
+          healthResults[s.name] = false;
+          document.getElementById(`dot-${s.name}`).className = 'dot dot-err';
+        }
+      })
       .catch(() => { healthResults[s.name] = false; document.getElementById(`dot-${s.name}`).className = 'dot dot-err'; })
-      .finally(() => { document.getElementById('tileServices').textContent = `${ok}/${total}`; });
+      .finally(() => { done++; document.getElementById('tileServices').textContent = `${ok}/${total}`; });
   });
   setTimeout(checkHealth, 30000);
 }
