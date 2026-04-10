@@ -489,38 +489,16 @@
     </div>
 
     <div id="governanceHubOptions" style="display:none">
-      <h4 style="font-size:1em;color:#2b6cb0;margin:14px 0 8px">Central Repository</h4>
-      <div class="row">
-        <div class="field">
-          <label>Database Type</label>
-          <select id="govHubDbType" onchange="updateGovHubPort()">
-            <option value="postgresql" selected>PostgreSQL</option>
-            <option value="mariadb">MariaDB / MySQL</option>
-            <option value="mssql">Microsoft SQL Server</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>Host</label>
-          <input type="text" id="govHubDbHost" placeholder="db.company.com">
-        </div>
-        <div class="field" style="flex:0.5">
-          <label>Port</label>
-          <input type="number" id="govHubDbPort" value="5432">
-        </div>
+      <div class="info-box">
+        <strong>Fleet Connection:</strong> The central fleet database is configured post-deployment
+        via the Admin Command Center's Fleet tab. If you have a <strong>Registration Token</strong>
+        from an existing fleet, enter it below to auto-configure the connection.
       </div>
-      <div class="row">
-        <div class="field">
-          <label>Database Name</label>
-          <input type="text" id="govHubDbName" value="insidellm_central">
-        </div>
-        <div class="field">
-          <label>Username</label>
-          <input type="text" id="govHubDbUser" placeholder="insidellm_sync">
-        </div>
-        <div class="field">
-          <label>Password</label>
-          <input type="text" id="govHubDbPassword" placeholder="Central DB password">
-        </div>
+
+      <div class="field" style="margin-top:12px">
+        <label>Registration Token <span style="font-weight:400;color:#718096">(optional — from fleet admin)</span></label>
+        <div class="hint">If provided, this instance will auto-register with the fleet and receive connection credentials. Generated from Fleet tab → Registration Token.</div>
+        <input type="text" id="govHubRegToken" placeholder="reg-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
       </div>
 
       <h4 style="font-size:1em;color:#2b6cb0;margin:14px 0 8px">Instance Identity</h4>
@@ -1106,14 +1084,37 @@ const INDUSTRY_TEMPLATES = {
   }
 };
 
-function applyIndustryTemplate() {
+async function applyIndustryTemplate() {
   const industry = v('industry');
-  const template = INDUSTRY_TEMPLATES[industry];
+  let template = null;
+  let source = 'local';
+
+  // Try fetching from central DB first (if Governance Hub is accessible)
+  try {
+    const resp = await fetch(`/governance/api/v1/keyword-templates/${industry}`, { signal: AbortSignal.timeout(2000) });
+    if (resp.ok) {
+      const data = await resp.json();
+      template = {
+        hint: data.hint,
+        tier: data.default_tier,
+        classification: data.default_classification,
+        categories: data.categories || {},
+      };
+      source = 'central';
+    }
+  } catch (e) { /* Network error — fall back to local */ }
+
+  // Fall back to local JS templates
+  if (!template) {
+    template = INDUSTRY_TEMPLATES[industry];
+    source = 'local';
+  }
   if (!template) return;
 
-  // Show hint
+  // Show hint with source indicator
   const hintEl = document.getElementById('industryHint');
-  hintEl.innerHTML = `<strong>${document.getElementById('industry').selectedOptions[0].text}:</strong> ${template.hint}`;
+  const sourceTag = source === 'central' ? ' <span style="font-size:0.8em;color:#38a169">(from Fleet DB)</span>' : '';
+  hintEl.innerHTML = `<strong>${document.getElementById('industry').selectedOptions[0].text}:</strong> ${template.hint}${sourceTag}`;
   hintEl.style.display = 'block';
 
   // Set governance defaults
@@ -1528,6 +1529,7 @@ governance_hub_instance_name       = "${v('govHubInstanceName')}"
 governance_hub_sync_schedule       = "${v('govHubSyncSchedule')}"`;
     if (v('govHubSupervisorEmails')) out += `\ngovernance_hub_supervisor_emails  = "${v('govHubSupervisorEmails')}"`;
     out += `\ngovernance_hub_advisor_model      = "${v('govHubAdvisorModel')}"`;
+    if (v('govHubRegToken')) out += `\n\n# Fleet Registration Token (single-use, auto-registers on first boot)\ngovernance_hub_registration_token = "${v('govHubRegToken')}"`;
   }
 
   // Keyword categories

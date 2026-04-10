@@ -10,7 +10,7 @@ from sqlalchemy import text
 from .config import settings
 from .db.local_db import AsyncSessionLocal, SyncSessionLocal, engine
 from .db.models import Base
-from .routers import advisor, audit, auth, changes, config_snapshots, connectors, fleet, framework, obligations, restore, schema, sync
+from .routers import advisor, audit, auth, changes, config_snapshots, connectors, fleet, framework, keyword_templates, obligations, restore, schema, sync
 from .services.config_service import capture_snapshot
 from .services.sync_service import collect_telemetry, export_to_central
 
@@ -49,6 +49,7 @@ app.include_router(restore.router)
 app.include_router(connectors.router)
 app.include_router(obligations.router)
 app.include_router(framework.router)
+app.include_router(keyword_templates.router)
 
 scheduler = AsyncIOScheduler()
 

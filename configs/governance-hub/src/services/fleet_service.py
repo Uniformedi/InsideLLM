@@ -364,6 +364,34 @@ _TABLES_POSTGRESQL = [
         updated_at TIMESTAMP DEFAULT NOW(),
         UNIQUE(instance_id)
     )""",
+    """CREATE TABLE IF NOT EXISTS governance_keyword_templates (
+        industry VARCHAR(50) PRIMARY KEY,
+        hint TEXT NOT NULL,
+        default_tier VARCHAR(20) DEFAULT 'tier3',
+        default_classification VARCHAR(30) DEFAULT 'internal',
+        is_active BOOLEAN DEFAULT TRUE,
+        version INTEGER DEFAULT 1,
+        updated_at TIMESTAMP DEFAULT NOW(),
+        updated_by VARCHAR(100) DEFAULT 'system'
+    )""",
+    """CREATE TABLE IF NOT EXISTS governance_keyword_categories (
+        id SERIAL PRIMARY KEY,
+        industry VARCHAR(50) NOT NULL,
+        category_name VARCHAR(100) NOT NULL,
+        keywords TEXT NOT NULL,
+        sort_order INTEGER DEFAULT 0,
+        UNIQUE(industry, category_name)
+    )""",
+    """CREATE TABLE IF NOT EXISTS governance_registration_tokens (
+        id SERIAL PRIMARY KEY,
+        token VARCHAR(255) NOT NULL UNIQUE,
+        created_by VARCHAR(100),
+        created_at TIMESTAMP DEFAULT NOW(),
+        expires_at TIMESTAMP NOT NULL,
+        used_by VARCHAR(100),
+        used_at TIMESTAMP,
+        is_used BOOLEAN DEFAULT FALSE
+    )""",
 ]
 
 _TABLES_MSSQL = [
@@ -440,6 +468,37 @@ _TABLES_MSSQL = [
         deployed_at DATETIME2 DEFAULT GETDATE(),
         updated_at DATETIME2 DEFAULT GETDATE()
     )""",
+    """IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'governance_keyword_templates')
+    CREATE TABLE governance_keyword_templates (
+        industry VARCHAR(50) PRIMARY KEY,
+        hint NVARCHAR(MAX) NOT NULL,
+        default_tier VARCHAR(20) DEFAULT 'tier3',
+        default_classification VARCHAR(30) DEFAULT 'internal',
+        is_active BIT DEFAULT 1,
+        version INT DEFAULT 1,
+        updated_at DATETIME2 DEFAULT GETDATE(),
+        updated_by VARCHAR(100) DEFAULT 'system'
+    )""",
+    """IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'governance_keyword_categories')
+    CREATE TABLE governance_keyword_categories (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        industry VARCHAR(50) NOT NULL,
+        category_name VARCHAR(100) NOT NULL,
+        keywords NVARCHAR(MAX) NOT NULL,
+        sort_order INT DEFAULT 0,
+        UNIQUE(industry, category_name)
+    )""",
+    """IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'governance_registration_tokens')
+    CREATE TABLE governance_registration_tokens (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        token VARCHAR(255) NOT NULL UNIQUE,
+        created_by VARCHAR(100),
+        created_at DATETIME2 DEFAULT GETDATE(),
+        expires_at DATETIME2 NOT NULL,
+        used_by VARCHAR(100),
+        used_at DATETIME2,
+        is_used BIT DEFAULT 0
+    )""",
 ]
 
 _TABLES_MARIADB = [
@@ -511,6 +570,34 @@ _TABLES_MARIADB = [
         deployed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )""",
+    """CREATE TABLE IF NOT EXISTS governance_keyword_templates (
+        industry VARCHAR(50) PRIMARY KEY,
+        hint TEXT NOT NULL,
+        default_tier VARCHAR(20) DEFAULT 'tier3',
+        default_classification VARCHAR(30) DEFAULT 'internal',
+        is_active BOOLEAN DEFAULT TRUE,
+        version INT DEFAULT 1,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_by VARCHAR(100) DEFAULT 'system'
+    )""",
+    """CREATE TABLE IF NOT EXISTS governance_keyword_categories (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        industry VARCHAR(50) NOT NULL,
+        category_name VARCHAR(100) NOT NULL,
+        keywords TEXT NOT NULL,
+        sort_order INT DEFAULT 0,
+        UNIQUE(industry, category_name)
+    )""",
+    """CREATE TABLE IF NOT EXISTS governance_registration_tokens (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        token VARCHAR(255) NOT NULL UNIQUE,
+        created_by VARCHAR(100),
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        expires_at DATETIME NOT NULL,
+        used_by VARCHAR(100),
+        used_at DATETIME,
+        is_used BOOLEAN DEFAULT FALSE
+    )""",
 ]
 
 
@@ -578,4 +665,16 @@ async def initialize_central_db(config: dict) -> dict:
 
     loop = asyncio.get_event_loop()
     with ThreadPoolExecutor(max_workers=1) as pool:
-        return await loop.run_in_executor(pool, _init_sync)
+        result = await loop.run_in_executor(pool, _init_sync)
+
+    # Seed keyword templates if tables were just created
+    if result.get("success"):
+        try:
+            from .keyword_template_service import seed_templates_if_empty
+            seed_result = await seed_templates_if_empty()
+            if seed_result.get("seeded"):
+                result["keyword_templates_seeded"] = seed_result.get("count", 0)
+        except Exception as e:
+            result["keyword_templates_seed_error"] = str(e)[:100]
+
+    return result

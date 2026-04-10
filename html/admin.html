@@ -397,6 +397,7 @@
       <div class="tab active" onclick="switchGovView('framework',this)" style="padding:10px 16px;font-size:11px">Framework</div>
       <div class="tab" onclick="switchGovView('compliance',this)" style="padding:10px 16px;font-size:11px">Compliance</div>
       <div class="tab" onclick="switchGovView('changes',this)" style="padding:10px 16px;font-size:11px">Changes</div>
+      <div class="tab" onclick="switchGovView('keywords',this)" style="padding:10px 16px;font-size:11px">Keywords</div>
       <div class="tab" onclick="switchGovView('syncaudit',this)" style="padding:10px 16px;font-size:11px">Sync &amp; Audit</div>
     </div>
 
@@ -436,6 +437,39 @@
         <button class="btn btn-action" onclick="loadChanges('implemented')">Implemented</button>
       </div>
       <div id="changesTable" class="loading">Loading...</div>
+    </div>
+
+    <!-- Keywords -->
+    <div class="gov-view" id="gov-keywords">
+      <div style="display:flex;gap:16px;margin-bottom:16px;align-items:center">
+        <span style="font-family:var(--font-mono);font-size:12px;color:var(--text-muted)">INDUSTRY:</span>
+        <select id="kwIndustrySelect" onchange="selectKeywordIndustry(this.value)" style="padding:8px 12px;background:var(--bg-deep);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:13px;min-width:200px">
+          <option value="">Loading...</option>
+        </select>
+        <span class="wiz-result" id="kwResult"></span>
+      </div>
+      <div id="kwEditor" style="display:none">
+        <div class="wiz-row">
+          <div class="wiz-field" style="flex:2"><label>Hint / Description</label><input type="text" id="kwHint"></div>
+          <div class="wiz-field" style="flex:0 0 140px"><label>Default Tier</label>
+            <select id="kwTier" style="width:100%;padding:8px;background:var(--bg-deep);border:1px solid var(--border);border-radius:4px;color:var(--text)">
+              <option value="tier1">Tier 1</option><option value="tier2">Tier 2</option><option value="tier3">Tier 3</option>
+            </select>
+          </div>
+          <div class="wiz-field" style="flex:0 0 160px"><label>Classification</label>
+            <select id="kwClassification" style="width:100%;padding:8px;background:var(--bg-deep);border:1px solid var(--border);border-radius:4px;color:var(--text)">
+              <option value="public">Public</option><option value="internal">Internal</option><option value="confidential">Confidential</option><option value="restricted">Restricted</option>
+            </select>
+          </div>
+        </div>
+        <div class="section-head" style="margin-top:16px">Categories &amp; Keywords <span class="accent">// edit inline</span></div>
+        <div id="kwCategoryRows"></div>
+        <button class="btn btn-action" onclick="addKwEditorRow()" style="margin-top:8px;font-size:11px">+ Add Category</button>
+        <div class="wiz-actions" style="margin-top:16px">
+          <div class="wiz-field" style="flex:1;max-width:300px"><label>Your Name (for audit)</label><input type="text" id="kwProposedBy" placeholder="Your name"></div>
+          <button class="btn btn-approve" onclick="saveKeywordTemplate()">Save Changes</button>
+        </div>
+      </div>
     </div>
 
     <!-- Sync & Audit -->
@@ -518,6 +552,7 @@
       Instance Registry <span class="accent">// all deployments</span>
       <span style="margin-left:auto;display:flex;gap:8px;align-items:center">
         <span id="syncResult" class="wiz-result"></span>
+        <button class="btn btn-action" onclick="generateRegToken()">Registration Token</button>
         <button class="btn btn-action" onclick="takeSnapshot()">Take Snapshot</button>
         <button class="btn btn-action" onclick="triggerSync()">Sync Now</button>
       </span>
@@ -913,6 +948,7 @@ function switchGovView(name, el) {
   if (name === 'framework' && !govViewLoaded.framework) { loadFrameworkTree(); govViewLoaded.framework = true; }
   if (name === 'compliance' && !govViewLoaded.compliance) { loadComplianceDashboard(); govViewLoaded.compliance = true; }
   if (name === 'changes') loadChanges('pending');
+  if (name === 'keywords' && !govViewLoaded.keywords) { loadKeywordTemplates(); govViewLoaded.keywords = true; }
   if (name === 'syncaudit' && !govViewLoaded.syncaudit) { loadSyncAudit(); govViewLoaded.syncaudit = true; }
 }
 
@@ -1070,6 +1106,101 @@ async function seedFramework() {
     loadFrameworkTree();
   } else {
     tree.innerHTML = `<div class="loading" style="color:var(--red)">Seed failed: ${res?.message || 'Unknown error'}</div>`;
+  }
+}
+
+// ================================================================
+// GOVERNANCE — Keywords
+// ================================================================
+let kwTemplates = [];
+
+async function loadKeywordTemplates() {
+  const data = await api('/api/v1/keyword-templates');
+  const sel = document.getElementById('kwIndustrySelect');
+  if (data?.templates?.length) {
+    kwTemplates = data.templates;
+    sel.innerHTML = '<option value="">Select an industry...</option>' +
+      data.templates.map(t => `<option value="${t.industry}">${t.industry} (v${t.version})</option>`).join('');
+  } else {
+    sel.innerHTML = '<option value="">No templates — click Initialize Database in Fleet tab first</option>';
+  }
+}
+
+function selectKeywordIndustry(industry) {
+  const editor = document.getElementById('kwEditor');
+  if (!industry) { editor.style.display = 'none'; return; }
+  const tmpl = kwTemplates.find(t => t.industry === industry);
+  if (!tmpl) return;
+
+  document.getElementById('kwHint').value = tmpl.hint || '';
+  document.getElementById('kwTier').value = tmpl.default_tier || 'tier3';
+  document.getElementById('kwClassification').value = tmpl.default_classification || 'internal';
+
+  // Populate category rows
+  const container = document.getElementById('kwCategoryRows');
+  container.innerHTML = '';
+  const cats = tmpl.categories || {};
+  Object.entries(cats).forEach(([cat, keywords], idx) => {
+    addKwEditorRow(cat, keywords);
+  });
+
+  editor.style.display = 'block';
+  document.getElementById('kwResult').innerHTML = '';
+}
+
+let kwRowIdx = 0;
+function addKwEditorRow(cat, keywords) {
+  const container = document.getElementById('kwCategoryRows');
+  const idx = kwRowIdx++;
+  const div = document.createElement('div');
+  div.style.cssText = 'display:flex;gap:8px;margin-bottom:6px;align-items:center';
+  div.id = `kwRow_${idx}`;
+  div.innerHTML = `
+    <input type="text" class="kw-ed-cat" value="${cat || ''}" placeholder="Category name" style="flex:1;padding:6px 10px;background:var(--bg-deep);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:12px;font-family:var(--font-mono)">
+    <input type="text" class="kw-ed-words" value="${(keywords || '').replace(/"/g, '&quot;')}" placeholder="Comma-separated keywords" style="flex:3;padding:6px 10px;background:var(--bg-deep);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:12px">
+    <button onclick="document.getElementById('kwRow_${idx}').remove()" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:16px">&times;</button>
+  `;
+  container.appendChild(div);
+}
+
+async function saveKeywordTemplate() {
+  const industry = document.getElementById('kwIndustrySelect').value;
+  const result = document.getElementById('kwResult');
+  if (!industry) { result.innerHTML = '<span style="color:var(--red)">Select an industry first</span>'; return; }
+
+  const proposedBy = document.getElementById('kwProposedBy').value.trim() || 'admin';
+  const rows = document.querySelectorAll('#kwCategoryRows > div');
+  const categories = [];
+  rows.forEach(row => {
+    const cat = row.querySelector('.kw-ed-cat')?.value?.trim();
+    const words = row.querySelector('.kw-ed-words')?.value?.trim();
+    if (cat && words) categories.push({ category_name: cat, keywords: words });
+  });
+
+  result.innerHTML = '<span style="color:var(--amber)">Saving...</span>';
+  try {
+    const resp = await fetch(`${GOV()}/api/v1/keyword-templates/${industry}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        hint: document.getElementById('kwHint').value,
+        default_tier: document.getElementById('kwTier').value,
+        default_classification: document.getElementById('kwClassification').value,
+        categories: categories,
+        proposed_by: proposedBy,
+        change_justification: `Updated ${industry} keyword template via admin UI`,
+      }),
+    });
+    const res = await resp.json();
+    if (res.success) {
+      result.innerHTML = `<span style="color:var(--green)">Saved (change #${res.change_id || '?'})</span>`;
+      govViewLoaded.keywords = false; // Force reload
+      loadKeywordTemplates();
+    } else {
+      result.innerHTML = `<span style="color:var(--red)">${res.detail || 'Failed'}</span>`;
+    }
+  } catch (e) {
+    result.innerHTML = `<span style="color:var(--red)">Error: ${e.message}</span>`;
   }
 }
 
@@ -1399,6 +1530,27 @@ async function saveFleetDb() {
       loadFleetDbConfig();
     } else {
       result.innerHTML = `<span style="color:var(--red)">Failed: ${res.message || 'Unknown error'}</span>`;
+    }
+  } catch (e) {
+    result.innerHTML = `<span style="color:var(--red)">Error: ${e.message}</span>`;
+  }
+}
+
+async function generateRegToken() {
+  const result = document.getElementById('syncResult');
+  result.innerHTML = '<span style="color:var(--amber)">Generating token...</span>';
+  try {
+    const resp = await fetch(`${GOV()}/api/v1/fleet/registration-token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hours: 24, created_by: 'admin-ui' }),
+      signal: AbortSignal.timeout(10000),
+    });
+    const res = await resp.json();
+    if (res.success) {
+      result.innerHTML = `<span style="color:var(--green)">Token (24h): </span><code style="color:var(--cyan);user-select:all;cursor:pointer" title="Click to copy" onclick="navigator.clipboard.writeText(this.textContent)">${res.token}</code>`;
+    } else {
+      result.innerHTML = `<span style="color:var(--red)">${res.message || 'Failed'}</span>`;
     }
   } catch (e) {
     result.innerHTML = `<span style="color:var(--red)">Error: ${e.message}</span>`;
@@ -1778,7 +1930,7 @@ function goToSyncAudit() {
   govTab.classList.add('active');
   document.getElementById('panel-governance').classList.add('active');
   govViewLoaded = {};
-  switchGovView('syncaudit', document.querySelectorAll('#panel-governance .tab')[3]); // 4th sub-tab
+  switchGovView('syncaudit', document.querySelectorAll('#panel-governance .tab')[4]); // 5th sub-tab
 }
 
 // ================================================================

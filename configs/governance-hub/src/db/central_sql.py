@@ -143,6 +143,59 @@ class _PostgreSQL:
         FROM governance_deployment_tfvars WHERE instance_id = :iid
     """
 
+    # Keyword templates
+    list_keyword_templates = """
+        SELECT t.industry, t.hint, t.default_tier, t.default_classification, t.is_active, t.version, t.updated_at, t.updated_by
+        FROM governance_keyword_templates t WHERE t.is_active = true ORDER BY t.industry
+    """
+
+    get_keyword_template = """
+        SELECT t.industry, t.hint, t.default_tier, t.default_classification, t.is_active, t.version, t.updated_at, t.updated_by
+        FROM governance_keyword_templates t WHERE t.industry = :industry
+    """
+
+    get_keyword_categories = """
+        SELECT category_name, keywords, sort_order
+        FROM governance_keyword_categories WHERE industry = :industry ORDER BY sort_order, category_name
+    """
+
+    upsert_keyword_template = """
+        INSERT INTO governance_keyword_templates (industry, hint, default_tier, default_classification, updated_by)
+        VALUES (:industry, :hint, :tier, :classification, :updated_by)
+        ON CONFLICT (industry) DO UPDATE SET
+            hint = EXCLUDED.hint, default_tier = EXCLUDED.default_tier,
+            default_classification = EXCLUDED.default_classification,
+            version = governance_keyword_templates.version + 1,
+            updated_at = NOW(), updated_by = EXCLUDED.updated_by
+    """
+
+    upsert_keyword_category = """
+        INSERT INTO governance_keyword_categories (industry, category_name, keywords, sort_order)
+        VALUES (:industry, :category, :keywords, :sort_order)
+        ON CONFLICT (industry, category_name) DO UPDATE SET
+            keywords = EXCLUDED.keywords, sort_order = EXCLUDED.sort_order
+    """
+
+    delete_keyword_categories = "DELETE FROM governance_keyword_categories WHERE industry = :industry"
+
+    count_keyword_templates = "SELECT COUNT(*) AS cnt FROM governance_keyword_templates"
+
+    # Registration tokens
+    create_registration_token = """
+        INSERT INTO governance_registration_tokens (token, created_by, expires_at)
+        VALUES (:token, :created_by, :expires_at)
+    """
+
+    validate_registration_token = """
+        SELECT id, token, created_by, expires_at FROM governance_registration_tokens
+        WHERE token = :token AND is_used = false AND expires_at > NOW()
+    """
+
+    mark_token_used = """
+        UPDATE governance_registration_tokens SET is_used = true, used_by = :used_by, used_at = NOW()
+        WHERE token = :token
+    """
+
 
 class _MSSQL:
     """Microsoft SQL Server dialect."""
@@ -271,6 +324,49 @@ class _MSSQL:
 
     get_tfvars = _PostgreSQL.get_tfvars
 
+    # Keyword templates (MSSQL uses BIT for boolean, GETDATE)
+    list_keyword_templates = """
+        SELECT industry, hint, default_tier, default_classification, is_active, version, updated_at, updated_by
+        FROM governance_keyword_templates WHERE is_active = 1 ORDER BY industry
+    """
+    get_keyword_template = _PostgreSQL.get_keyword_template
+    get_keyword_categories = _PostgreSQL.get_keyword_categories
+
+    upsert_keyword_template = """
+        MERGE governance_keyword_templates AS target
+        USING (SELECT :industry AS industry) AS source ON target.industry = source.industry
+        WHEN MATCHED THEN UPDATE SET
+            hint = :hint, default_tier = :tier, default_classification = :classification,
+            is_active = 1, version = target.version + 1, updated_at = GETDATE(), updated_by = :updated_by
+        WHEN NOT MATCHED THEN INSERT (industry, hint, default_tier, default_classification, is_active, version, updated_by)
+        VALUES (:industry, :hint, :tier, :classification, 1, 1, :updated_by);
+    """
+
+    upsert_keyword_category = """
+        MERGE governance_keyword_categories AS target
+        USING (SELECT :industry AS industry, :category AS category_name) AS source
+        ON target.industry = source.industry AND target.category_name = source.category_name
+        WHEN MATCHED THEN UPDATE SET keywords = :keywords, sort_order = :sort_order
+        WHEN NOT MATCHED THEN INSERT (industry, category_name, keywords, sort_order)
+        VALUES (:industry, :category, :keywords, :sort_order);
+    """
+
+    delete_keyword_categories = _PostgreSQL.delete_keyword_categories
+    count_keyword_templates = _PostgreSQL.count_keyword_templates
+
+    create_registration_token = """
+        INSERT INTO governance_registration_tokens (token, created_by, expires_at)
+        VALUES (:token, :created_by, :expires_at)
+    """
+    validate_registration_token = """
+        SELECT id, token, created_by, expires_at FROM governance_registration_tokens
+        WHERE token = :token AND is_used = 0 AND expires_at > GETDATE()
+    """
+    mark_token_used = """
+        UPDATE governance_registration_tokens SET is_used = 1, used_by = :used_by, used_at = GETDATE()
+        WHERE token = :token
+    """
+
 
 class _MariaDB:
     """MariaDB / MySQL dialect."""
@@ -328,6 +424,32 @@ class _MariaDB:
     """
 
     get_tfvars = _PostgreSQL.get_tfvars
+
+    # Keyword templates (MariaDB uses ON DUPLICATE KEY)
+    list_keyword_templates = _PostgreSQL.list_keyword_templates
+    get_keyword_template = _PostgreSQL.get_keyword_template
+    get_keyword_categories = _PostgreSQL.get_keyword_categories
+
+    upsert_keyword_template = """
+        INSERT INTO governance_keyword_templates (industry, hint, default_tier, default_classification, updated_by)
+        VALUES (:industry, :hint, :tier, :classification, :updated_by)
+        ON DUPLICATE KEY UPDATE
+            hint = VALUES(hint), default_tier = VALUES(default_tier),
+            default_classification = VALUES(default_classification),
+            version = version + 1, updated_at = CURRENT_TIMESTAMP, updated_by = VALUES(updated_by)
+    """
+
+    upsert_keyword_category = """
+        INSERT INTO governance_keyword_categories (industry, category_name, keywords, sort_order)
+        VALUES (:industry, :category, :keywords, :sort_order)
+        ON DUPLICATE KEY UPDATE keywords = VALUES(keywords), sort_order = VALUES(sort_order)
+    """
+
+    delete_keyword_categories = _PostgreSQL.delete_keyword_categories
+    count_keyword_templates = _PostgreSQL.count_keyword_templates
+    create_registration_token = _PostgreSQL.create_registration_token
+    validate_registration_token = _PostgreSQL.validate_registration_token
+    mark_token_used = _PostgreSQL.mark_token_used
 
 
 def _get_dialect_class():

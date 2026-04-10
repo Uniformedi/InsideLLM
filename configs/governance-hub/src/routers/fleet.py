@@ -82,3 +82,52 @@ async def save_fleet_db_config(config: FleetDbConfig):
 async def initialize_fleet_db(config: FleetDbConfig):
     """Create governance tables in the central database if they don't exist."""
     return await initialize_central_db(config.model_dump())
+
+
+class RegistrationTokenRequest(BaseModel):
+    hours: int = 24
+    created_by: str = "admin"
+
+
+class RegistrationRequest(BaseModel):
+    token: str
+    instance_id: str
+    instance_name: str = ""
+
+
+@router.post("/registration-token")
+async def create_registration_token(req: RegistrationTokenRequest):
+    """Generate a time-limited registration token for new instances to self-register.
+
+    The token is single-use and expires after the specified hours.
+    Share it with the new instance's administrator.
+    """
+    from ..services.registration_service import generate_registration_token, store_token
+    from datetime import datetime, timedelta, timezone
+
+    result = generate_registration_token(req.hours, req.created_by)
+    stored = await store_token(result["token"], req.created_by,
+                               datetime.now(timezone.utc) + timedelta(hours=req.hours))
+    if not stored:
+        return {"success": False, "message": "Failed to store token in central DB"}
+
+    return {"success": True, **result}
+
+
+@router.post("/register")
+async def register_instance(req: RegistrationRequest):
+    """Self-register a new instance using a registration token.
+
+    Returns encrypted fleet DB credentials on success.
+    """
+    from ..services.registration_service import validate_and_consume_token
+
+    result = await validate_and_consume_token(req.token, req.instance_id)
+    if not result:
+        raise HTTPException(status_code=401, detail="Invalid, expired, or already-used registration token")
+
+    return {
+        "success": True,
+        "message": "Instance registered successfully",
+        **result,
+    }
