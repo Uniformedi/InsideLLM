@@ -496,7 +496,7 @@ runcmd:
     rm -f opa-policies.zip
 %{ endif ~}
 %{ if governance_hub_enable ~}
-  - mkdir -p /opt/InsideLLM/data/governance-hub
+  - mkdir -p /opt/InsideLLM/data/governance-hub && chown 999:999 /opt/InsideLLM/data/governance-hub
   - |
     cd /opt/InsideLLM
     if [ ! -s governance-hub.zip ]; then
