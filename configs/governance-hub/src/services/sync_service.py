@@ -14,7 +14,8 @@ from .audit_chain import append_event
 async def collect_telemetry(db: AsyncSession, days: int = 1) -> TelemetrySummary:
     """Collect governance telemetry from local PostgreSQL."""
     now = datetime.now(timezone.utc)
-    since = now - timedelta(days=days)
+    # Use naive datetime for LiteLLM queries (its startTime is timestamp without tz)
+    since_naive = (now - timedelta(days=days)).replace(tzinfo=None)
 
     result = await db.execute(text("""
         SELECT
@@ -24,18 +25,22 @@ async def collect_telemetry(db: AsyncSession, days: int = 1) -> TelemetrySummary
             COUNT(*) FILTER (WHERE status != 'success') AS error_count
         FROM "LiteLLM_SpendLogs"
         WHERE "startTime" > :since
-    """), {"since": since})
+    """), {"since": since_naive})
     row = result.mappings().first()
 
-    # Keyword flags
-    flags = await db.execute(text("""
-        SELECT
-            COALESCE(SUM(CASE WHEN severity = 'critical' THEN match_count ELSE 0 END), 0) AS critical,
-            COALESCE(SUM(CASE WHEN severity = 'high' THEN match_count ELSE 0 END), 0) AS high
-        FROM keyword_daily_summary
-        WHERE day > :since
-    """), {"since": since})
-    flag_row = flags.mappings().first()
+    # Keyword flags (table may not exist if keyword analysis not configured)
+    flag_row = None
+    try:
+        flags = await db.execute(text("""
+            SELECT
+                COALESCE(SUM(CASE WHEN severity = 'critical' THEN match_count ELSE 0 END), 0) AS critical,
+                COALESCE(SUM(CASE WHEN severity = 'high' THEN match_count ELSE 0 END), 0) AS high
+            FROM keyword_daily_summary
+            WHERE day > :since
+        """), {"since": since_naive})
+        flag_row = flags.mappings().first()
+    except Exception:
+        await db.rollback()
 
     # Top models
     models_result = await db.execute(text("""
@@ -43,7 +48,7 @@ async def collect_telemetry(db: AsyncSession, days: int = 1) -> TelemetrySummary
         FROM "LiteLLM_SpendLogs"
         WHERE "startTime" > :since
         GROUP BY model ORDER BY cnt DESC LIMIT 10
-    """), {"since": since})
+    """), {"since": since_naive})
     top_models = {r["model"]: r["cnt"] for r in models_result.mappings()}
 
     # Compliance score: (1 - error_rate) * 100, capped at 100

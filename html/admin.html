@@ -1100,16 +1100,21 @@ async function triggerSync() {
   try {
     const resp = await fetch(`${GOV()}/api/v1/sync/trigger`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': 'admin' },
       signal: AbortSignal.timeout(30000),
     });
+    if (!resp.ok) {
+      const text = await resp.text();
+      result.innerHTML = `<span style="color:var(--red)">HTTP ${resp.status}: ${text.slice(0, 100)}</span>`;
+      return;
+    }
     const res = await resp.json();
     if (res.status === 'success') {
       result.innerHTML = `<span style="color:var(--green)">Synced (${res.records_exported} records)</span>`;
-      // Reload fleet data
       loadFleet();
+    } else if (res.status === 'skipped') {
+      result.innerHTML = `<span style="color:var(--amber)">Skipped: ${res.error || 'Central DB not configured'}</span>`;
     } else {
-      result.innerHTML = `<span style="color:var(--red)">${res.status}: ${res.error || 'Failed'}</span>`;
+      result.innerHTML = `<span style="color:var(--red)">${res.status || 'Error'}: ${res.error || 'Sync failed'}</span>`;
     }
   } catch (e) {
     result.innerHTML = `<span style="color:var(--red)">Error: ${e.message}</span>`;

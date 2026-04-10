@@ -53,4 +53,8 @@ test-winrm.ps1
 
 # Build artifacts
 terraform-InsideLLM.tar.gz
+terraform-claude-wrapper.tar.gz
 tfplan
+
+# Confidential documents
+AI_Governance_Framework.md

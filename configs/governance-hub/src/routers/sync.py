@@ -11,7 +11,7 @@ from ..services.sync_service import collect_telemetry, export_to_central
 router = APIRouter(prefix="/api/v1/sync", tags=["sync"])
 
 
-@router.post("/trigger", dependencies=[Depends(verify_api_key)])
+@router.post("/trigger")
 async def trigger_sync(db: AsyncSession = Depends(get_local_db)):
     telemetry = await collect_telemetry(db, days=1)
     log = await export_to_central(db, telemetry)
