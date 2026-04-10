@@ -22,6 +22,8 @@ class FleetDbConfig(BaseModel):
     db_name: str = "insidellm_central"
     username: str = ""
     password: str = ""
+    trust_server_certificate: bool = True
+    encrypt: bool = True
 
 
 @router.get("/instances")

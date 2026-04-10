@@ -335,6 +335,7 @@
   <div class="tab" onclick="switchTab('changes')">Changes</div>
   <div class="tab" onclick="switchTab('fleet')">Fleet</div>
   <div class="tab" onclick="switchTab('services')">Services</div>
+  <div class="tab" onclick="switchTab('specs')">Specifications</div>
 </div>
 
 <div class="content">
@@ -424,6 +425,14 @@
           <input type="password" id="fleetDbPass" placeholder="Enter password">
         </div>
       </div>
+      <div id="fleetDbMssqlOpts" style="display:flex;gap:20px;margin-bottom:12px">
+        <label style="display:flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:12px;color:var(--text-dim);cursor:pointer">
+          <input type="checkbox" id="fleetDbTrustCert" checked> Trust Server Certificate
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:12px;color:var(--text-dim);cursor:pointer">
+          <input type="checkbox" id="fleetDbEncrypt" checked> Encrypt Connection
+        </label>
+      </div>
       <div class="wiz-actions">
         <button class="btn btn-action" onclick="testFleetDb()">Test Connection</button>
         <button class="btn btn-approve" onclick="saveFleetDb()">Save Configuration</button>
@@ -489,6 +498,91 @@
         <tr><td><code>5050</code></td><td>pgAdmin</td><td>Database administration</td></tr>
         <tr><td><code>3389</code></td><td>xRDP</td><td>Remote desktop access</td></tr>
         <tr><td><code>11434</code></td><td>Ollama</td><td>Local LLM API (if enabled)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ======================== SPECIFICATIONS ======================== -->
+  <div class="panel" id="panel-specs">
+    <div class="section-head">API &amp; Protocol Specifications <span class="accent">// standards this stack implements</span></div>
+    <table class="data-table">
+      <thead><tr><th>Specification</th><th>Version</th><th>Used By</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><strong>OpenAI Chat Completions API</strong></td><td><code>v1</code></td><td>LiteLLM, Open WebUI, Claude Code CLI</td><td>Unified LLM API interface — all models accessed via <code>/v1/chat/completions</code></td></tr>
+        <tr><td><strong>OpenAPI Specification</strong></td><td><code>3.0.3</code></td><td>Governance Hub, LiteLLM</td><td>API documentation and Swagger UI auto-generation</td></tr>
+        <tr><td><strong>OAuth 2.0</strong></td><td><code>RFC 6749</code></td><td>Open WebUI, Grafana, LiteLLM</td><td>Authorization framework for SSO (Azure AD, Okta)</td></tr>
+        <tr><td><strong>OpenID Connect</strong></td><td><code>1.0</code></td><td>Open WebUI, Grafana, LiteLLM</td><td>Identity layer on OAuth 2.0 — user profile, email, groups</td></tr>
+        <tr><td><strong>JSON Web Token (JWT)</strong></td><td><code>RFC 7519</code></td><td>LiteLLM, Governance Hub</td><td>Stateless authentication tokens for SSO and API access</td></tr>
+        <tr><td><strong>JSON Web Key Set (JWKS)</strong></td><td><code>RFC 7517</code></td><td>SSO validation</td><td>Public key discovery for JWT signature verification</td></tr>
+      </tbody>
+    </table>
+
+    <div class="section-head">Transport &amp; Security <span class="accent">// encryption and communication</span></div>
+    <table class="data-table">
+      <thead><tr><th>Specification</th><th>Version</th><th>Used By</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><strong>TLS</strong></td><td><code>1.2 / 1.3</code></td><td>Nginx</td><td>All external traffic encrypted via self-signed or CA certificate</td></tr>
+        <tr><td><strong>HTTP/2</strong></td><td><code>RFC 7540</code></td><td>Nginx</td><td>Multiplexed connections for dashboard and API performance</td></tr>
+        <tr><td><strong>WebSocket</strong></td><td><code>RFC 6455</code></td><td>Nginx, Open WebUI</td><td>Real-time chat streaming and UI updates</td></tr>
+        <tr><td><strong>HSTS</strong></td><td><code>RFC 6797</code></td><td>Nginx</td><td>HTTP Strict Transport Security — forces HTTPS</td></tr>
+        <tr><td><strong>CORS</strong></td><td><code>W3C Fetch Standard</code></td><td>Nginx, LiteLLM</td><td>Cross-origin request policy enforcement</td></tr>
+      </tbody>
+    </table>
+
+    <div class="section-head">Infrastructure &amp; Orchestration <span class="accent">// deployment and provisioning</span></div>
+    <table class="data-table">
+      <thead><tr><th>Specification</th><th>Version</th><th>Used By</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Docker Compose</strong></td><td><code>Spec 2.x</code></td><td>All containers</td><td>Multi-container service orchestration and networking</td></tr>
+        <tr><td><strong>OCI Image Spec</strong></td><td><code>1.1</code></td><td>Docker</td><td>Container image format for all services</td></tr>
+        <tr><td><strong>Terraform HCL</strong></td><td><code>1.x</code></td><td>Hyper-V deployment</td><td>Infrastructure-as-code for VM provisioning and configuration</td></tr>
+        <tr><td><strong>Cloud-init</strong></td><td><code>v2</code></td><td>VM provisioning</td><td>First-boot configuration: packages, files, users, Docker setup</td></tr>
+        <tr><td><strong>WinRM / WS-Management</strong></td><td><code>1.1</code></td><td>Terraform Hyper-V provider</td><td>Remote management of Windows host for VM lifecycle</td></tr>
+        <tr><td><strong>Hyper-V WMI</strong></td><td><code>v2</code></td><td>Terraform</td><td>Virtual machine creation, networking, and disk management</td></tr>
+      </tbody>
+    </table>
+
+    <div class="section-head">Data &amp; Query Languages <span class="accent">// database and log querying</span></div>
+    <table class="data-table">
+      <thead><tr><th>Specification</th><th>Version</th><th>Used By</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><strong>SQL</strong></td><td><code>ANSI SQL:2016</code></td><td>PostgreSQL, LiteLLM, Governance Hub</td><td>Spend tracking, audit logs, governance data, keyword analysis</td></tr>
+        <tr><td><strong>T-SQL</strong></td><td><code>SQL Server 2019+</code></td><td>Fleet central DB (MSSQL option)</td><td>Central fleet database queries when using Microsoft SQL Server</td></tr>
+        <tr><td><strong>LogQL</strong></td><td><code>Loki 2.x</code></td><td>Grafana, Loki</td><td>Log querying for compliance dashboards and alert rules</td></tr>
+        <tr><td><strong>Rego</strong></td><td><code>OPA v0.x</code></td><td>OPA Policy Engine</td><td>Declarative policy evaluation — immutable, pure evaluation only</td></tr>
+      </tbody>
+    </table>
+
+    <div class="section-head">Document &amp; File Formats <span class="accent">// generation and conversion</span></div>
+    <table class="data-table">
+      <thead><tr><th>Specification</th><th>Version</th><th>Used By</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Office Open XML (OOXML)</strong></td><td><code>ISO/IEC 29500</code></td><td>DocForge</td><td>DOCX, XLSX, PPTX generation from structured data</td></tr>
+        <tr><td><strong>PDF</strong></td><td><code>ISO 32000-2</code></td><td>DocForge</td><td>PDF generation and conversion via LibreOffice</td></tr>
+        <tr><td><strong>Open Document Format (ODF)</strong></td><td><code>ISO/IEC 26300</code></td><td>DocForge (LibreOffice)</td><td>Intermediate format for cross-format conversion</td></tr>
+      </tbody>
+    </table>
+
+    <div class="section-head">Monitoring &amp; Alerting <span class="accent">// observability protocols</span></div>
+    <table class="data-table">
+      <thead><tr><th>Specification</th><th>Version</th><th>Used By</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Prometheus Exposition Format</strong></td><td><code>0.0.4</code></td><td>Netdata</td><td>System metrics collection (CPU, memory, disk, containers)</td></tr>
+        <tr><td><strong>Grafana Alerting</strong></td><td><code>Unified Alerting v1</code></td><td>Grafana</td><td>Alert rules, contact points, notification policies</td></tr>
+        <tr><td><strong>Slack Incoming Webhooks</strong></td><td><code>v1</code></td><td>Watchtower, Grafana, LiteLLM, Uptime Kuma</td><td>Alert delivery to Slack channels</td></tr>
+        <tr><td><strong>Grafana Provisioning</strong></td><td><code>API v1</code></td><td>Grafana</td><td>Declarative datasource and dashboard configuration via YAML</td></tr>
+        <tr><td><strong>Socket.IO</strong></td><td><code>v4</code></td><td>Uptime Kuma</td><td>Real-time monitor management and status updates</td></tr>
+      </tbody>
+    </table>
+
+    <div class="section-head">Governance &amp; Compliance <span class="accent">// framework alignment</span></div>
+    <table class="data-table">
+      <thead><tr><th>Specification</th><th>Version</th><th>Used By</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><strong>NIST AI Risk Management Framework</strong></td><td><code>AI 100-1</code></td><td>Governance Hub</td><td>Risk tiering methodology (Tier 1/2/3) for AI governance classification</td></tr>
+        <tr><td><strong>ISO/IEC 42001</strong></td><td><code>2023</code></td><td>Governance Hub</td><td>AI management system requirements — data classification, audit trails</td></tr>
+        <tr><td><strong>OWASP Top 10</strong></td><td><code>2021</code></td><td>DLP pipeline, Nginx</td><td>Web security baseline — XSS headers, CSP, input validation</td></tr>
+        <tr><td><strong>CVE / NVD</strong></td><td><code>NIST NVD API 2.0</code></td><td>Trivy</td><td>Container image vulnerability scanning against known CVEs</td></tr>
       </tbody>
     </table>
   </div>
@@ -823,6 +917,7 @@ const DB_PORTS = { mssql: 1433, mariadb: 3306, postgresql: 5432 };
 function onFleetDbTypeChange() {
   const type = document.getElementById('fleetDbType').value;
   document.getElementById('fleetDbPort').value = DB_PORTS[type] || 5432;
+  document.getElementById('fleetDbMssqlOpts').style.display = type === 'mssql' ? 'flex' : 'none';
 }
 
 async function loadFleetDbConfig() {
@@ -849,7 +944,7 @@ async function loadFleetDbConfig() {
 }
 
 function getFleetDbFormData() {
-  return {
+  const data = {
     db_type: document.getElementById('fleetDbType').value,
     host: document.getElementById('fleetDbHost').value.trim(),
     port: parseInt(document.getElementById('fleetDbPort').value) || 5432,
@@ -857,6 +952,11 @@ function getFleetDbFormData() {
     username: document.getElementById('fleetDbUser').value.trim(),
     password: document.getElementById('fleetDbPass').value,
   };
+  if (data.db_type === 'mssql') {
+    data.trust_server_certificate = document.getElementById('fleetDbTrustCert').checked;
+    data.encrypt = document.getElementById('fleetDbEncrypt').checked;
+  }
+  return data;
 }
 
 async function testFleetDb() {

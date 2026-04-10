@@ -235,9 +235,21 @@ async def test_db_connection(config: dict) -> dict:
     def _test_sync() -> dict:
         engine = None
         try:
+            connect_args: dict = {}
+            if "psycopg2" in url:
+                connect_args = {"connect_timeout": 5}
+            elif "pymssql" in url:
+                connect_args = {
+                    "login_timeout": 5,
+                    "tds_version": "7.3",
+                }
+                if config.get("encrypt"):
+                    connect_args["conn_properties"] = "Encrypt=yes;"
+                if config.get("trust_server_certificate"):
+                    connect_args["conn_properties"] = connect_args.get("conn_properties", "") + "TrustServerCertificate=yes;"
+
             engine = create_engine(url, pool_size=1, max_overflow=0, pool_pre_ping=False,
-                                   connect_args={"connect_timeout": 5} if "psycopg2" in url else
-                                                 {"login_timeout": 5} if "pymssql" in url else {})
+                                   connect_args=connect_args)
             start = time.monotonic()
             with engine.connect() as conn:
                 conn.execute(text("SELECT 1"))
