@@ -412,12 +412,31 @@ locals {
 # Create Hyper-V virtual switch
 # ---------------------------------------------------------------------------
 
-resource "hyperv_network_switch" "insidellm" {
-  name        = var.vm_switch_name
-  switch_type = var.vm_switch_type
+resource "null_resource" "ensure_vm_switch" {
+  # Create the Hyper-V virtual switch only if it doesn't already exist.
+  # This prevents error 0x8007054F when a switch with the same name
+  # is already bound to the network adapter.
 
-  # Only set net_adapter_names for External switches
-  net_adapter_names = var.vm_switch_type == "External" ? [var.vm_switch_adapter] : []
+  provisioner "local-exec" {
+    command     = <<-EOT
+      $switchName = "${var.vm_switch_name}"
+      $existing = Get-VMSwitch -Name $switchName -ErrorAction SilentlyContinue
+      if ($existing) {
+        Write-Host "Virtual switch '$switchName' already exists ($($existing.SwitchType)) — skipping creation"
+      } else {
+        Write-Host "Creating virtual switch '$switchName' (${var.vm_switch_type})..."
+        if ("${var.vm_switch_type}" -eq "External") {
+          New-VMSwitch -Name $switchName -NetAdapterName "${var.vm_switch_adapter}" -AllowManagementOS $true
+        } elseif ("${var.vm_switch_type}" -eq "Internal") {
+          New-VMSwitch -Name $switchName -SwitchType Internal
+        } else {
+          New-VMSwitch -Name $switchName -SwitchType Private
+        }
+        Write-Host "Virtual switch '$switchName' created"
+      }
+    EOT
+    interpreter = ["PowerShell", "-NoProfile", "-Command"]
+  }
 }
 
 # ---------------------------------------------------------------------------
@@ -425,7 +444,7 @@ resource "hyperv_network_switch" "insidellm" {
 # ---------------------------------------------------------------------------
 
 resource "null_resource" "prepare_vm_disk" {
-  depends_on = [hyperv_network_switch.insidellm]
+  depends_on = [null_resource.ensure_vm_switch]
 
   provisioner "local-exec" {
     command     = <<-EOT
@@ -503,7 +522,7 @@ resource "hyperv_machine_instance" "insidellm" {
   depends_on = [
     null_resource.prepare_vm_disk,
     null_resource.create_cloud_init_iso,
-    hyperv_network_switch.insidellm,
+    null_resource.ensure_vm_switch,
   ]
 
   name                 = var.vm_name
@@ -552,7 +571,7 @@ resource "hyperv_machine_instance" "insidellm" {
   # Network adapter
   network_adaptors {
     name        = "eth0"
-    switch_name = hyperv_network_switch.insidellm.name
+    switch_name = var.vm_switch_name
   }
 
   integration_services = {
@@ -596,7 +615,7 @@ locals {
 
 resource "null_resource" "prepare_ollama_vm_disk" {
   count      = var.ollama_separate_vm ? 1 : 0
-  depends_on = [hyperv_network_switch.insidellm]
+  depends_on = [null_resource.ensure_vm_switch]
 
   provisioner "local-exec" {
     command     = <<-EOT
@@ -651,7 +670,7 @@ resource "hyperv_machine_instance" "ollama" {
   depends_on = [
     null_resource.prepare_ollama_vm_disk,
     null_resource.create_ollama_cloud_init_iso,
-    hyperv_network_switch.insidellm,
+    null_resource.ensure_vm_switch,
   ]
 
   name                 = local.ollama_vm_name
@@ -682,7 +701,7 @@ resource "hyperv_machine_instance" "ollama" {
 
   network_adaptors {
     name        = "eth0"
-    switch_name = hyperv_network_switch.insidellm.name
+    switch_name = var.vm_switch_name
   }
 
   integration_services = {
