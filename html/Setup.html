@@ -1509,13 +1509,8 @@ ops_backup_schedule      = "${v('opsBackupSchedule')}"`;
   // Enterprise Governance Hub
   if (checked('enableGovernanceHub')) {
     out += `\n\n# Enterprise Governance Hub
+# Central fleet database is configured post-deployment via the Admin UI (Fleet tab)
 governance_hub_enable              = true
-governance_hub_central_db_type     = "${v('govHubDbType')}"
-governance_hub_central_db_host     = "${v('govHubDbHost')}"
-governance_hub_central_db_port     = ${v('govHubDbPort')}
-governance_hub_central_db_name     = "${v('govHubDbName')}"
-governance_hub_central_db_user     = "${v('govHubDbUser')}"
-governance_hub_central_db_password = "${v('govHubDbPassword')}"
 governance_hub_instance_name       = "${v('govHubInstanceName')}"
 governance_hub_sync_schedule       = "${v('govHubSyncSchedule')}"`;
     if (v('govHubSupervisorEmails')) out += `\ngovernance_hub_supervisor_emails  = "${v('govHubSupervisorEmails')}"`;
@@ -1577,11 +1572,7 @@ function generateWsl2Command() {
   if (v('opsAlertWebhook')) args.push(`-OpsAlertWebhook "${v('opsAlertWebhook')}"`);
   if (checked('enableGovernanceHub')) {
     args.push('-GovernanceHubEnable $true');
-    args.push(`-GovernanceHubDbType "${v('govHubDbType')}"`);
-    args.push(`-GovernanceHubDbHost "${v('govHubDbHost')}"`);
-    args.push(`-GovernanceHubDbName "${v('govHubDbName')}"`);
-    args.push(`-GovernanceHubDbUser "${v('govHubDbUser')}"`);
-    args.push(`-GovernanceHubDbPassword "${v('govHubDbPassword')}"`);
+    // Central fleet DB is configured post-deployment via Admin UI Fleet tab
     if (v('govHubInstanceName')) args.push(`-GovernanceHubInstanceName "${v('govHubInstanceName')}"`);
     if (v('govHubSupervisorEmails')) args.push(`-GovernanceHubSupervisors "${v('govHubSupervisorEmails')}"`);
   }

@@ -185,12 +185,16 @@ def _build_sync_url(config: dict) -> str:
     host = config["host"]
     port = config.get("port", 5432)
     db_name = config.get("db_name", "insidellm_central")
+    windows_auth = config.get("windows_auth", False)
 
     if db_type == "postgresql":
         return f"postgresql+psycopg2://{user}:{password}@{host}:{port}/{db_name}"
     elif db_type in ("mariadb", "mysql"):
         return f"mysql+pymysql://{user}:{password}@{host}:{port}/{db_name}"
     elif db_type == "mssql":
+        if windows_auth:
+            # Windows Integrated Auth — no user/password in URL
+            return f"mssql+pymssql://@{host}:{port}/{db_name}"
         return f"mssql+pymssql://{user}:{password}@{host}:{port}/{db_name}"
     raise ValueError(f"Unsupported database type: {db_type}")
 
@@ -270,8 +274,9 @@ def save_db_config(config: dict) -> dict:
         "central_db_host": config["host"],
         "central_db_port": str(config["port"]),
         "central_db_name": config["db_name"],
-        "central_db_user": config["username"],
-        "central_db_password": config["password"],
+        "central_db_user": config.get("username", ""),
+        "central_db_password": config.get("password", ""),
+        "central_db_windows_auth": str(config.get("windows_auth", False)).lower(),
     }
 
     try:

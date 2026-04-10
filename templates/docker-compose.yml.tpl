@@ -364,12 +364,7 @@ services:
     restart: always
     environment:
       GOVERNANCE_HUB_DATABASE_URL: "postgresql+asyncpg://litellm:${postgres_password}@postgres:5432/litellm"
-      GOVERNANCE_HUB_CENTRAL_DB_TYPE: "${governance_hub_central_db_type}"
-      GOVERNANCE_HUB_CENTRAL_DB_HOST: "${governance_hub_central_db_host}"
-      GOVERNANCE_HUB_CENTRAL_DB_PORT: "${governance_hub_central_db_port}"
-      GOVERNANCE_HUB_CENTRAL_DB_NAME: "${governance_hub_central_db_name}"
-      GOVERNANCE_HUB_CENTRAL_DB_USER: "${governance_hub_central_db_user}"
-      GOVERNANCE_HUB_CENTRAL_DB_PASSWORD: "${governance_hub_central_db_password}"
+      # Central fleet DB is configured via the Admin UI Fleet tab (stored in local DB)
       GOVERNANCE_HUB_PLATFORM_VERSION: "${platform_version}"
       GOVERNANCE_HUB_INSTANCE_ID: "${governance_hub_instance_id}"
       GOVERNANCE_HUB_INSTANCE_NAME: "${governance_hub_instance_name}"

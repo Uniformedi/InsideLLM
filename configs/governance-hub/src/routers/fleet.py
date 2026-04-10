@@ -25,6 +25,7 @@ class FleetDbConfig(BaseModel):
     password: str = ""
     trust_server_certificate: bool = True
     encrypt: bool = True
+    windows_auth: bool = False
 
 
 @router.get("/instances")

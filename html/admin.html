@@ -493,7 +493,10 @@
             <input type="password" id="fleetDbPass" placeholder="Enter password">
           </div>
         </div>
-        <div id="fleetDbMssqlOpts" style="display:flex;gap:20px;margin-bottom:12px">
+        <div id="fleetDbMssqlOpts" style="display:flex;gap:20px;margin-bottom:12px;flex-wrap:wrap">
+          <label style="display:flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:12px;color:var(--text-dim);cursor:pointer">
+            <input type="checkbox" id="fleetDbWinAuth" onchange="onFleetDbWinAuthChange()"> Windows Authentication
+          </label>
           <label style="display:flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:12px;color:var(--text-dim);cursor:pointer">
             <input type="checkbox" id="fleetDbTrustCert" checked> Trust Server Certificate
           </label>
@@ -1232,6 +1235,25 @@ function onFleetDbTypeChange() {
   const type = document.getElementById('fleetDbType').value;
   document.getElementById('fleetDbPort').value = DB_PORTS[type] || 5432;
   document.getElementById('fleetDbMssqlOpts').style.display = type === 'mssql' ? 'flex' : 'none';
+  if (type !== 'mssql') {
+    document.getElementById('fleetDbWinAuth').checked = false;
+    onFleetDbWinAuthChange();
+  }
+}
+
+function onFleetDbWinAuthChange() {
+  const winAuth = document.getElementById('fleetDbWinAuth').checked;
+  document.getElementById('fleetDbUser').disabled = winAuth;
+  document.getElementById('fleetDbPass').disabled = winAuth;
+  if (winAuth) {
+    document.getElementById('fleetDbUser').value = '';
+    document.getElementById('fleetDbPass').value = '';
+    document.getElementById('fleetDbUser').placeholder = 'Uses domain credentials';
+    document.getElementById('fleetDbPass').placeholder = 'Uses domain credentials';
+  } else {
+    document.getElementById('fleetDbUser').placeholder = 'insidellm_sync';
+    document.getElementById('fleetDbPass').placeholder = 'Enter password';
+  }
 }
 
 async function loadFleetDbConfig() {
@@ -1287,6 +1309,7 @@ function getFleetDbFormData() {
   if (data.db_type === 'mssql') {
     data.trust_server_certificate = document.getElementById('fleetDbTrustCert').checked;
     data.encrypt = document.getElementById('fleetDbEncrypt').checked;
+    data.windows_auth = document.getElementById('fleetDbWinAuth').checked;
   }
   return data;
 }

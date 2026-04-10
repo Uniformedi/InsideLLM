@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     central_db_user: str = ""
     central_db_password: str = ""
     central_db_ssl: bool = True
+    central_db_windows_auth: bool = False
 
     # Sync
     sync_schedule: str = "0 */6 * * *"
@@ -77,6 +78,8 @@ class Settings(BaseSettings):
         elif self.central_db_type == "mariadb":
             return f"mysql+aiomysql://{self.central_db_user}:{self.central_db_password}@{self.central_db_host}:{self.central_db_port}/{self.central_db_name}"
         elif self.central_db_type == "mssql":
+            if self.central_db_windows_auth:
+                return f"mssql+pymssql://@{self.central_db_host}:{self.central_db_port}/{self.central_db_name}"
             return f"mssql+pymssql://{self.central_db_user}:{self.central_db_password}@{self.central_db_host}:{self.central_db_port}/{self.central_db_name}"
         return ""
 
