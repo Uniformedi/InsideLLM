@@ -112,6 +112,14 @@ async def landing():
       <span class="icon" style="background:#d97706">GR</span>
       <div><div class="label">Compliance Dashboards</div><div class="desc">Grafana — spend tracking, keyword analysis, audit trails, fleet overview</div></div>
     </a>
+    <a href="/governance/api/v1/audit/chain/stats">
+      <span class="icon" style="background:#dc2626">AC</span>
+      <div><div class="label">Audit Chain</div><div class="desc">Hash-chained tamper-evident audit trail — verify integrity</div></div>
+    </a>
+    <a href="/governance/api/v1/audit/chain/entries?limit=50">
+      <span class="icon" style="background:#475569">AL</span>
+      <div><div class="label">Audit Log (JSON)</div><div class="desc">Raw audit chain entries — all governance events with SHA-256 chain</div></div>
+    </a>
   </div>
 </div>
 </body></html>"""

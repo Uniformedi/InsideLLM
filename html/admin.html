@@ -373,7 +373,7 @@
       <div class="tile"><div class="label">Services</div><div class="value cyan" id="tileServices">--</div><div class="sub">healthy / checked</div></div>
       <div class="tile"><div class="label">Sync Status</div><div class="value" id="tileSyncStatus">--</div><div class="sub" id="tileSyncTime">last sync: --</div></div>
       <div class="tile"><div class="label">Pending Changes</div><div class="value amber" id="tilePending">--</div><div class="sub">awaiting approval</div></div>
-      <div class="tile"><div class="label">Audit Chain</div><div class="value cyan" id="tileChain">--</div><div class="sub">hash-linked entries</div></div>
+      <div class="tile" style="cursor:pointer" onclick="goToSyncAudit()"><div class="label">Audit Chain</div><div class="value cyan" id="tileChain">--</div><div class="sub">hash-linked entries — click to view</div></div>
       <div class="tile"><div class="label">Schema Version</div><div class="value" id="tileSchema">--</div><div class="sub" id="tileInstance">instance: --</div></div>
     </div>
 
@@ -1644,6 +1644,17 @@ async function downloadCloneTfvars() {
   } catch (e) {
     result.innerHTML = `<span style="color:var(--red)">Error: ${e.message}</span>`;
   }
+}
+
+function goToSyncAudit() {
+  // Navigate to Governance tab → Sync & Audit sub-view
+  document.querySelectorAll('.tab-bar > .tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  const govTab = document.querySelectorAll('.tab-bar > .tab')[1]; // Governance is 2nd tab
+  govTab.classList.add('active');
+  document.getElementById('panel-governance').classList.add('active');
+  govViewLoaded = {};
+  switchGovView('syncaudit', document.querySelectorAll('#panel-governance .tab')[3]); // 4th sub-tab
 }
 
 // ================================================================
