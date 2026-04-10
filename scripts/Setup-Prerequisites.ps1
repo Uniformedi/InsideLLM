@@ -112,8 +112,18 @@ $ubuntuUrl = "https://cloud-images.ubuntu.com/noble/current/noble-server-cloudim
 $imgPath   = Join-Path $ImageDir "ubuntu-24.04-cloudimg-amd64.img"
 $vhdxPath  = Join-Path $ImageDir "ubuntu-24.04-cloudimg-amd64.vhdx"
 
-if ($SkipImageDownload -and (Test-Path $vhdxPath)) {
-    Write-Ok "Skipping download - VHDX already exists at $vhdxPath"
+# Skip download+conversion if VHDX exists and was created/modified in the last 7 days
+$vhdxRecent = $false
+if (Test-Path $vhdxPath) {
+    $vhdxAge = (Get-Date) - (Get-Item $vhdxPath).LastWriteTime
+    if ($vhdxAge.TotalDays -lt 7) {
+        $vhdxRecent = $true
+    }
+}
+
+if (($SkipImageDownload -or $vhdxRecent) -and (Test-Path $vhdxPath)) {
+    $ageMsg = if ($vhdxRecent) { " (modified $([math]::Round($vhdxAge.TotalDays,1)) days ago)" } else { "" }
+    Write-Ok "VHDX already exists at $vhdxPath$ageMsg — skipping download and conversion"
 } else {
     if (-not (Test-Path $imgPath)) {
         Write-Host "  Downloading Ubuntu 24.04 cloud image (~700MB)..."
@@ -242,11 +252,10 @@ $tfvarsPath    = Join-Path $terraformDir "terraform.tfvars"
 # Check if terraform.tfvars exists — if not, prompt to create it first
 if (-not (Test-Path $tfvarsPath)) {
     Write-Host "  Next step:" -ForegroundColor Yellow
-    Write-Host "  Open $setupHtmlPath and save the output as:" -ForegroundColor White
+    Write-Host "  Open the Setup Wizard and save the output as:" -ForegroundColor White
     Write-Host "    $tfvarsPath" -ForegroundColor Cyan
     Write-Host ""
-    Write-Host "  (Or manually: copy terraform.tfvars.example to terraform.tfvars" -ForegroundColor DarkGray
-    Write-Host "   and edit it with your values)" -ForegroundColor DarkGray
+    Write-Host "  Setup Wizard: $setupHtmlPath" -ForegroundColor DarkGray
     Write-Host ""
     Write-Host "  After creating terraform.tfvars, re-run this script to deploy." -ForegroundColor Yellow
     Write-Host ""
@@ -254,12 +263,8 @@ if (-not (Test-Path $tfvarsPath)) {
     return
 }
 
-Write-Host "  terraform.tfvars found — ready to deploy!" -ForegroundColor Green
+Write-Host "  terraform.tfvars found — proceeding to deploy." -ForegroundColor Green
 Write-Host ""
-Write-Host "  Press Enter to run Terraform and deploy InsideLLM," -ForegroundColor Yellow
-Write-Host "  or Ctrl+C to exit and deploy manually later." -ForegroundColor Yellow
-Write-Host ""
-Read-Host "  Press Enter to continue"
 
 # --- Terraform Init ---
 Write-Host ""
