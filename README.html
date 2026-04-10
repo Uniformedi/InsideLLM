@@ -1509,7 +1509,7 @@ okta_domain        = "your-org.okta.com"</pre>
   <div class="code-block">
     <span class="lang-label">PowerShell</span>
     <pre># 1. Run prerequisites (once, requires admin)
-.\scripts\Setup-Prerequisites.ps1
+.\scripts\SetupInstall.ps1
 
 # 2. Configure
 cp terraform.tfvars.example terraform.tfvars
@@ -1610,7 +1610,7 @@ curl -sk https://localhost/health                     # Open WebUI (via Nginx)</
 &#9500;&#9472;&#9472; outputs.tf                          # VM IP, URLs, secrets
 &#9500;&#9472;&#9472; providers.tf                        # Hyper-V provider config
 &#9500;&#9472;&#9472; terraform.tfvars.example            # Template for your values
-&#9500;&#9472;&#9472; Setup-Prerequisites.ps1             # Windows host preparation
+&#9500;&#9472;&#9472; SetupInstall.ps1             # Windows host preparation
 &#9500;&#9472;&#9472; configs/
 &#9474;   &#9500;&#9472;&#9472; cloud-init/
 &#9474;   &#9474;   &#9500;&#9472;&#9472; user-data.yaml.tpl          # VM first-boot provisioning

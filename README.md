@@ -37,7 +37,7 @@
 - **External Data Connectors** -- query PostgreSQL, MySQL, MSSQL, REST APIs with team-based RBAC, row filtering, field masking, and full audit logging
 - **Interactive Admin Hub** -- command center SPA with governance dashboard, change management UI, fleet overview, and service status
 - **AI System Designer** -- Open WebUI Tool that designs deployments, estimates costs, recommends configs, and plans multi-instance fleet architectures
-- **PowerShell-native ISO creation** -- cloud-init ISO creation without WSL or Windows ADK using pure .NET (`New-CloudInitIso.ps1`)
+- **PowerShell-native ISO creation** -- cloud-init ISO creation without WSL or Windows ADK using pure .NET (`scripts/New-CloudInitIso.ps1`)
 
 ### What Was New in 2.0
 
@@ -1334,7 +1334,7 @@ knowledge needed to configure -- just fill in the form and click Download.
 #    Save it to the terraform/ directory
 
 # 2. Run prerequisites + deploy (requires admin)
-.\scripts\Setup-Prerequisites.ps1
+.\scripts\SetupInstall.ps1
 # This script: enables Hyper-V, downloads Ubuntu image, configures WinRM,
 # then automatically runs terraform init → plan → apply from terraform/
 ```
@@ -1447,7 +1447,6 @@ InsideLLM/
 +-- README.html                         # Visual landing page
 +-- VERSION                             # Platform version (e.g., 3.1.0)
 +-- LICENSE                             # MIT License
-+-- New-CloudInitIso.ps1                # PowerShell-native ISO builder
 +-- terraform/                          # Terraform infrastructure-as-code
 |   +-- main.tf                         # Root module: VM + provisioning
 |   +-- variables.tf                    # All input variables
@@ -1455,7 +1454,8 @@ InsideLLM/
 |   +-- providers.tf                    # Hyper-V provider config
 |   +-- terraform.tfvars.example        # Template for your values
 +-- scripts/                            # User-facing PowerShell scripts
-|   +-- Setup-Prerequisites.ps1         # Host prep + auto terraform deploy
+|   +-- SetupInstall.ps1             # Setup, prerequisites, and terraform deploy
+|   +-- New-CloudInitIso.ps1        # PowerShell-native cloud-init ISO builder
 |   +-- Initialize-InsideLLM.ps1        # Standalone: WSL2 + Docker + SCFW + TLS
 |   +-- Install-InsideLLM.ps1           # Generated wrapper (from Setup Wizard)
 |   +-- Install-InsideLLM-WSL.ps1       # Full WSL2 deployment
@@ -1946,7 +1946,7 @@ Write operations are blocked for read-only grants. Results capped at 1000 rows. 
 
 ## 18. Cloud-Init ISO Creation
 
-The Hyper-V deployment path requires a cloud-init ISO to provision the Ubuntu VM. The `New-CloudInitIso.ps1` script creates this ISO using a three-tier fallback:
+The Hyper-V deployment path requires a cloud-init ISO to provision the Ubuntu VM. The `scripts/New-CloudInitIso.ps1` script creates this ISO using a three-tier fallback:
 
 | Priority | Method | Dependency |
 |----------|--------|------------|
@@ -1956,7 +1956,7 @@ The Hyper-V deployment path requires a cloud-init ISO to provision the Ubuntu VM
 
 The PowerShell native fallback writes a minimal ISO 9660 image using .NET `System.IO.BinaryWriter`. This means Hyper-V deployments work on bare Windows Server without WSL or ADK installed.
 
-`Setup-Prerequisites.ps1` (Step 5) attempts to install `genisoimage` in WSL if available, and warns if no ISO tool is found. The native fallback ensures `terraform apply` succeeds regardless.
+`SetupInstall.ps1` (Step 5) attempts to install `genisoimage` in WSL if available, and warns if no ISO tool is found. The native fallback ensures `terraform apply` succeeds regardless.
 
 ---
 

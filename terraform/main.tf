@@ -508,7 +508,7 @@ resource "null_resource" "create_cloud_init_iso" {
       $isoFile = Join-Path "${var.vm_path}" "${var.vm_name}-cloud-init.iso"
 
       # Build cloud-init ISO (tries: oscdimg > WSL genisoimage > PowerShell native)
-      & "${path.module}\..\New-CloudInitIso.ps1" -SourceDir $isoDir -OutputIso $isoFile -VolumeLabel "cidata"
+      & "${path.module}\..\scripts\New-CloudInitIso.ps1" -SourceDir $isoDir -OutputIso $isoFile -VolumeLabel "cidata"
     EOT
     interpreter = ["PowerShell", "-Command"]
   }
@@ -659,7 +659,7 @@ ${local.ollama_cloud_init_network}
       $isoPath = "${var.vm_path}\${local.ollama_vm_name}-cloud-init.iso"
 
       # Build cloud-init ISO (tries: oscdimg > WSL genisoimage > PowerShell native)
-      & "${path.module}\..\New-CloudInitIso.ps1" -SourceDir $ciDir -OutputIso $isoPath -VolumeLabel "cidata"
+      & "${path.module}\..\scripts\New-CloudInitIso.ps1" -SourceDir $ciDir -OutputIso $isoPath -VolumeLabel "cidata"
     EOT
     interpreter = ["PowerShell", "-Command"]
   }

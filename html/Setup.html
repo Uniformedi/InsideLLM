@@ -1677,9 +1677,9 @@ function generateNextSteps() {
     el.innerHTML = `<h3>Next Steps</h3><ol>
       <li>Save the downloaded <code>terraform.tfvars</code> to the <code>terraform\\</code> folder in the project directory</li>
       <li>Open <strong>PowerShell as Administrator</strong> and run:<br>
-        <code>.\\scripts\\Setup-Prerequisites.ps1</code><br>
+        <code>.\\scripts\\SetupInstall.ps1</code><br>
         <em>(enables Hyper-V, downloads Ubuntu image, configures WinRM, then automatically runs terraform init &rarr; plan &rarr; apply)</em></li>
-      <li>If prompted, <strong>reboot</strong> and re-run scripts\\Setup-Prerequisites.ps1</li>
+      <li>If prompted, <strong>reboot</strong> and re-run scripts\\SetupInstall.ps1</li>
       <li>Optionally set up port forwarding:<br>
         <code>.\\scripts\\Port-Forward-InsideLLM.ps1</code></li>
       ${gpu ? `<li>Configure GPU passthrough:<br><code>.\\scripts\\Setup-GPU-Passthrough.ps1</code></li>` : ''}

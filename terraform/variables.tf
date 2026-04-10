@@ -112,7 +112,7 @@ variable "vm_switch_adapter" {
 }
 
 variable "ubuntu_vhdx_source" {
-  description = "Path to the Ubuntu 24.04 cloud image VHDX on the Hyper-V host (created by Setup-Prerequisites.ps1)"
+  description = "Path to the Ubuntu 24.04 cloud image VHDX on the Hyper-V host (created by SetupInstall.ps1)"
   type        = string
   default     = "C:\\HyperV\\Images\\ubuntu-24.04-cloudimg-amd64.vhdx"
 }

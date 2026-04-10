@@ -1,20 +1,21 @@
 #Requires -RunAsAdministrator
 <#
 .SYNOPSIS
-    Prepares the Windows Hyper-V host for the InsideLLM Terraform deployment.
+    Sets up and installs InsideLLM via Hyper-V Terraform deployment.
 
 .DESCRIPTION
-    This script:
+    This script prepares the host, verifies prerequisites, and runs Terraform:
     1. Enables Hyper-V if not already enabled
     2. Configures WinRM for Terraform's Hyper-V provider
-    3. Downloads the Ubuntu 24.04 cloud image
+    3. Downloads the Ubuntu 24.04 cloud image (skips if recent VHDX exists)
     4. Converts it to VHDX format for Hyper-V Gen2 VMs
     5. Installs genisoimage in WSL for cloud-init ISO creation
-    6. Verifies all prerequisites
+    6. Verifies all prerequisites (Terraform, SSH key)
+    7. Runs terraform init, plan, and apply
 
 .NOTES
-    Run this ONCE before your first `terraform apply`.
     Requires: Windows 11 Pro or Windows Server 2022+ with admin rights.
+    Usage: .\scripts\SetupInstall.ps1
 #>
 
 param(
