@@ -19,25 +19,13 @@ from ..db.central_db import run_central_query, get_central_session_factory
 
 async def list_instances() -> list[dict]:
     """List all registered InsideLLM instances from the central DB."""
+    from ..db.central_sql import SQL
+
     def _query(db):
-        result = db.execute(text("""
-            SELECT
-                i.instance_id, i.instance_name, i.industry,
-                i.governance_tier, i.data_classification,
-                i.schema_version, i.platform_version,
-                i.last_sync_at, i.status, i.created_at
-            FROM governance_instances i
-            ORDER BY i.instance_name
-        """))
+        result = db.execute(text(SQL.list_instances))
         instances = []
         for row in result.mappings():
-            tel = db.execute(text("""
-                SELECT total_requests, total_spend, unique_users,
-                       compliance_score, keyword_flags_critical, keyword_flags_high
-                FROM governance_telemetry
-                WHERE instance_id = :iid
-                ORDER BY synced_at DESC LIMIT 1
-            """), {"iid": row["instance_id"]})
+            tel = db.execute(text(SQL.latest_telemetry), {"iid": row["instance_id"]})
             tel_row = tel.mappings().first()
             instances.append({
                 **dict(row),
@@ -53,32 +41,20 @@ async def list_instances() -> list[dict]:
 
 async def get_instance_detail(instance_id: str) -> dict | None:
     """Get detailed info for a specific instance including telemetry history."""
+    from ..db.central_sql import SQL
+
     def _query(db):
-        result = db.execute(text(
-            "SELECT * FROM governance_instances WHERE instance_id = :iid"
-        ), {"iid": instance_id})
+        result = db.execute(text(SQL.instance_detail), {"iid": instance_id})
         instance = result.mappings().first()
         if not instance:
             return None
 
-        tel_result = db.execute(text("""
-            SELECT period_start, period_end, total_requests, total_spend,
-                   unique_users, dlp_blocks, error_count,
-                   keyword_flags_critical, keyword_flags_high,
-                   compliance_score, synced_at
-            FROM governance_telemetry
-            WHERE instance_id = :iid
-            ORDER BY synced_at DESC LIMIT 30
-        """), {"iid": instance_id})
+        tel_result = db.execute(text(SQL.telemetry_history), {"iid": instance_id})
         telemetry = [dict(r) for r in tel_result.mappings()]
 
         changes = []
         try:
-            changes_result = db.execute(text("""
-                SELECT id, title, category, status, source, proposed_at
-                FROM governance_changes WHERE instance_id = :iid
-                ORDER BY proposed_at DESC LIMIT 20
-            """), {"iid": instance_id})
+            changes_result = db.execute(text(SQL.instance_changes), {"iid": instance_id})
             changes = [dict(r) for r in changes_result.mappings()]
         except Exception:
             pass
@@ -94,24 +70,17 @@ async def get_instance_detail(instance_id: str) -> dict | None:
 
 async def compare_instances(instance_ids: list[str]) -> dict:
     """Compare configuration and metrics across multiple instances."""
+    from ..db.central_sql import SQL
+
     def _query(db):
         comparisons = []
         for iid in instance_ids:
-            inst_result = db.execute(text("""
-                SELECT instance_id, instance_name, industry, governance_tier,
-                       data_classification, schema_version, last_sync_at
-                FROM governance_instances WHERE instance_id = :iid
-            """), {"iid": iid})
+            inst_result = db.execute(text(SQL.instance_detail), {"iid": iid})
             inst = inst_result.mappings().first()
             if not inst:
                 comparisons.append({"instance_id": iid, "error": "not found"})
                 continue
-            tel = db.execute(text("""
-                SELECT total_requests, total_spend, unique_users,
-                       compliance_score, keyword_flags_critical
-                FROM governance_telemetry
-                WHERE instance_id = :iid ORDER BY synced_at DESC LIMIT 1
-            """), {"iid": iid})
+            tel = db.execute(text(SQL.latest_telemetry), {"iid": iid})
             tel_row = tel.mappings().first()
             comparisons.append({**dict(inst), "telemetry": dict(tel_row) if tel_row else None})
         return {"instances": comparisons, "compared_at": datetime.now(timezone.utc).isoformat()}
@@ -122,39 +91,19 @@ async def compare_instances(instance_ids: list[str]) -> dict:
 
 async def get_fleet_summary() -> dict:
     """Aggregate fleet-wide metrics."""
+    from ..db.central_sql import SQL
+
     def _query(db):
-        count_result = db.execute(text(
-            "SELECT COUNT(*) AS cnt FROM governance_instances WHERE status = 'active'"
-        ))
+        count_result = db.execute(text(SQL.fleet_count))
         total = count_result.mappings().first()["cnt"]
 
-        agg_result = db.execute(text("""
-            SELECT
-                COUNT(DISTINCT t.instance_id) AS reporting_instances,
-                SUM(t.total_requests) AS fleet_requests,
-                SUM(t.total_spend) AS fleet_spend,
-                SUM(t.unique_users) AS fleet_users,
-                AVG(t.compliance_score) AS avg_compliance_score,
-                SUM(t.keyword_flags_critical) AS total_critical_flags
-            FROM governance_telemetry t
-            INNER JOIN (
-                SELECT instance_id, MAX(synced_at) AS max_sync
-                FROM governance_telemetry GROUP BY instance_id
-            ) latest ON t.instance_id = latest.instance_id AND t.synced_at = latest.max_sync
-        """))
+        agg_result = db.execute(text(SQL.fleet_aggregate))
         agg = agg_result.mappings().first()
 
-        industry_result = db.execute(text("""
-            SELECT industry, COUNT(*) AS cnt
-            FROM governance_instances WHERE status = 'active'
-            GROUP BY industry ORDER BY cnt DESC
-        """))
+        industry_result = db.execute(text(SQL.fleet_by_industry))
         by_industry = {r["industry"]: r["cnt"] for r in industry_result.mappings()}
 
-        stale_result = db.execute(text("""
-            SELECT COUNT(*) AS cnt FROM governance_instances
-            WHERE status = 'active' AND (last_sync_at IS NULL OR last_sync_at < NOW() - INTERVAL '24 hours')
-        """))
+        stale_result = db.execute(text(SQL.fleet_stale))
         stale = stale_result.mappings().first()["cnt"]
 
         return {

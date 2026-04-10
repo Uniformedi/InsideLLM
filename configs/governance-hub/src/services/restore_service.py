@@ -12,7 +12,6 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
-from ..db.central_db import get_central_session_factory
 
 
 def generate_tfvars(config: dict, overrides: dict | None = None) -> str:
@@ -116,42 +115,28 @@ def generate_tfvars(config: dict, overrides: dict | None = None) -> str:
 
 async def get_snapshot_from_central(instance_id: str, snapshot_id: int | None = None) -> dict | None:
     """Retrieve a config snapshot from the central database."""
-    factory = get_central_session_factory()
-    if not factory:
-        return None
+    from ..db.central_db import run_central_query
+    from ..db.central_sql import SQL
 
-    async with factory() as db:
+    def _query(db):
         if snapshot_id:
-            result = await db.execute(text("""
-                SELECT * FROM governance_config_snapshots
-                WHERE instance_id = :iid AND id = :sid
-            """), {"iid": instance_id, "sid": snapshot_id})
+            result = db.execute(text(SQL.snapshot_by_id), {"iid": instance_id, "sid": snapshot_id})
         else:
-            # Latest snapshot
-            result = await db.execute(text("""
-                SELECT * FROM governance_config_snapshots
-                WHERE instance_id = :iid
-                ORDER BY snapshot_at DESC LIMIT 1
-            """), {"iid": instance_id})
-
+            result = db.execute(text(SQL.snapshot_latest), {"iid": instance_id})
         row = result.mappings().first()
-        if not row:
-            return None
-        return dict(row)
+        return dict(row) if row else None
+
+    return await run_central_query(_query)
 
 
 async def list_instance_snapshots(instance_id: str, limit: int = 20) -> list[dict]:
     """List config snapshots for an instance from the central database."""
-    factory = get_central_session_factory()
-    if not factory:
-        return []
+    from ..db.central_db import run_central_query
+    from ..db.central_sql import SQL
 
-    async with factory() as db:
-        result = await db.execute(text("""
-            SELECT id, instance_id, schema_version, snapshot_at, created_by
-            FROM governance_config_snapshots
-            WHERE instance_id = :iid
-            ORDER BY snapshot_at DESC
-            LIMIT :lim
-        """), {"iid": instance_id, "lim": limit})
+    def _query(db):
+        result = db.execute(text(SQL.snapshot_list), {"iid": instance_id, "lim": limit})
         return [dict(r) for r in result.mappings()]
+
+    result = await run_central_query(_query)
+    return result if result is not None else []

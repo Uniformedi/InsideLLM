@@ -131,16 +131,10 @@ async def export_to_central(local_db: AsyncSession, telemetry: TelemetrySummary)
         # Run all central DB operations via sync session in thread pool
         from ..db.central_db import run_central_query
 
+        from ..db.central_sql import SQL
+
         def _sync_export(central_db):
-            central_db.execute(text("""
-                INSERT INTO governance_instances (instance_id, instance_name, industry, governance_tier, data_classification, schema_version, platform_version, last_sync_at, status)
-                VALUES (:id, :name, :industry, :tier, :classification, :schema_version, :platform_version, NOW(), 'active')
-                ON CONFLICT (instance_id) DO UPDATE SET
-                    instance_name = EXCLUDED.instance_name,
-                    schema_version = EXCLUDED.schema_version,
-                    platform_version = EXCLUDED.platform_version,
-                    last_sync_at = NOW()
-            """), {
+            central_db.execute(text(SQL.upsert_instance), {
                 "id": settings.instance_id, "name": settings.instance_name,
                 "industry": settings.industry, "tier": settings.governance_tier,
                 "classification": settings.data_classification,
@@ -148,26 +142,10 @@ async def export_to_central(local_db: AsyncSession, telemetry: TelemetrySummary)
                 "platform_version": settings.platform_version,
             })
 
-            central_db.execute(text("""
-                INSERT INTO governance_telemetry
-                    (instance_id, instance_name, schema_version, platform_version, period_start, period_end,
-                     total_requests, total_spend, unique_users, dlp_blocks, error_count,
-                     keyword_flags_critical, keyword_flags_high, compliance_score, industry, governance_tier, metrics_json)
-                VALUES
-                    (:instance_id, :instance_name, :schema_version, :platform_version, :period_start, :period_end,
-                     :total_requests, :total_spend, :unique_users, :dlp_blocks, :error_count,
-                     :kw_critical, :kw_high, :compliance_score, :industry, :tier, :metrics)
-            """), tel_params)
+            central_db.execute(text(SQL.insert_telemetry), tel_params)
 
             if snap_params:
-                central_db.execute(text("""
-                    INSERT INTO governance_config_snapshots
-                        (id, instance_id, schema_version, config_json, diff_from_previous, snapshot_at, created_by)
-                    VALUES (:id, :iid, :sv, :config::jsonb, :diff::jsonb, :snap_at, :created_by)
-                    ON CONFLICT (id, instance_id) DO UPDATE SET
-                        config_json = EXCLUDED.config_json,
-                        snapshot_at = EXCLUDED.snapshot_at
-                """), snap_params)
+                central_db.execute(text(SQL.upsert_snapshot), snap_params)
 
             central_db.commit()
             return True
