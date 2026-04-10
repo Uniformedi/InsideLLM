@@ -5,10 +5,13 @@ Reads from the central DB to provide a unified view of all InsideLLM
 deployments: status, config versions, compliance scores, telemetry.
 """
 
+import os
+import time
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from sqlalchemy import func, select, text
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from ..config import settings
 from ..db.central_db import get_central_session_factory
@@ -197,3 +200,102 @@ async def get_fleet_summary() -> dict:
             "total_critical_flags": agg["total_critical_flags"] or 0,
             "instances_by_industry": by_industry,
         }
+
+
+def _build_sync_url(config: dict) -> str:
+    """Build a synchronous SQLAlchemy URL (works for all drivers)."""
+    db_type = config["db_type"]
+    user = config.get("username", "")
+    password = config.get("password", "")
+    host = config["host"]
+    port = config.get("port", 5432)
+    db_name = config.get("db_name", "insidellm_central")
+
+    if db_type == "postgresql":
+        return f"postgresql+psycopg2://{user}:{password}@{host}:{port}/{db_name}"
+    elif db_type in ("mariadb", "mysql"):
+        return f"mysql+pymysql://{user}:{password}@{host}:{port}/{db_name}"
+    elif db_type == "mssql":
+        return f"mssql+pymssql://{user}:{password}@{host}:{port}/{db_name}"
+    raise ValueError(f"Unsupported database type: {db_type}")
+
+
+async def test_db_connection(config: dict) -> dict:
+    """Test a database connection without persisting. Returns success, message, latency_ms."""
+    import asyncio
+    from concurrent.futures import ThreadPoolExecutor
+    from sqlalchemy import create_engine
+
+    try:
+        url = _build_sync_url(config)
+    except ValueError as e:
+        return {"success": False, "message": str(e), "latency_ms": 0}
+
+    def _test_sync() -> dict:
+        engine = None
+        try:
+            engine = create_engine(url, pool_size=1, max_overflow=0, pool_pre_ping=False,
+                                   connect_args={"connect_timeout": 5} if "psycopg2" in url else
+                                                 {"login_timeout": 5} if "pymssql" in url else {})
+            start = time.monotonic()
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            latency = int((time.monotonic() - start) * 1000)
+            return {"success": True, "message": "Connection successful", "latency_ms": latency}
+        except Exception as e:
+            msg = str(e)
+            if "No module named" in msg or "ImportError" in msg:
+                msg = f"Database driver not installed for {config['db_type']}"
+            elif len(msg) > 200:
+                msg = msg[:200]
+            return {"success": False, "message": msg, "latency_ms": 0}
+        finally:
+            if engine:
+                engine.dispose()
+
+    loop = asyncio.get_event_loop()
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        return await loop.run_in_executor(pool, _test_sync)
+
+
+def get_db_config() -> dict:
+    """Return current central DB configuration with password masked."""
+    if not settings.central_db_host:
+        return {"configured": False, "connected": False}
+
+    # Check connection status without creating an engine (avoids async driver issues)
+    connected = False
+    try:
+        factory = get_central_session_factory()
+        connected = factory is not None
+    except Exception:
+        pass
+
+    return {
+        "configured": True,
+        "connected": connected,
+        "db_type": settings.central_db_type,
+        "host": settings.central_db_host,
+        "port": settings.central_db_port,
+        "db_name": settings.central_db_name,
+        "username": settings.central_db_user,
+        "password_set": bool(settings.central_db_password),
+    }
+
+
+def save_db_config(config: dict) -> dict:
+    """Save central DB config to an env override file for next restart."""
+    env_path = Path("/app/data/.env.central-db")
+    try:
+        lines = [
+            f"GOVERNANCE_HUB_CENTRAL_DB_TYPE={config['db_type']}",
+            f"GOVERNANCE_HUB_CENTRAL_DB_HOST={config['host']}",
+            f"GOVERNANCE_HUB_CENTRAL_DB_PORT={config['port']}",
+            f"GOVERNANCE_HUB_CENTRAL_DB_NAME={config['db_name']}",
+            f"GOVERNANCE_HUB_CENTRAL_DB_USER={config['username']}",
+            f"GOVERNANCE_HUB_CENTRAL_DB_PASSWORD={config['password']}",
+        ]
+        env_path.write_text("\n".join(lines) + "\n")
+        return {"success": True, "message": f"Saved to {env_path}. Restart the Governance Hub container to apply."}
+    except Exception as e:
+        return {"success": False, "message": str(e)}

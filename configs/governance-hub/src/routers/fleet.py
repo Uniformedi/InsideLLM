@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 
 from ..middleware.auth import verify_api_key
 from ..services.fleet_service import (
@@ -6,9 +7,21 @@ from ..services.fleet_service import (
     get_fleet_summary,
     get_instance_detail,
     list_instances,
+    test_db_connection,
+    get_db_config,
+    save_db_config,
 )
 
 router = APIRouter(prefix="/api/v1/fleet", tags=["fleet"])
+
+
+class FleetDbConfig(BaseModel):
+    db_type: str  # mssql, mariadb, postgresql
+    host: str
+    port: int = 5432
+    db_name: str = "insidellm_central"
+    username: str = ""
+    password: str = ""
 
 
 @router.get("/instances")
@@ -41,3 +54,21 @@ async def compare(instance_ids: list[str]):
     if len(instance_ids) > 10:
         raise HTTPException(status_code=400, detail="Maximum 10 instances per comparison")
     return await compare_instances(instance_ids)
+
+
+@router.get("/db/config")
+async def get_fleet_db_config():
+    """Get the current central database configuration (password masked)."""
+    return get_db_config()
+
+
+@router.post("/db/test")
+async def test_fleet_db(config: FleetDbConfig):
+    """Test a database connection without persisting. Returns success, message, latency_ms."""
+    return await test_db_connection(config.model_dump())
+
+
+@router.put("/db/config")
+async def save_fleet_db_config(config: FleetDbConfig):
+    """Save central database configuration to env override file."""
+    return save_db_config(config.model_dump())

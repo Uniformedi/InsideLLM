@@ -5,7 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>InsideLLM &mdash; Command Center</title>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    // Apply theme before first paint to prevent flash
+    (function() {
+      var t = localStorage.getItem('insidellm-theme');
+      if (t) document.documentElement.setAttribute('data-theme', t);
+    })();
+  </script>
   <style>
+    /* ===== Theme: Dark (default) ===== */
     :root {
       --bg-deep: #0a0e1a;
       --bg-panel: #111827;
@@ -23,8 +31,72 @@
       --amber: #fbbf24;
       --blue: #60a5fa;
       --purple: #a78bfa;
+      --topbar-bg: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
       --font-mono: 'JetBrains Mono', 'Cascadia Code', monospace;
       --font-body: 'DM Sans', system-ui, sans-serif;
+    }
+
+    /* ===== Theme: Light ===== */
+    [data-theme="light"] {
+      --bg-deep: #f1f5f9;
+      --bg-panel: #ffffff;
+      --bg-card: #ffffff;
+      --bg-elevated: #f8fafc;
+      --border: #e2e8f0;
+      --border-light: #cbd5e1;
+      --text: #1e293b;
+      --text-dim: #475569;
+      --text-muted: #94a3b8;
+      --cyan: #0891b2;
+      --cyan-dim: #06b6d4;
+      --green: #059669;
+      --red: #dc2626;
+      --amber: #d97706;
+      --blue: #2563eb;
+      --purple: #7c3aed;
+      --topbar-bg: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    }
+
+    /* ===== Theme: Midnight ===== */
+    [data-theme="midnight"] {
+      --bg-deep: #0c0a1d;
+      --bg-panel: #13102b;
+      --bg-card: #1a1640;
+      --bg-elevated: #221e4a;
+      --border: #2d2660;
+      --border-light: #3d3580;
+      --text: #e0dff4;
+      --text-dim: #a5a0d4;
+      --text-muted: #6d68a0;
+      --cyan: #a78bfa;
+      --cyan-dim: #8b5cf6;
+      --green: #34d399;
+      --red: #fb7185;
+      --amber: #fbbf24;
+      --blue: #818cf8;
+      --purple: #c084fc;
+      --topbar-bg: linear-gradient(135deg, #0e0a22 0%, #1a1545 100%);
+    }
+
+    /* ===== Theme: High Contrast ===== */
+    [data-theme="contrast"] {
+      --bg-deep: #000000;
+      --bg-panel: #0a0a0a;
+      --bg-card: #111111;
+      --bg-elevated: #1a1a1a;
+      --border: #444444;
+      --border-light: #666666;
+      --text: #ffffff;
+      --text-dim: #e0e0e0;
+      --text-muted: #aaaaaa;
+      --cyan: #00ffff;
+      --cyan-dim: #00cccc;
+      --green: #00ff88;
+      --red: #ff4444;
+      --amber: #ffdd00;
+      --blue: #4488ff;
+      --purple: #cc88ff;
+      --topbar-bg: linear-gradient(135deg, #000000 0%, #111111 100%);
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -32,7 +104,7 @@
 
     /* Topbar */
     .topbar {
-      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      background: var(--topbar-bg);
       border-bottom: 1px solid var(--border);
       padding: 0 24px;
       display: flex; align-items: center; height: 56px; gap: 20px;
@@ -196,6 +268,44 @@
     .modal input:focus, .modal textarea:focus { outline: none; border-color: var(--cyan); }
     .modal .btn-row { display: flex; gap: 10px; justify-content: flex-end; margin-top: 8px; }
 
+    /* Theme picker */
+    .theme-picker { display: flex; align-items: center; gap: 6px; }
+    .theme-picker label { color: var(--text-muted); font-size: 12px; font-family: var(--font-mono); }
+    .theme-btn {
+      width: 18px; height: 18px; border-radius: 50%; border: 2px solid transparent;
+      cursor: pointer; transition: border-color 0.2s, transform 0.15s; flex-shrink: 0;
+    }
+    .theme-btn:hover { transform: scale(1.2); }
+    .theme-btn.active { border-color: var(--text); }
+    .theme-btn[data-t="dark"] { background: linear-gradient(135deg, #0a0e1a, #1e293b); }
+    .theme-btn[data-t="light"] { background: linear-gradient(135deg, #f1f5f9, #e2e8f0); }
+    .theme-btn[data-t="midnight"] { background: linear-gradient(135deg, #0c0a1d, #2d2660); }
+    .theme-btn[data-t="contrast"] { background: linear-gradient(135deg, #000, #333); }
+
+    /* Wizard form fields */
+    .wizard-box {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px;
+      padding: 20px 24px; margin-bottom: 24px;
+    }
+    .wizard-box .wiz-title {
+      font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 4px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .wizard-box .wiz-title .accent { color: var(--cyan); font-family: var(--font-mono); font-size: 12px; font-weight: 400; }
+    .wizard-box .wiz-desc { font-size: 12px; color: var(--text-muted); margin-bottom: 16px; }
+    .wiz-row { display: flex; gap: 12px; margin-bottom: 12px; }
+    .wiz-field { flex: 1; }
+    .wiz-field label { display: block; font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); text-transform: uppercase; margin-bottom: 4px; }
+    .wiz-field select, .wiz-field input {
+      width: 100%; padding: 8px 12px; background: var(--bg-deep); border: 1px solid var(--border);
+      border-radius: 4px; color: var(--text); font-size: 13px; font-family: var(--font-body);
+    }
+    .wiz-field select { cursor: pointer; }
+    .wiz-field select:focus, .wiz-field input:focus { outline: none; border-color: var(--cyan); }
+    .wiz-actions { display: flex; gap: 10px; align-items: center; margin-top: 16px; }
+    .wiz-result { font-family: var(--font-mono); font-size: 12px; margin-left: 12px; }
+    .wiz-status { display: flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 12px; margin-bottom: 14px; }
+
     /* Footer */
     .footer { text-align: center; padding: 32px; color: var(--text-muted); font-size: 12px; font-family: var(--font-mono); border-top: 1px solid var(--border); margin-top: 40px; }
     .footer a { color: var(--cyan); text-decoration: none; }
@@ -206,6 +316,13 @@
 <div class="topbar">
   <div class="logo">InsideLLM <span>// Command Center</span></div>
   <div id="statusPills" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+  <div class="theme-picker">
+    <label>THEME</label>
+    <span class="theme-btn active" data-t="dark" title="Dark" onclick="setTheme('dark')"></span>
+    <span class="theme-btn" data-t="light" title="Light" onclick="setTheme('light')"></span>
+    <span class="theme-btn" data-t="midnight" title="Midnight" onclick="setTheme('midnight')"></span>
+    <span class="theme-btn" data-t="contrast" title="High Contrast" onclick="setTheme('contrast')"></span>
+  </div>
   <div class="host-input">
     <label>HOST</label>
     <input type="text" id="hostInput" oninput="onHostChange()">
@@ -268,6 +385,52 @@
 
   <!-- ======================== FLEET ======================== -->
   <div class="panel" id="panel-fleet">
+    <div class="wizard-box" id="fleetDbWizard">
+      <div class="wiz-title">Central Fleet Database <span class="accent">// connection setup</span></div>
+      <div class="wiz-desc">Connect to an external database to enable fleet management, cross-instance sync, and enterprise dashboards.</div>
+      <div class="wiz-status" id="fleetDbStatus">
+        <span class="dot dot-spin"></span>
+        <span>Checking connection...</span>
+      </div>
+      <div class="wiz-row">
+        <div class="wiz-field" style="flex:0 0 200px">
+          <label>Database Type</label>
+          <select id="fleetDbType" onchange="onFleetDbTypeChange()">
+            <option value="mssql">MS SQL Server</option>
+            <option value="mariadb">MariaDB / MySQL</option>
+            <option value="postgresql">PostgreSQL</option>
+          </select>
+        </div>
+        <div class="wiz-field" style="flex:2">
+          <label>Host</label>
+          <input type="text" id="fleetDbHost" placeholder="db.company.com">
+        </div>
+        <div class="wiz-field" style="flex:0 0 100px">
+          <label>Port</label>
+          <input type="number" id="fleetDbPort" value="1433">
+        </div>
+      </div>
+      <div class="wiz-row">
+        <div class="wiz-field">
+          <label>Database Name</label>
+          <input type="text" id="fleetDbName" value="insidellm_central">
+        </div>
+        <div class="wiz-field">
+          <label>Username</label>
+          <input type="text" id="fleetDbUser" placeholder="insidellm_sync">
+        </div>
+        <div class="wiz-field">
+          <label>Password</label>
+          <input type="password" id="fleetDbPass" placeholder="Enter password">
+        </div>
+      </div>
+      <div class="wiz-actions">
+        <button class="btn btn-action" onclick="testFleetDb()">Test Connection</button>
+        <button class="btn btn-approve" onclick="saveFleetDb()">Save Configuration</button>
+        <span class="wiz-result" id="fleetDbResult"></span>
+      </div>
+    </div>
+
     <div class="tile-grid" id="fleetTiles"></div>
     <div class="section-head">Instance Registry <span class="accent">// all deployments</span></div>
     <div id="fleetTable" class="loading">Loading...</div>
@@ -359,6 +522,25 @@ const hostInput = document.getElementById('hostInput');
 hostInput.value = window.location.hostname || 'localhost';
 const H = () => hostInput.value.trim() || window.location.hostname || 'localhost';
 const GOV = () => `${window.location.protocol}//${H()}/governance`;
+
+// ================================================================
+// Theme switching
+// ================================================================
+function setTheme(name) {
+  if (name === 'dark') {
+    document.documentElement.removeAttribute('data-theme');
+    localStorage.removeItem('insidellm-theme');
+  } else {
+    document.documentElement.setAttribute('data-theme', name);
+    localStorage.setItem('insidellm-theme', name);
+  }
+  document.querySelectorAll('.theme-btn').forEach(b => b.classList.toggle('active', b.dataset.t === name));
+}
+// Highlight active theme button on load
+(function() {
+  const saved = localStorage.getItem('insidellm-theme') || 'dark';
+  document.querySelectorAll('.theme-btn').forEach(b => b.classList.toggle('active', b.dataset.t === saved));
+})();
 
 // ================================================================
 // Tab navigation
@@ -605,12 +787,108 @@ async function submitApproval() {
 }
 
 // ================================================================
-// FLEET panel
+// FLEET panel — DB wizard
+// ================================================================
+const DB_PORTS = { mssql: 1433, mariadb: 3306, postgresql: 5432 };
+
+function onFleetDbTypeChange() {
+  const type = document.getElementById('fleetDbType').value;
+  document.getElementById('fleetDbPort').value = DB_PORTS[type] || 5432;
+}
+
+async function loadFleetDbConfig() {
+  const config = await api('/api/v1/fleet/db/config');
+  const status = document.getElementById('fleetDbStatus');
+  if (config && !config.error) {
+    // Populate form with current config
+    if (config.db_type) document.getElementById('fleetDbType').value = config.db_type;
+    if (config.host) document.getElementById('fleetDbHost').value = config.host;
+    if (config.port) document.getElementById('fleetDbPort').value = config.port;
+    if (config.db_name) document.getElementById('fleetDbName').value = config.db_name;
+    if (config.username) document.getElementById('fleetDbUser').value = config.username;
+    // Don't populate password — it's masked
+
+    if (config.connected) {
+      status.innerHTML = `<span class="dot dot-ok"></span><span style="color:var(--green)">Connected</span>` +
+        `<span style="color:var(--text-muted);margin-left:8px">${config.db_type} @ ${config.host}:${config.port}</span>`;
+    } else {
+      status.innerHTML = `<span class="dot dot-warn"></span><span style="color:var(--amber)">Configured but not connected</span>`;
+    }
+  } else {
+    status.innerHTML = `<span class="dot dot-err"></span><span style="color:var(--text-muted)">No central database configured</span>`;
+  }
+}
+
+function getFleetDbFormData() {
+  return {
+    db_type: document.getElementById('fleetDbType').value,
+    host: document.getElementById('fleetDbHost').value.trim(),
+    port: parseInt(document.getElementById('fleetDbPort').value) || 5432,
+    db_name: document.getElementById('fleetDbName').value.trim(),
+    username: document.getElementById('fleetDbUser').value.trim(),
+    password: document.getElementById('fleetDbPass').value,
+  };
+}
+
+async function testFleetDb() {
+  const result = document.getElementById('fleetDbResult');
+  const data = getFleetDbFormData();
+  if (!data.host) { result.innerHTML = `<span style="color:var(--red)">Host is required</span>`; return; }
+
+  result.innerHTML = `<span style="color:var(--amber)">Testing...</span>`;
+  try {
+    const resp = await fetch(`${GOV()}/api/v1/fleet/db/test`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+      signal: AbortSignal.timeout(15000),
+    });
+    const res = await resp.json();
+    if (res.success) {
+      result.innerHTML = `<span style="color:var(--green)">Connected (${res.latency_ms}ms)</span>`;
+    } else {
+      result.innerHTML = `<span style="color:var(--red)">Failed: ${res.message}</span>`;
+    }
+  } catch (e) {
+    result.innerHTML = `<span style="color:var(--red)">Error: ${e.message}</span>`;
+  }
+}
+
+async function saveFleetDb() {
+  const result = document.getElementById('fleetDbResult');
+  const data = getFleetDbFormData();
+  if (!data.host) { result.innerHTML = `<span style="color:var(--red)">Host is required</span>`; return; }
+
+  result.innerHTML = `<span style="color:var(--amber)">Saving...</span>`;
+  try {
+    const resp = await fetch(`${GOV()}/api/v1/fleet/db/config`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+      signal: AbortSignal.timeout(10000),
+    });
+    const res = await resp.json();
+    if (res.success) {
+      result.innerHTML = `<span style="color:var(--green)">Saved. Restart Governance Hub to apply.</span>`;
+      loadFleetDbConfig();
+    } else {
+      result.innerHTML = `<span style="color:var(--red)">Failed: ${res.message || 'Unknown error'}</span>`;
+    }
+  } catch (e) {
+    result.innerHTML = `<span style="color:var(--red)">Error: ${e.message}</span>`;
+  }
+}
+
+// ================================================================
+// FLEET panel — data
 // ================================================================
 async function loadFleet() {
-  const [summary, instances] = await Promise.all([
+  loadFleetDbConfig();
+  const [summary, instances, localSync, localSchema] = await Promise.all([
     api('/api/v1/fleet/summary'),
     api('/api/v1/fleet/instances'),
+    api('/api/v1/sync/status'),
+    api('/api/v1/schema/current'),
   ]);
 
   const ft = document.getElementById('fleetTiles');
@@ -624,19 +902,39 @@ async function loadFleet() {
       <div class="tile"><div class="label">Avg Compliance</div><div class="value green">${(summary.avg_compliance_score || 0).toFixed(1)}%</div></div>
     `;
   } else {
-    ft.innerHTML = '<div class="tile"><div class="label">Fleet</div><div class="value amber">N/A</div><div class="sub">Central DB not configured</div></div>';
+    ft.innerHTML = '<div class="tile"><div class="label">Fleet Mode</div><div class="value amber">Local</div><div class="sub">Configure a central DB above to enable multi-instance fleet</div></div>';
   }
 
   const table = document.getElementById('fleetTable');
-  if (instances?.instances?.length) {
+  const allInstances = instances?.instances?.length ? instances.instances : [];
+
+  // Always include the local instance
+  const localInstanceName = localSchema?.instance_name || localSchema?.instance_id || H();
+  const localExists = allInstances.some(i => i.instance_name === localInstanceName || i.instance_id === localSchema?.instance_id);
+  if (!localExists) {
+    allInstances.unshift({
+      instance_name: localInstanceName,
+      instance_id: localSchema?.instance_id || 'local',
+      industry: localSchema?.industry || '--',
+      governance_tier: localSchema?.governance_tier || '--',
+      data_classification: localSchema?.data_classification || '--',
+      schema_version: localSchema?.schema_version || '?',
+      last_sync_at: localSync?.last_sync_at || null,
+      _local: true,
+      latest_telemetry: null,
+    });
+  }
+
+  if (allInstances.length) {
     table.innerHTML = `<table class="data-table"><thead><tr><th>Instance</th><th>Industry</th><th>Tier</th><th>Classification</th><th>Schema</th><th>Last Sync</th><th>Compliance</th><th>Spend</th><th>Actions</th></tr></thead><tbody>` +
-      instances.instances.map(i => {
+      allInstances.map(i => {
         const tel = i.latest_telemetry || {};
         const score = tel.compliance_score != null ? `${tel.compliance_score}%` : '--';
         const spend = tel.total_spend != null ? `$${tel.total_spend.toFixed(2)}` : '--';
         const syncTime = i.last_sync_at ? i.last_sync_at.slice(0, 16).replace('T', ' ') : 'never';
+        const localBadge = i._local ? ' <span class="badge badge-info">THIS INSTANCE</span>' : '';
         return `<tr>
-          <td><strong>${i.instance_name}</strong></td>
+          <td><strong>${i.instance_name}</strong>${localBadge}</td>
           <td>${i.industry || '--'}</td>
           <td><code>${i.governance_tier || '--'}</code></td>
           <td>${i.data_classification || '--'}</td>
@@ -644,12 +942,13 @@ async function loadFleet() {
           <td>${syncTime}</td>
           <td>${score}</td>
           <td>${spend}</td>
-          <td><button class="btn btn-action" onclick="alert('Use the Fleet Management tool in Open WebUI to generate restore configs.\\n\\nInstance: ${i.instance_id}')">Restore</button></td>
+          <td>${i._local ? '<span style="color:var(--text-muted);font-family:var(--font-mono);font-size:11px">Local</span>' :
+            `<button class="btn btn-action" onclick="alert('Instance: ${i.instance_id}')">Details</button>`}</td>
         </tr>`;
       }).join('') +
       `</tbody></table>`;
   } else {
-    table.innerHTML = '<div class="loading">No instances registered. Enable the Governance Hub with a central database to track fleet deployments.</div>';
+    table.innerHTML = '<div class="loading">No instances found.</div>';
   }
 }
 
