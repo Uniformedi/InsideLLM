@@ -935,7 +935,7 @@ driver on the host. No extra configuration is needed inside WSL2.
 To enable GPU in the WSL2 deployment:
 
 ```powershell
-.\Install-InsideLLM-WSL.ps1 -AnthropicApiKey "sk-ant-..." -OllamaGpu $true
+.\scripts\Install-InsideLLM-WSL.ps1 -AnthropicApiKey "sk-ant-..." -OllamaGpu $true
 ```
 
 This is the **recommended path for GPU-accelerated local models**.
@@ -955,14 +955,14 @@ keeps using the GPU for display while the VM gets compute access:
 
 ```powershell
 # After terraform apply:
-.\Setup-GPU-Passthrough.ps1
+.\scripts\Setup-GPU-Passthrough.ps1
 ```
 
 **DDA (full passthrough)** exclusively assigns the GPU to the VM. The host
 loses access entirely -- ensure you have integrated graphics or a second GPU:
 
 ```powershell
-.\Setup-GPU-Passthrough.ps1 -Mode DDA
+.\scripts\Setup-GPU-Passthrough.ps1 -Mode DDA
 ```
 
 The script automatically:
@@ -974,7 +974,7 @@ The script automatically:
 To remove the GPU assignment:
 
 ```powershell
-.\Setup-GPU-Passthrough.ps1 -Remove
+.\scripts\Setup-GPU-Passthrough.ps1 -Remove
 ```
 
 After GPU setup, set `ollama_gpu = true` in `terraform.tfvars` and redeploy,
@@ -1536,7 +1536,7 @@ configuration as the Hyper-V path.
 
 ```powershell
 # Run as Administrator -- full deployment in one step:
-powershell -ExecutionPolicy Bypass -File .\Install-InsideLLM-WSL.ps1 -AnthropicApiKey "sk-ant-api03-..."
+powershell -ExecutionPolicy Bypass -File .\scripts\Install-InsideLLM-WSL.ps1 -AnthropicApiKey "sk-ant-api03-..."
 ```
 
 That's it. The script handles WSL2 installation, Docker setup, SCFW deployment,
@@ -1550,10 +1550,10 @@ the application stack, use the standalone initialization script:
 
 ```powershell
 # Run as Administrator -- infrastructure only:
-powershell -ExecutionPolicy Bypass -File .\Initialize-InsideLLM.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\Initialize-InsideLLM.ps1
 
 # Then deploy the stack later:
-powershell -ExecutionPolicy Bypass -File .\Install-InsideLLM-WSL.ps1 -AnthropicApiKey "sk-ant-api03-..."
+powershell -ExecutionPolicy Bypass -File .\scripts\Install-InsideLLM-WSL.ps1 -AnthropicApiKey "sk-ant-api03-..."
 ```
 
 Both scripts are idempotent -- `Install-InsideLLM-WSL.ps1` will skip any steps
@@ -1562,7 +1562,7 @@ already completed by `Initialize-InsideLLM.ps1`.
 ### Disabling Ollama for a lighter deployment
 
 ```powershell
-.\Install-InsideLLM-WSL.ps1 -AnthropicApiKey "sk-ant-..." -EnableOllama $false
+.\scripts\Install-InsideLLM-WSL.ps1 -AnthropicApiKey "sk-ant-..." -EnableOllama $false
 ```
 
 ### All Parameters
@@ -1602,7 +1602,7 @@ already completed by `Initialize-InsideLLM.ps1`.
 ### Uninstall
 
 ```powershell
-.\Install-InsideLLM-WSL.ps1 -Uninstall
+.\scripts\Install-InsideLLM-WSL.ps1 -Uninstall
 ```
 
 This removes all containers, configs, port forwarding rules, and firewall rules.
