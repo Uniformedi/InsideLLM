@@ -109,6 +109,13 @@ write_files:
     content: |
       ${indent(6, admin_html)}
 
+  # --- Setup Wizard (used for clone-to-wizard flow) ---
+  - path: /opt/InsideLLM/Setup.html
+    permissions: "0644"
+    owner: root:root
+    content: |
+      ${indent(6, setup_html)}
+
   # --- Docker daemon config (log rotation) ---
   - path: /etc/docker/daemon.json
     permissions: "0644"

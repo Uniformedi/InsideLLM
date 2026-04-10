@@ -261,6 +261,12 @@ http {
             default_type text/html;
         }
 
+        # --- Setup Wizard (used for cloning) ---
+        location /setup {
+            alias /opt/InsideLLM/Setup.html;
+            default_type text/html;
+        }
+
         # --- Health check ---
         location /nginx-health {
             return 200 'OK';

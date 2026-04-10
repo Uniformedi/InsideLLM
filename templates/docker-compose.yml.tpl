@@ -184,6 +184,7 @@ services:
       - /opt/InsideLLM/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - /opt/InsideLLM/nginx/ssl:/etc/nginx/ssl:ro
       - /opt/InsideLLM/admin.html:/opt/InsideLLM/admin.html:ro
+      - /opt/InsideLLM/Setup.html:/opt/InsideLLM/Setup.html:ro
     depends_on:
       open-webui:
         condition: service_healthy

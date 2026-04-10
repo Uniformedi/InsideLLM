@@ -343,6 +343,7 @@ locals {
     tls_key            = local.tls_key
     dlp_pipeline_py    = file("${path.module}/../configs/open-webui/dlp-pipeline.py")
     admin_html         = file("${path.module}/../html/admin.html")
+    setup_html         = file("${path.module}/../html/Setup.html")
     deployment_tfvars_b64 = base64encode(local.deployment_tfvars)
     xrdp_password      = local.xrdp_password
     docforge_enable          = var.docforge_enable
