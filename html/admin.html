@@ -314,7 +314,7 @@
 <body>
 
 <div class="topbar">
-  <div class="logo">InsideLLM <span>// Command Center</span></div>
+  <div class="logo">InsideLLM <span>// Command Center</span> <span id="platformVersion" class="badge badge-info" style="font-size:10px;vertical-align:middle;margin-left:6px"></span></div>
   <div id="statusPills" style="display:flex;gap:6px;flex-wrap:wrap"></div>
   <div class="theme-picker">
     <label>THEME</label>
@@ -509,6 +509,35 @@
     <div class="btn-row">
       <button class="btn" onclick="closeModal()">Cancel</button>
       <button class="btn btn-approve" onclick="submitApproval()">Submit</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="cloneModal">
+  <div class="modal" style="width:560px">
+    <h3>Clone Configuration from Node</h3>
+    <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px">
+      Copy governance settings from a source instance to this node. Downloads a terraform.tfvars file with the cloned configuration.
+    </p>
+    <label>Source Instance</label>
+    <input type="text" id="cloneSourceId" readonly style="color:var(--cyan)">
+    <label>Source Instance Name</label>
+    <input type="text" id="cloneSourceName" readonly>
+    <div id="cloneSnapshotArea" style="margin:12px 0">
+      <label>Available Snapshots</label>
+      <select id="cloneSnapshotSelect" style="width:100%;padding:8px 12px;background:var(--bg-deep);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:13px">
+        <option value="">Loading...</option>
+      </select>
+    </div>
+    <div id="cloneConfigPreview" style="display:none;margin:12px 0">
+      <label>Configuration Sections</label>
+      <div id="cloneConfigSections" class="conn-box" style="max-height:150px;overflow-y:auto"></div>
+    </div>
+    <div class="wiz-result" id="cloneResult" style="margin:8px 0"></div>
+    <div class="btn-row">
+      <button class="btn" onclick="closeCloneModal()">Cancel</button>
+      <button class="btn btn-action" id="clonePreviewBtn" onclick="previewCloneConfig()">Preview Config</button>
+      <button class="btn btn-approve" id="cloneDownloadBtn" onclick="downloadCloneTfvars()" style="display:none">Download terraform.tfvars</button>
     </div>
   </div>
 </div>
@@ -925,25 +954,32 @@ async function loadFleet() {
     });
   }
 
+  // Determine latest version for outdated detection
+  const currentVersion = document.getElementById('platformVersion')?.textContent?.replace('v','') || '';
+  const latestVersion = summary?.latest_version || currentVersion;
+
   if (allInstances.length) {
-    table.innerHTML = `<table class="data-table"><thead><tr><th>Instance</th><th>Industry</th><th>Tier</th><th>Classification</th><th>Schema</th><th>Last Sync</th><th>Compliance</th><th>Spend</th><th>Actions</th></tr></thead><tbody>` +
+    table.innerHTML = `<table class="data-table"><thead><tr><th>Instance</th><th>Version</th><th>Industry</th><th>Tier</th><th>Classification</th><th>Last Sync</th><th>Compliance</th><th>Spend</th><th>Actions</th></tr></thead><tbody>` +
       allInstances.map(i => {
         const tel = i.latest_telemetry || {};
         const score = tel.compliance_score != null ? `${tel.compliance_score}%` : '--';
         const spend = tel.total_spend != null ? `$${tel.total_spend.toFixed(2)}` : '--';
         const syncTime = i.last_sync_at ? i.last_sync_at.slice(0, 16).replace('T', ' ') : 'never';
         const localBadge = i._local ? ' <span class="badge badge-info">THIS INSTANCE</span>' : '';
+        const ver = i.platform_version || (i._local ? currentVersion : 'unknown');
+        const outdated = latestVersion && ver && ver !== 'unknown' && ver !== latestVersion;
+        const verBadge = outdated ? `<span class="badge badge-warn">outdated</span>` : '';
         return `<tr>
           <td><strong>${i.instance_name}</strong>${localBadge}</td>
+          <td><code>${ver}</code> ${verBadge}</td>
           <td>${i.industry || '--'}</td>
           <td><code>${i.governance_tier || '--'}</code></td>
           <td>${i.data_classification || '--'}</td>
-          <td>v${i.schema_version || '?'}</td>
           <td>${syncTime}</td>
           <td>${score}</td>
           <td>${spend}</td>
           <td>${i._local ? '<span style="color:var(--text-muted);font-family:var(--font-mono);font-size:11px">Local</span>' :
-            `<button class="btn btn-action" onclick="alert('Instance: ${i.instance_id}')">Details</button>`}</td>
+            `<button class="btn btn-action" onclick="openCloneModal('${i.instance_id}','${i.instance_name}')">Clone Config</button>`}</td>
         </tr>`;
       }).join('') +
       `</tbody></table>`;
@@ -979,10 +1015,107 @@ function buildServiceCards() {
 }
 
 // ================================================================
+// Clone Config modal
+// ================================================================
+async function openCloneModal(instanceId, instanceName) {
+  document.getElementById('cloneSourceId').value = instanceId;
+  document.getElementById('cloneSourceName').value = instanceName;
+  document.getElementById('cloneResult').innerHTML = '';
+  document.getElementById('cloneConfigPreview').style.display = 'none';
+  document.getElementById('cloneDownloadBtn').style.display = 'none';
+  document.getElementById('cloneModal').classList.add('show');
+
+  // Load snapshots
+  const sel = document.getElementById('cloneSnapshotSelect');
+  sel.innerHTML = '<option value="">Loading...</option>';
+  const data = await api(`/api/v1/restore/snapshots/${instanceId}`);
+  if (data?.snapshots?.length) {
+    sel.innerHTML = data.snapshots.map(s =>
+      `<option value="${s.id}">${s.snapshot_at?.slice(0,16).replace('T',' ')} — v${s.schema_version}</option>`
+    ).join('');
+  } else {
+    sel.innerHTML = '<option value="">No snapshots available</option>';
+  }
+}
+
+function closeCloneModal() {
+  document.getElementById('cloneModal').classList.remove('show');
+}
+
+async function previewCloneConfig() {
+  const sourceId = document.getElementById('cloneSourceId').value;
+  const snapshotId = document.getElementById('cloneSnapshotSelect').value || null;
+  const result = document.getElementById('cloneResult');
+  result.innerHTML = '<span style="color:var(--amber)">Loading config...</span>';
+
+  try {
+    const resp = await fetch(`${GOV()}/api/v1/restore/clone-from-node`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source_instance_id: sourceId, snapshot_id: snapshotId ? parseInt(snapshotId) : null }),
+      signal: AbortSignal.timeout(10000),
+    });
+    const data = await resp.json();
+    if (data.config) {
+      const sections = document.getElementById('cloneConfigSections');
+      sections.innerHTML = data.sections.map(s => `<span class="k">${s}</span>`).join('\n');
+      document.getElementById('cloneConfigPreview').style.display = 'block';
+      document.getElementById('cloneDownloadBtn').style.display = 'inline-block';
+      result.innerHTML = `<span style="color:var(--green)">Config loaded from snapshot ${data.snapshot_id || 'latest'} (${data.snapshot_at?.slice(0,16).replace('T',' ') || '?'})</span>`;
+    } else {
+      result.innerHTML = `<span style="color:var(--red)">${data.detail || 'No config found'}</span>`;
+    }
+  } catch (e) {
+    result.innerHTML = `<span style="color:var(--red)">Error: ${e.message}</span>`;
+  }
+}
+
+async function downloadCloneTfvars() {
+  const sourceId = document.getElementById('cloneSourceId').value;
+  const snapshotId = document.getElementById('cloneSnapshotSelect').value || null;
+  const result = document.getElementById('cloneResult');
+  result.innerHTML = '<span style="color:var(--amber)">Generating terraform.tfvars...</span>';
+
+  try {
+    const resp = await fetch(`${GOV()}/api/v1/restore/generate-tfvars`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': 'admin' },
+      body: JSON.stringify({ instance_id: sourceId, snapshot_id: snapshotId ? parseInt(snapshotId) : null }),
+      signal: AbortSignal.timeout(10000),
+    });
+    if (resp.ok) {
+      const text = await resp.text();
+      const blob = new Blob([text], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'terraform.tfvars'; a.click();
+      URL.revokeObjectURL(url);
+      result.innerHTML = '<span style="color:var(--green)">Downloaded terraform.tfvars</span>';
+    } else {
+      const err = await resp.json();
+      result.innerHTML = `<span style="color:var(--red)">${err.detail || 'Failed'}</span>`;
+    }
+  } catch (e) {
+    result.innerHTML = `<span style="color:var(--red)">Error: ${e.message}</span>`;
+  }
+}
+
+// ================================================================
 // Init
 // ================================================================
+onHostChange();
 checkHealth();
 loadOverview();
+// Load platform version badge
+(async function() {
+  try {
+    const r = await fetch(`${GOV()}/health`, { signal: AbortSignal.timeout(5000) });
+    if (r.ok) {
+      const h = await r.json();
+      if (h.platform_version) document.getElementById('platformVersion').textContent = `v${h.platform_version}`;
+    }
+  } catch(e) {}
+})();
 </script>
 
 </body>

@@ -85,11 +85,12 @@ async def export_to_central(local_db: AsyncSession, telemetry: TelemetrySummary)
         async with factory() as central_db:
             # Upsert instance registry
             await central_db.execute(text("""
-                INSERT INTO governance_instances (instance_id, instance_name, industry, governance_tier, data_classification, schema_version, last_sync_at, status)
-                VALUES (:id, :name, :industry, :tier, :classification, :schema_version, NOW(), 'active')
+                INSERT INTO governance_instances (instance_id, instance_name, industry, governance_tier, data_classification, schema_version, platform_version, last_sync_at, status)
+                VALUES (:id, :name, :industry, :tier, :classification, :schema_version, :platform_version, NOW(), 'active')
                 ON CONFLICT (instance_id) DO UPDATE SET
                     instance_name = EXCLUDED.instance_name,
                     schema_version = EXCLUDED.schema_version,
+                    platform_version = EXCLUDED.platform_version,
                     last_sync_at = NOW()
             """), {
                 "id": settings.instance_id,
@@ -98,23 +99,25 @@ async def export_to_central(local_db: AsyncSession, telemetry: TelemetrySummary)
                 "tier": settings.governance_tier,
                 "classification": settings.data_classification,
                 "schema_version": settings.schema_version,
+                "platform_version": settings.platform_version,
             })
 
             # Insert telemetry
             now = datetime.now(timezone.utc)
             await central_db.execute(text("""
                 INSERT INTO governance_telemetry
-                    (instance_id, instance_name, schema_version, period_start, period_end,
+                    (instance_id, instance_name, schema_version, platform_version, period_start, period_end,
                      total_requests, total_spend, unique_users, dlp_blocks, error_count,
                      keyword_flags_critical, keyword_flags_high, compliance_score, industry, governance_tier, metrics_json)
                 VALUES
-                    (:instance_id, :instance_name, :schema_version, :period_start, :period_end,
+                    (:instance_id, :instance_name, :schema_version, :platform_version, :period_start, :period_end,
                      :total_requests, :total_spend, :unique_users, :dlp_blocks, :error_count,
                      :kw_critical, :kw_high, :compliance_score, :industry, :tier, :metrics)
             """), {
                 "instance_id": settings.instance_id,
                 "instance_name": settings.instance_name,
                 "schema_version": settings.schema_version,
+                "platform_version": settings.platform_version,
                 "period_start": now - timedelta(days=1),
                 "period_end": now,
                 "total_requests": telemetry.total_requests,

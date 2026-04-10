@@ -685,6 +685,10 @@
     </div>
 
     <h3 style="font-size:1.1em;color:#2b6cb0;margin:20px 0 10px">SSO Provider</h3>
+    <p class="desc" style="margin-bottom:10px">
+      SSO applies to <strong>all services</strong>: Open WebUI (chat), LiteLLM (API), Grafana (dashboards), and the Admin Center.
+      A single app registration in your IdP is shared across all services.
+    </p>
     <div class="field">
       <select id="ssoProvider" onchange="toggleSso()">
         <option value="none">None (local authentication only)</option>
@@ -702,6 +706,15 @@
       <div class="field"><label>Okta Client ID</label><input type="text" id="oktaClientId"></div>
       <div class="field"><label>Okta Client Secret</label><input type="text" id="oktaClientSecret"></div>
       <div class="field"><label>Okta Domain</label><input type="text" id="oktaDomain" placeholder="your-org.okta.com"></div>
+    </div>
+
+    <div class="warn-box" id="ssoRedirectUris" style="display:none">
+      <strong>Redirect URIs to register in your IdP:</strong>
+      <ul style="margin:8px 0 0 20px;font-family:'Cascadia Code','Fira Code',monospace;font-size:0.88em">
+        <li><code>https://&lt;your-host&gt;/oauth/oidc/callback</code> (Open WebUI)</li>
+        <li><code>https://&lt;your-host&gt;/grafana/login/generic_oauth</code> (Grafana)</li>
+        <li><code>https://&lt;your-host&gt;/litellm/sso/callback</code> (LiteLLM)</li>
+      </ul>
     </div>
 
     <!-- SSO Group-to-Team Mapping -->
@@ -1171,6 +1184,7 @@ function toggleSso() {
   const val = document.getElementById('ssoProvider').value;
   document.getElementById('azureFields').style.display = val === 'azure_ad' ? 'block' : 'none';
   document.getElementById('oktaFields').style.display = val === 'okta' ? 'block' : 'none';
+  document.getElementById('ssoRedirectUris').style.display = val !== 'none' ? 'block' : 'none';
 
   const groupSection = document.getElementById('groupMappingSection');
   const hintEl = document.getElementById('groupClaimHint');

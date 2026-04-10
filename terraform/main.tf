@@ -171,6 +171,10 @@ locals {
     webui_secret       = local.webui_secret
     sso_provider       = var.sso_provider
     sso_env            = local.sso_env
+    sso_client_id      = var.sso_provider == "azure_ad" ? var.azure_ad_client_id : var.sso_provider == "okta" ? var.okta_client_id : ""
+    sso_client_secret  = var.sso_provider == "azure_ad" ? var.azure_ad_client_secret : var.sso_provider == "okta" ? var.okta_client_secret : ""
+    sso_tenant_id      = var.sso_provider == "azure_ad" ? var.azure_ad_tenant_id : ""
+    sso_okta_domain    = var.sso_provider == "okta" ? var.okta_domain : ""
     ollama_enable      = var.ollama_enable && !var.ollama_separate_vm
     ollama_models      = var.ollama_models
     ollama_gpu               = var.ollama_gpu
@@ -190,6 +194,7 @@ locals {
     governance_hub_central_db_name  = var.governance_hub_central_db_name
     governance_hub_central_db_user  = var.governance_hub_central_db_user
     governance_hub_central_db_password = var.governance_hub_central_db_password
+    platform_version               = trimspace(file("${path.module}/../VERSION"))
     governance_hub_instance_id      = var.vm_name
     governance_hub_instance_name    = var.governance_hub_instance_name != "" ? var.governance_hub_instance_name : var.vm_name
     governance_hub_sync_schedule    = var.governance_hub_sync_schedule

@@ -24,6 +24,11 @@ class RestoreRequest(BaseModel):
     overrides: dict[str, Any] | None = None
 
 
+class CloneRequest(BaseModel):
+    source_instance_id: str
+    snapshot_id: int | None = None  # None = latest
+
+
 @router.post("/generate-tfvars", dependencies=[Depends(verify_api_key)])
 async def restore_tfvars(req: RestoreRequest):
     """
@@ -83,3 +88,33 @@ async def restore_from_local(
         media_type="text/plain",
         headers={"Content-Disposition": f'attachment; filename="terraform.tfvars"'},
     )
+
+
+@router.post("/clone-from-node")
+async def clone_from_node(req: CloneRequest):
+    """
+    Clone governance configuration from a source instance to this instance.
+
+    Fetches the latest (or specified) snapshot from the central DB and returns
+    the config for review. Use generate-tfvars to apply via Terraform, or apply
+    governance settings directly via the appropriate API endpoints.
+    """
+    snapshot = await get_snapshot_from_central(req.source_instance_id, req.snapshot_id)
+    if not snapshot:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No snapshot found for instance {req.source_instance_id}",
+        )
+
+    config = snapshot.get("config_json", {})
+    if isinstance(config, str):
+        import json
+        config = json.loads(config)
+
+    return {
+        "source_instance_id": req.source_instance_id,
+        "snapshot_id": snapshot.get("id"),
+        "snapshot_at": snapshot.get("snapshot_at"),
+        "config": config,
+        "sections": list(config.keys()) if isinstance(config, dict) else [],
+    }

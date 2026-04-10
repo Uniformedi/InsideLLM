@@ -32,6 +32,7 @@ async def list_instances() -> list[dict]:
                 i.governance_tier,
                 i.data_classification,
                 i.schema_version,
+                i.platform_version,
                 i.last_sync_at,
                 i.status,
                 i.created_at

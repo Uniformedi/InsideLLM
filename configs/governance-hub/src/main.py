@@ -53,7 +53,12 @@ async def health():
         "status": "ok",
         "service": "governance-hub",
         "instance_id": settings.instance_id,
+        "instance_name": settings.instance_name,
         "schema_version": settings.schema_version,
+        "platform_version": settings.platform_version,
+        "industry": settings.industry,
+        "governance_tier": settings.governance_tier,
+        "data_classification": settings.data_classification,
     }
 
 

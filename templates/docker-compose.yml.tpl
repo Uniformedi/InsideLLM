@@ -136,6 +136,25 @@ services:
 
       # Security
       WEBUI_AUTH: "true"
+%{ if sso_provider != "none" }
+      # SSO / OIDC
+      ENABLE_OAUTH_SIGNUP: "true"
+      OAUTH_MERGE_ACCOUNTS_BY_EMAIL: "true"
+%{ if sso_provider == "azure_ad" }
+      OAUTH_PROVIDER_NAME: "Microsoft"
+      OAUTH_CLIENT_ID: "${sso_client_id}"
+      OAUTH_CLIENT_SECRET: "${sso_client_secret}"
+      OPENID_PROVIDER_URL: "https://login.microsoftonline.com/${sso_tenant_id}/v2.0/.well-known/openid-configuration"
+      OAUTH_SCOPES: "openid email profile"
+%{ endif }
+%{ if sso_provider == "okta" }
+      OAUTH_PROVIDER_NAME: "Okta"
+      OAUTH_CLIENT_ID: "${sso_client_id}"
+      OAUTH_CLIENT_SECRET: "${sso_client_secret}"
+      OPENID_PROVIDER_URL: "https://${sso_okta_domain}/.well-known/openid-configuration"
+      OAUTH_SCOPES: "openid email profile"
+%{ endif }
+%{ endif }
     volumes:
       - /opt/InsideLLM/data/open-webui:/app/backend/data
       - /opt/InsideLLM/pipelines:/app/backend/pipelines
@@ -351,6 +370,7 @@ services:
       GOVERNANCE_HUB_CENTRAL_DB_NAME: "${governance_hub_central_db_name}"
       GOVERNANCE_HUB_CENTRAL_DB_USER: "${governance_hub_central_db_user}"
       GOVERNANCE_HUB_CENTRAL_DB_PASSWORD: "${governance_hub_central_db_password}"
+      GOVERNANCE_HUB_PLATFORM_VERSION: "${platform_version}"
       GOVERNANCE_HUB_INSTANCE_ID: "${governance_hub_instance_id}"
       GOVERNANCE_HUB_INSTANCE_NAME: "${governance_hub_instance_name}"
       GOVERNANCE_HUB_SYNC_SCHEDULE: "${governance_hub_sync_schedule}"
@@ -476,6 +496,25 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: "${grafana_admin_password}"
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_AUTH_ANONYMOUS_ENABLED: "false"
+%{ if sso_provider != "none" }
+      # SSO / Generic OAuth
+      GF_AUTH_GENERIC_OAUTH_ENABLED: "true"
+      GF_AUTH_GENERIC_OAUTH_NAME: "InsideLLM SSO"
+      GF_AUTH_GENERIC_OAUTH_ALLOW_SIGN_UP: "true"
+      GF_AUTH_GENERIC_OAUTH_CLIENT_ID: "${sso_client_id}"
+      GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET: "${sso_client_secret}"
+      GF_AUTH_GENERIC_OAUTH_SCOPES: "openid email profile"
+%{ if sso_provider == "azure_ad" }
+      GF_AUTH_GENERIC_OAUTH_AUTH_URL: "https://login.microsoftonline.com/${sso_tenant_id}/oauth2/v2.0/authorize"
+      GF_AUTH_GENERIC_OAUTH_TOKEN_URL: "https://login.microsoftonline.com/${sso_tenant_id}/oauth2/v2.0/token"
+      GF_AUTH_GENERIC_OAUTH_API_URL: "https://graph.microsoft.com/oidc/userinfo"
+%{ endif }
+%{ if sso_provider == "okta" }
+      GF_AUTH_GENERIC_OAUTH_AUTH_URL: "https://${sso_okta_domain}/oauth2/default/v1/authorize"
+      GF_AUTH_GENERIC_OAUTH_TOKEN_URL: "https://${sso_okta_domain}/oauth2/default/v1/token"
+      GF_AUTH_GENERIC_OAUTH_API_URL: "https://${sso_okta_domain}/oauth2/default/v1/userinfo"
+%{ endif }
+%{ endif }
     volumes:
       - /opt/InsideLLM/data/grafana:/var/lib/grafana
       - /opt/InsideLLM/grafana/provisioning:/etc/grafana/provisioning:ro

@@ -2,6 +2,9 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
+    # Platform
+    platform_version: str = "dev"
+
     # Instance identity
     instance_id: str = ""
     instance_name: str = ""
