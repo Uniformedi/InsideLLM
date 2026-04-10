@@ -354,6 +354,16 @@ _TABLES_POSTGRESQL = [
         framework_version INTEGER,
         implemented_at TIMESTAMP
     )""",
+    """CREATE TABLE IF NOT EXISTS governance_deployment_tfvars (
+        id SERIAL PRIMARY KEY,
+        instance_id VARCHAR(100) NOT NULL,
+        platform_version VARCHAR(20),
+        encrypted_tfvars TEXT NOT NULL,
+        encryption_iv VARCHAR(48),
+        deployed_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE(instance_id)
+    )""",
 ]
 
 _TABLES_MSSQL = [
@@ -420,6 +430,16 @@ _TABLES_MSSQL = [
         framework_version INT,
         implemented_at DATETIME2
     )""",
+    """IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'governance_deployment_tfvars')
+    CREATE TABLE governance_deployment_tfvars (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        instance_id VARCHAR(100) NOT NULL UNIQUE,
+        platform_version VARCHAR(20),
+        encrypted_tfvars NVARCHAR(MAX) NOT NULL,
+        encryption_iv VARCHAR(48),
+        deployed_at DATETIME2 DEFAULT GETDATE(),
+        updated_at DATETIME2 DEFAULT GETDATE()
+    )""",
 ]
 
 _TABLES_MARIADB = [
@@ -481,6 +501,15 @@ _TABLES_MARIADB = [
         reviewer_comments TEXT,
         framework_version INT,
         implemented_at DATETIME
+    )""",
+    """CREATE TABLE IF NOT EXISTS governance_deployment_tfvars (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        instance_id VARCHAR(100) NOT NULL UNIQUE,
+        platform_version VARCHAR(20),
+        encrypted_tfvars LONGTEXT NOT NULL,
+        encryption_iv VARCHAR(48),
+        deployed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )""",
 ]
 

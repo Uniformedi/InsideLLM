@@ -50,6 +50,110 @@ locals {
 
   vm_fqdn = "${var.vm_hostname}.${var.vm_domain}"
 
+  # Sanitized deployment tfvars — stored on the VM for snapshot/clone.
+  # Secrets are replaced with REDACTED placeholders.
+  platform_version = trimspace(file("${path.module}/../VERSION"))
+  deployment_tfvars = <<-TFVARS
+# InsideLLM Deployment Configuration (sanitized — secrets redacted)
+# Deployed: ${timestamp()}
+# Platform: v${trimspace(file("${path.module}/../VERSION"))}
+
+# Hyper-V
+hyperv_user     = "${var.hyperv_user}"
+hyperv_password = "REDACTED"
+hyperv_host     = "${var.hyperv_host}"
+
+# VM
+vm_name              = "${var.vm_name}"
+vm_processor_count   = ${var.vm_processor_count}
+vm_memory_startup_bytes = ${var.vm_memory_startup_bytes}
+vm_disk_size_bytes      = ${var.vm_disk_size_bytes}
+vm_path              = "${replace(var.vm_path, "\\", "\\\\")}"
+vm_vhd_path          = "${replace(var.vm_vhd_path, "\\", "\\\\")}"
+vm_hostname          = "${var.vm_hostname}"
+vm_domain            = "${var.vm_domain}"
+ubuntu_vhdx_source   = "${replace(var.ubuntu_vhdx_source, "\\", "\\\\")}"
+
+# Network
+vm_switch_name    = "${var.vm_switch_name}"
+vm_switch_type    = "${var.vm_switch_type}"
+vm_switch_adapter = "${var.vm_switch_adapter}"
+vm_static_ip      = "${var.vm_static_ip}"
+vm_gateway        = "${var.vm_gateway}"
+vm_dns_servers    = ${jsonencode(var.vm_dns_servers)}
+
+# SSH
+ssh_admin_user      = "${var.ssh_admin_user}"
+ssh_public_key_path = "${var.ssh_public_key_path}"
+
+# API
+anthropic_api_key = "REDACTED"
+
+# LiteLLM
+litellm_master_key         = "REDACTED"
+litellm_default_model      = "${var.litellm_default_model}"
+litellm_enable_haiku       = ${var.litellm_enable_haiku}
+litellm_enable_opus        = ${var.litellm_enable_opus}
+litellm_global_max_budget  = ${var.litellm_global_max_budget}
+litellm_default_user_budget = ${var.litellm_default_user_budget}
+litellm_default_user_rpm   = ${var.litellm_default_user_rpm}
+litellm_default_user_tpm   = ${var.litellm_default_user_tpm}
+
+# Database
+postgres_password = "REDACTED"
+
+# Ollama
+ollama_enable = ${var.ollama_enable}
+ollama_models = ${jsonencode(var.ollama_models)}
+ollama_gpu    = ${var.ollama_gpu}
+
+# SSO
+sso_provider = "${var.sso_provider}"
+
+# AD Domain Join
+ad_domain_join   = ${var.ad_domain_join}
+ad_admin_groups  = "${var.ad_admin_groups}"
+
+# DLP
+dlp_enable           = ${var.dlp_enable}
+dlp_block_ssn        = ${var.dlp_block_ssn}
+dlp_block_credit_cards = ${var.dlp_block_credit_cards}
+dlp_block_phi        = ${var.dlp_block_phi}
+dlp_block_credentials = ${var.dlp_block_credentials}
+
+# Optional Services
+docforge_enable = ${var.docforge_enable}
+
+# AI Governance
+industry                 = "${var.industry}"
+governance_tier          = "${var.governance_tier}"
+data_classification      = "${var.data_classification}"
+ai_ethics_officer        = "${var.ai_ethics_officer}"
+ai_ethics_officer_email  = "${var.ai_ethics_officer_email}"
+log_retention_days       = ${var.log_retention_days}
+
+# Operations
+ops_watchtower_enable    = ${var.ops_watchtower_enable}
+ops_trivy_enable         = ${var.ops_trivy_enable}
+ops_grafana_enable       = ${var.ops_grafana_enable}
+ops_uptime_kuma_enable   = ${var.ops_uptime_kuma_enable}
+ops_backup_schedule      = "${var.ops_backup_schedule}"
+
+# Governance Hub
+governance_hub_enable              = ${var.governance_hub_enable}
+governance_hub_instance_name       = "${var.governance_hub_instance_name != "" ? var.governance_hub_instance_name : var.vm_name}"
+governance_hub_sync_schedule       = "${var.governance_hub_sync_schedule}"
+governance_hub_supervisor_emails   = "${var.governance_hub_supervisor_emails}"
+governance_hub_advisor_model       = "${var.governance_hub_advisor_model}"
+
+# OPA Policy Engine
+policy_engine_enable               = ${var.policy_engine_enable}
+
+# Environment
+environment = "${var.environment}"
+owner       = "${var.owner}"
+TFVARS
+
   # Read SSH public key
   ssh_public_key = file(pathexpand(var.ssh_public_key_path))
 
@@ -239,6 +343,7 @@ locals {
     tls_key            = local.tls_key
     dlp_pipeline_py    = file("${path.module}/../configs/open-webui/dlp-pipeline.py")
     admin_html         = file("${path.module}/../html/admin.html")
+    deployment_tfvars_b64 = base64encode(local.deployment_tfvars)
     xrdp_password      = local.xrdp_password
     docforge_enable          = var.docforge_enable
     docforge_zip_b64         = var.docforge_enable ? filebase64(data.archive_file.docforge[0].output_path) : ""

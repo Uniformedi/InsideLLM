@@ -147,6 +147,29 @@ async def export_to_central(local_db: AsyncSession, telemetry: TelemetrySummary)
             if snap_params:
                 central_db.execute(text(SQL.upsert_snapshot), snap_params)
 
+            # Sync encrypted deployment tfvars to central DB
+            try:
+                from ..db.local_db import SyncSessionLocal
+                from .tfvars_vault import retrieve_deployment_tfvars
+                with SyncSessionLocal() as local_sync:
+                    # Read from local DB (already encrypted)
+                    tfvars_row = local_sync.execute(text(
+                        "SELECT encrypted_tfvars, encryption_iv, platform_version, deployed_at "
+                        "FROM governance_deployment_tfvars WHERE instance_id = :iid"
+                    ), {"iid": settings.instance_id}).first()
+                    if tfvars_row:
+                        central_db.execute(text(SQL.upsert_tfvars), {
+                            "iid": settings.instance_id,
+                            "ver": tfvars_row[2],
+                            "enc": tfvars_row[0],
+                            "iv": tfvars_row[1],
+                            "deployed_at": tfvars_row[3],
+                            "updated_at": now,
+                        })
+            except Exception as e:
+                import logging
+                logging.getLogger("governance-hub").warning(f"Tfvars sync skipped: {e}")
+
             central_db.commit()
             return True
 

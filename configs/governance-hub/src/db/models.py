@@ -296,6 +296,19 @@ class ComplianceStatus(Base):
     notes = Column(Text)
 
 
+class DeploymentTfvars(Base):
+    """Encrypted deployment terraform.tfvars — stored for clone/restore."""
+    __tablename__ = "governance_deployment_tfvars"
+
+    id = Column(Integer, primary_key=True)
+    instance_id = Column(String(255), nullable=False)
+    platform_version = Column(String(20))
+    encrypted_tfvars = Column(Text, nullable=False)  # AES-256-GCM encrypted, base64
+    encryption_iv = Column(String(48))  # Base64 IV for AES-GCM
+    deployed_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    updated_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+
+
 class ComplianceAttestation(Base):
     """Manual attestation records for non-automated framework sections."""
     __tablename__ = "governance_compliance_attestations"

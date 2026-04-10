@@ -127,6 +127,22 @@ class _PostgreSQL:
         ORDER BY snapshot_at DESC LIMIT :lim
     """
 
+    upsert_tfvars = """
+        INSERT INTO governance_deployment_tfvars
+            (instance_id, platform_version, encrypted_tfvars, encryption_iv, deployed_at, updated_at)
+        VALUES (:iid, :ver, :enc, :iv, :deployed_at, :updated_at)
+        ON CONFLICT (instance_id) DO UPDATE SET
+            encrypted_tfvars = EXCLUDED.encrypted_tfvars,
+            encryption_iv = EXCLUDED.encryption_iv,
+            platform_version = EXCLUDED.platform_version,
+            updated_at = EXCLUDED.updated_at
+    """
+
+    get_tfvars = """
+        SELECT encrypted_tfvars, encryption_iv, platform_version, deployed_at
+        FROM governance_deployment_tfvars WHERE instance_id = :iid
+    """
+
 
 class _MSSQL:
     """Microsoft SQL Server dialect."""
@@ -241,6 +257,20 @@ class _MSSQL:
         ORDER BY snapshot_at DESC
     """
 
+    upsert_tfvars = """
+        MERGE governance_deployment_tfvars AS target
+        USING (SELECT :iid AS instance_id) AS source
+        ON target.instance_id = source.instance_id
+        WHEN MATCHED THEN UPDATE SET
+            encrypted_tfvars = :enc, encryption_iv = :iv,
+            platform_version = :ver, updated_at = :updated_at
+        WHEN NOT MATCHED THEN INSERT
+            (instance_id, platform_version, encrypted_tfvars, encryption_iv, deployed_at, updated_at)
+        VALUES (:iid, :ver, :enc, :iv, :deployed_at, :updated_at);
+    """
+
+    get_tfvars = _PostgreSQL.get_tfvars
+
 
 class _MariaDB:
     """MariaDB / MySQL dialect."""
@@ -285,6 +315,19 @@ class _MariaDB:
     snapshot_by_id = _PostgreSQL.snapshot_by_id
     snapshot_latest = _PostgreSQL.snapshot_latest
     snapshot_list = _PostgreSQL.snapshot_list
+
+    upsert_tfvars = """
+        INSERT INTO governance_deployment_tfvars
+            (instance_id, platform_version, encrypted_tfvars, encryption_iv, deployed_at, updated_at)
+        VALUES (:iid, :ver, :enc, :iv, :deployed_at, :updated_at)
+        ON DUPLICATE KEY UPDATE
+            encrypted_tfvars = VALUES(encrypted_tfvars),
+            encryption_iv = VALUES(encryption_iv),
+            platform_version = VALUES(platform_version),
+            updated_at = VALUES(updated_at)
+    """
+
+    get_tfvars = _PostgreSQL.get_tfvars
 
 
 def _get_dialect_class():

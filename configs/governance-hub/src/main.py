@@ -8,7 +8,7 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy import text
 
 from .config import settings
-from .db.local_db import AsyncSessionLocal, engine
+from .db.local_db import AsyncSessionLocal, SyncSessionLocal, engine
 from .db.models import Base
 from .routers import advisor, audit, auth, changes, config_snapshots, connectors, fleet, framework, obligations, restore, schema, sync
 from .services.config_service import capture_snapshot
@@ -164,6 +164,15 @@ async def startup():
         load_settings_overrides()
     except Exception as e:
         logger.warning(f"Failed to load settings overrides: {e}")
+
+    # Ingest and encrypt pending deployment tfvars from cloud-init
+    try:
+        from .services.tfvars_vault import ingest_pending_tfvars
+        with SyncSessionLocal() as sync_db:
+            if ingest_pending_tfvars(sync_db):
+                logger.info("Deployment tfvars encrypted and stored")
+    except Exception as e:
+        logger.warning(f"Tfvars ingestion skipped: {e}")
 
     # Seed governance framework sections if not already done
     try:

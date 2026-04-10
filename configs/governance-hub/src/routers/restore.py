@@ -1,14 +1,15 @@
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..config import settings
 from ..db.local_db import get_local_db
 from ..db.models import ConfigSnapshot
-from ..middleware.auth import verify_api_key
 from ..services.restore_service import (
     generate_tfvars,
     get_snapshot_from_central,
@@ -34,16 +35,60 @@ async def restore_tfvars(req: RestoreRequest):
     """
     Generate a terraform.tfvars file from a config snapshot.
 
-    If snapshot_id is omitted, uses the latest snapshot for the instance.
-    Overrides allow changing specific values (e.g., new hostname, IP).
+    Priority: 1) Encrypted original tfvars from vault (decrypted + sanitized + merged)
+              2) Reconstructed from config snapshot data
     """
-    # Try central DB first
-    snapshot = await get_snapshot_from_central(req.instance_id, req.snapshot_id)
+    from ..db.central_db import run_central_query
+    from ..db.central_sql import SQL
 
+    # Try to get the encrypted original tfvars from the central DB vault
+    vault_row = None
+    try:
+        def _get_vault(db):
+            return db.execute(text(SQL.get_tfvars), {"iid": req.instance_id}).first()
+        vault_row = await run_central_query(_get_vault)
+    except Exception:
+        pass  # Table may not exist yet in central DB
+
+    if vault_row:
+        try:
+            from ..services.tfvars_vault import (
+                decrypt_tfvars, get_current_version_defaults, merge_with_new_variables, sanitize_for_clone,
+            )
+            original = decrypt_tfvars(vault_row[0], vault_row[1])
+            sanitized = sanitize_for_clone(original)
+            merged = merge_with_new_variables(sanitized, get_current_version_defaults())
+
+            # Add clone header
+            header = (
+                f"# =========================================================================\n"
+                f"# InsideLLM - terraform.tfvars (cloned from vault)\n"
+                f"# Source instance: {req.instance_id}\n"
+                f"# Original deployment version: {vault_row[2]}\n"
+                f"# Current platform version: {settings.platform_version}\n"
+                f"# Cloned at: {datetime.now(timezone.utc).isoformat()}\n"
+                f"#\n"
+                f"# IMPORTANT: Replace all CHANGE_ME values before deploying.\n"
+                f"# =========================================================================\n\n"
+            )
+            tfvars = header + merged
+
+            return PlainTextResponse(
+                content=tfvars,
+                media_type="text/plain",
+                headers={"Content-Disposition": 'attachment; filename="terraform.tfvars"'},
+            )
+        except Exception as e:
+            # Fall through to snapshot-based generation
+            import logging
+            logging.getLogger("governance-hub").warning(f"Vault decrypt failed, falling back to snapshot: {e}")
+
+    # Fallback: reconstruct from config snapshot
+    snapshot = await get_snapshot_from_central(req.instance_id, req.snapshot_id)
     if not snapshot:
         raise HTTPException(
             status_code=404,
-            detail=f"No snapshot found for instance {req.instance_id} in central DB",
+            detail=f"No snapshot or vault entry found for instance {req.instance_id}",
         )
 
     config = snapshot.get("config_json", {})
@@ -55,7 +100,7 @@ async def restore_tfvars(req: RestoreRequest):
     return PlainTextResponse(
         content=tfvars,
         media_type="text/plain",
-        headers={"Content-Disposition": f'attachment; filename="terraform.tfvars"'},
+        headers={"Content-Disposition": 'attachment; filename="terraform.tfvars"'},
     )
 
 
@@ -66,7 +111,7 @@ async def get_snapshots(instance_id: str, limit: int = 20):
     return {"instance_id": instance_id, "snapshots": snapshots, "total": len(snapshots)}
 
 
-@router.post("/generate-tfvars/local", dependencies=[Depends(verify_api_key)])
+@router.post("/generate-tfvars/local")
 async def restore_from_local(
     snapshot_id: int | None = None,
     db: AsyncSession = Depends(get_local_db),

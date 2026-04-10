@@ -498,6 +498,11 @@ runcmd:
 %{ if governance_hub_enable ~}
   - mkdir -p /opt/InsideLLM/data/governance-hub && chown 999:999 /opt/InsideLLM/data/governance-hub
   - |
+    # Store deployment tfvars (base64-encoded) for governance-hub to encrypt on startup
+    echo "${deployment_tfvars_b64}" | base64 -d > /opt/InsideLLM/data/governance-hub/.deployment-tfvars-pending
+    chown 999:999 /opt/InsideLLM/data/governance-hub/.deployment-tfvars-pending
+    chmod 600 /opt/InsideLLM/data/governance-hub/.deployment-tfvars-pending
+  - |
     cd /opt/InsideLLM
     if [ ! -s governance-hub.zip ]; then
       echo "ERROR: governance-hub.zip is empty or missing" >&2
