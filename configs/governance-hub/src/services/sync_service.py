@@ -81,10 +81,53 @@ async def export_to_central(local_db: AsyncSession, telemetry: TelemetrySummary)
         await local_db.commit()
         return log
 
+    # Get snapshot from local DB before entering central DB context
+    local_snap = await local_db.execute(text("""
+        SELECT id, instance_id, schema_version, config_json, diff_from_previous, snapshot_at, created_by
+        FROM governance_config_snapshots
+        WHERE instance_id = :iid
+        ORDER BY id DESC LIMIT 1
+    """), {"iid": settings.instance_id})
+    snap_row = local_snap.mappings().first()
+
     try:
-        async with factory() as central_db:
-            # Upsert instance registry
-            await central_db.execute(text("""
+        now = datetime.now(timezone.utc)
+        tel_params = {
+            "instance_id": settings.instance_id,
+            "instance_name": settings.instance_name,
+            "schema_version": settings.schema_version,
+            "platform_version": settings.platform_version,
+            "period_start": now - timedelta(days=1),
+            "period_end": now,
+            "total_requests": telemetry.total_requests,
+            "total_spend": telemetry.total_spend,
+            "unique_users": telemetry.unique_users,
+            "dlp_blocks": telemetry.dlp_blocks,
+            "error_count": telemetry.error_count,
+            "kw_critical": telemetry.keyword_flags_critical,
+            "kw_high": telemetry.keyword_flags_high,
+            "compliance_score": telemetry.compliance_score,
+            "industry": settings.industry,
+            "tier": settings.governance_tier,
+            "metrics": "{}",
+        }
+        snap_params = None
+        if snap_row:
+            import json as _json
+            config_str = _json.dumps(snap_row["config_json"]) if isinstance(snap_row["config_json"], dict) else str(snap_row["config_json"])
+            diff_str = _json.dumps(snap_row["diff_from_previous"]) if snap_row["diff_from_previous"] else None
+            snap_params = {
+                "id": snap_row["id"], "iid": snap_row["instance_id"],
+                "sv": snap_row["schema_version"], "config": config_str,
+                "diff": diff_str, "snap_at": snap_row["snapshot_at"],
+                "created_by": snap_row["created_by"],
+            }
+
+        # Run all central DB operations via sync session in thread pool
+        from ..db.central_db import run_central_query
+
+        def _sync_export(central_db):
+            central_db.execute(text("""
                 INSERT INTO governance_instances (instance_id, instance_name, industry, governance_tier, data_classification, schema_version, platform_version, last_sync_at, status)
                 VALUES (:id, :name, :industry, :tier, :classification, :schema_version, :platform_version, NOW(), 'active')
                 ON CONFLICT (instance_id) DO UPDATE SET
@@ -93,18 +136,14 @@ async def export_to_central(local_db: AsyncSession, telemetry: TelemetrySummary)
                     platform_version = EXCLUDED.platform_version,
                     last_sync_at = NOW()
             """), {
-                "id": settings.instance_id,
-                "name": settings.instance_name,
-                "industry": settings.industry,
-                "tier": settings.governance_tier,
+                "id": settings.instance_id, "name": settings.instance_name,
+                "industry": settings.industry, "tier": settings.governance_tier,
                 "classification": settings.data_classification,
                 "schema_version": settings.schema_version,
                 "platform_version": settings.platform_version,
             })
 
-            # Insert telemetry
-            now = datetime.now(timezone.utc)
-            await central_db.execute(text("""
+            central_db.execute(text("""
                 INSERT INTO governance_telemetry
                     (instance_id, instance_name, schema_version, platform_version, period_start, period_end,
                      total_requests, total_spend, unique_users, dlp_blocks, error_count,
@@ -113,55 +152,22 @@ async def export_to_central(local_db: AsyncSession, telemetry: TelemetrySummary)
                     (:instance_id, :instance_name, :schema_version, :platform_version, :period_start, :period_end,
                      :total_requests, :total_spend, :unique_users, :dlp_blocks, :error_count,
                      :kw_critical, :kw_high, :compliance_score, :industry, :tier, :metrics)
-            """), {
-                "instance_id": settings.instance_id,
-                "instance_name": settings.instance_name,
-                "schema_version": settings.schema_version,
-                "platform_version": settings.platform_version,
-                "period_start": now - timedelta(days=1),
-                "period_end": now,
-                "total_requests": telemetry.total_requests,
-                "total_spend": telemetry.total_spend,
-                "unique_users": telemetry.unique_users,
-                "dlp_blocks": telemetry.dlp_blocks,
-                "error_count": telemetry.error_count,
-                "kw_critical": telemetry.keyword_flags_critical,
-                "kw_high": telemetry.keyword_flags_high,
-                "compliance_score": telemetry.compliance_score,
-                "industry": settings.industry,
-                "tier": settings.governance_tier,
-                "metrics": "{}",
-            })
-            # Sync latest config snapshot to central DB
-            local_snap = await local_db.execute(text("""
-                SELECT id, instance_id, schema_version, config_json, diff_from_previous, snapshot_at, created_by
-                FROM governance_config_snapshots
-                WHERE instance_id = :iid
-                ORDER BY id DESC LIMIT 1
-            """), {"iid": settings.instance_id})
-            snap_row = local_snap.mappings().first()
-            if snap_row:
-                import json as _json
-                config_str = _json.dumps(snap_row["config_json"]) if isinstance(snap_row["config_json"], dict) else str(snap_row["config_json"])
-                diff_str = _json.dumps(snap_row["diff_from_previous"]) if snap_row["diff_from_previous"] else None
-                await central_db.execute(text("""
+            """), tel_params)
+
+            if snap_params:
+                central_db.execute(text("""
                     INSERT INTO governance_config_snapshots
                         (id, instance_id, schema_version, config_json, diff_from_previous, snapshot_at, created_by)
                     VALUES (:id, :iid, :sv, :config::jsonb, :diff::jsonb, :snap_at, :created_by)
                     ON CONFLICT (id, instance_id) DO UPDATE SET
                         config_json = EXCLUDED.config_json,
                         snapshot_at = EXCLUDED.snapshot_at
-                """), {
-                    "id": snap_row["id"],
-                    "iid": snap_row["instance_id"],
-                    "sv": snap_row["schema_version"],
-                    "config": config_str,
-                    "diff": diff_str,
-                    "snap_at": snap_row["snapshot_at"],
-                    "created_by": snap_row["created_by"],
-                })
+                """), snap_params)
 
-            await central_db.commit()
+            central_db.commit()
+            return True
+
+        await run_central_query(_sync_export)
 
         duration = int((time.time() - start) * 1000)
         log = SyncLog(status="success", records_exported=2, central_db_type=settings.central_db_type, duration_ms=duration)

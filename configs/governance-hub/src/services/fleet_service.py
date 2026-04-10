@@ -1,8 +1,9 @@
 """
 Fleet management service — cross-instance visibility via the central database.
 
-Reads from the central DB to provide a unified view of all InsideLLM
-deployments: status, config versions, compliance scores, telemetry.
+All central DB operations use synchronous SQLAlchemy sessions run in a thread
+pool via run_central_query(). This supports all database types (PostgreSQL,
+MariaDB, MSSQL/pymssql) without requiring async drivers.
 """
 
 import os
@@ -10,39 +11,27 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from sqlalchemy import func, select, text
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy import create_engine, text
 
 from ..config import settings
-from ..db.central_db import get_central_session_factory
+from ..db.central_db import run_central_query, get_central_session_factory
 
 
 async def list_instances() -> list[dict]:
     """List all registered InsideLLM instances from the central DB."""
-    factory = get_central_session_factory()
-    if not factory:
-        return []
-
-    async with factory() as db:
-        result = await db.execute(text("""
+    def _query(db):
+        result = db.execute(text("""
             SELECT
-                i.instance_id,
-                i.instance_name,
-                i.industry,
-                i.governance_tier,
-                i.data_classification,
-                i.schema_version,
-                i.platform_version,
-                i.last_sync_at,
-                i.status,
-                i.created_at
+                i.instance_id, i.instance_name, i.industry,
+                i.governance_tier, i.data_classification,
+                i.schema_version, i.platform_version,
+                i.last_sync_at, i.status, i.created_at
             FROM governance_instances i
             ORDER BY i.instance_name
         """))
         instances = []
         for row in result.mappings():
-            # Get latest telemetry for each instance
-            tel = await db.execute(text("""
+            tel = db.execute(text("""
                 SELECT total_requests, total_spend, unique_users,
                        compliance_score, keyword_flags_critical, keyword_flags_high
                 FROM governance_telemetry
@@ -50,7 +39,6 @@ async def list_instances() -> list[dict]:
                 ORDER BY synced_at DESC LIMIT 1
             """), {"iid": row["instance_id"]})
             tel_row = tel.mappings().first()
-
             instances.append({
                 **dict(row),
                 "last_sync_at": row["last_sync_at"].isoformat() if row["last_sync_at"] else None,
@@ -59,24 +47,21 @@ async def list_instances() -> list[dict]:
             })
         return instances
 
+    result = await run_central_query(_query)
+    return result if result is not None else []
+
 
 async def get_instance_detail(instance_id: str) -> dict | None:
     """Get detailed info for a specific instance including telemetry history."""
-    factory = get_central_session_factory()
-    if not factory:
-        return None
-
-    async with factory() as db:
-        # Instance info
-        result = await db.execute(text("""
-            SELECT * FROM governance_instances WHERE instance_id = :iid
-        """), {"iid": instance_id})
+    def _query(db):
+        result = db.execute(text(
+            "SELECT * FROM governance_instances WHERE instance_id = :iid"
+        ), {"iid": instance_id})
         instance = result.mappings().first()
         if not instance:
             return None
 
-        # Telemetry history (last 30 entries)
-        tel_result = await db.execute(text("""
+        tel_result = db.execute(text("""
             SELECT period_start, period_end, total_requests, total_spend,
                    unique_users, dlp_blocks, error_count,
                    keyword_flags_critical, keyword_flags_high,
@@ -87,16 +72,13 @@ async def get_instance_detail(instance_id: str) -> dict | None:
         """), {"iid": instance_id})
         telemetry = [dict(r) for r in tel_result.mappings()]
 
-        # Change proposals from this instance
-        changes_result = await db.execute(text("""
-            SELECT id, title, category, status, source, proposed_at
-            FROM governance_changes
-            WHERE instance_id = :iid
-            ORDER BY proposed_at DESC LIMIT 20
-        """), {"iid": instance_id})
-        # governance_changes may not have instance_id in central — fallback gracefully
         changes = []
         try:
+            changes_result = db.execute(text("""
+                SELECT id, title, category, status, source, proposed_at
+                FROM governance_changes WHERE instance_id = :iid
+                ORDER BY proposed_at DESC LIMIT 20
+            """), {"iid": instance_id})
             changes = [dict(r) for r in changes_result.mappings()]
         except Exception:
             pass
@@ -107,18 +89,15 @@ async def get_instance_detail(instance_id: str) -> dict | None:
             "recent_changes": changes,
         }
 
+    return await run_central_query(_query)
+
 
 async def compare_instances(instance_ids: list[str]) -> dict:
     """Compare configuration and metrics across multiple instances."""
-    factory = get_central_session_factory()
-    if not factory:
-        return {"error": "Central DB not configured"}
-
-    async with factory() as db:
+    def _query(db):
         comparisons = []
         for iid in instance_ids:
-            # Instance info
-            inst_result = await db.execute(text("""
+            inst_result = db.execute(text("""
                 SELECT instance_id, instance_name, industry, governance_tier,
                        data_classification, schema_version, last_sync_at
                 FROM governance_instances WHERE instance_id = :iid
@@ -127,38 +106,29 @@ async def compare_instances(instance_ids: list[str]) -> dict:
             if not inst:
                 comparisons.append({"instance_id": iid, "error": "not found"})
                 continue
-
-            # Latest telemetry
-            tel = await db.execute(text("""
+            tel = db.execute(text("""
                 SELECT total_requests, total_spend, unique_users,
                        compliance_score, keyword_flags_critical
                 FROM governance_telemetry
-                WHERE instance_id = :iid
-                ORDER BY synced_at DESC LIMIT 1
+                WHERE instance_id = :iid ORDER BY synced_at DESC LIMIT 1
             """), {"iid": iid})
             tel_row = tel.mappings().first()
-
-            comparisons.append({
-                **dict(inst),
-                "telemetry": dict(tel_row) if tel_row else None,
-            })
-
+            comparisons.append({**dict(inst), "telemetry": dict(tel_row) if tel_row else None})
         return {"instances": comparisons, "compared_at": datetime.now(timezone.utc).isoformat()}
+
+    result = await run_central_query(_query)
+    return result if result is not None else {"error": "Central DB not configured"}
 
 
 async def get_fleet_summary() -> dict:
     """Aggregate fleet-wide metrics."""
-    factory = get_central_session_factory()
-    if not factory:
-        return {"error": "Central DB not configured", "total_instances": 0}
-
-    async with factory() as db:
-        # Count instances
-        count_result = await db.execute(text("SELECT COUNT(*) AS cnt FROM governance_instances WHERE status = 'active'"))
+    def _query(db):
+        count_result = db.execute(text(
+            "SELECT COUNT(*) AS cnt FROM governance_instances WHERE status = 'active'"
+        ))
         total = count_result.mappings().first()["cnt"]
 
-        # Aggregate latest telemetry per instance
-        agg_result = await db.execute(text("""
+        agg_result = db.execute(text("""
             SELECT
                 COUNT(DISTINCT t.instance_id) AS reporting_instances,
                 SUM(t.total_requests) AS fleet_requests,
@@ -169,22 +139,19 @@ async def get_fleet_summary() -> dict:
             FROM governance_telemetry t
             INNER JOIN (
                 SELECT instance_id, MAX(synced_at) AS max_sync
-                FROM governance_telemetry
-                GROUP BY instance_id
+                FROM governance_telemetry GROUP BY instance_id
             ) latest ON t.instance_id = latest.instance_id AND t.synced_at = latest.max_sync
         """))
         agg = agg_result.mappings().first()
 
-        # Instances by industry
-        industry_result = await db.execute(text("""
+        industry_result = db.execute(text("""
             SELECT industry, COUNT(*) AS cnt
             FROM governance_instances WHERE status = 'active'
             GROUP BY industry ORDER BY cnt DESC
         """))
         by_industry = {r["industry"]: r["cnt"] for r in industry_result.mappings()}
 
-        # Stale instances (no sync in 24h)
-        stale_result = await db.execute(text("""
+        stale_result = db.execute(text("""
             SELECT COUNT(*) AS cnt FROM governance_instances
             WHERE status = 'active' AND (last_sync_at IS NULL OR last_sync_at < NOW() - INTERVAL '24 hours')
         """))
@@ -202,9 +169,16 @@ async def get_fleet_summary() -> dict:
             "instances_by_industry": by_industry,
         }
 
+    result = await run_central_query(_query)
+    return result if result is not None else {"error": "Central DB not configured", "total_instances": 0}
+
+
+# =========================================================================
+# Fleet DB connection test / config
+# =========================================================================
 
 def _build_sync_url(config: dict) -> str:
-    """Build a synchronous SQLAlchemy URL (works for all drivers)."""
+    """Build a synchronous SQLAlchemy URL."""
     db_type = config["db_type"]
     user = config.get("username", "")
     password = config.get("password", "")
@@ -222,10 +196,9 @@ def _build_sync_url(config: dict) -> str:
 
 
 async def test_db_connection(config: dict) -> dict:
-    """Test a database connection without persisting. Returns success, message, latency_ms."""
+    """Test a database connection without persisting."""
     import asyncio
     from concurrent.futures import ThreadPoolExecutor
-    from sqlalchemy import create_engine
 
     try:
         url = _build_sync_url(config)
@@ -239,17 +212,10 @@ async def test_db_connection(config: dict) -> dict:
             if "psycopg2" in url:
                 connect_args = {"connect_timeout": 5}
             elif "pymssql" in url:
-                connect_args = {
-                    "login_timeout": 5,
-                    "tds_version": "7.3",
-                }
-                if config.get("encrypt"):
-                    connect_args["conn_properties"] = "Encrypt=yes;"
-                if config.get("trust_server_certificate"):
-                    connect_args["conn_properties"] = connect_args.get("conn_properties", "") + "TrustServerCertificate=yes;"
+                connect_args = {"login_timeout": 5, "tds_version": "7.3"}
 
-            engine = create_engine(url, pool_size=1, max_overflow=0, pool_pre_ping=False,
-                                   connect_args=connect_args)
+            engine = create_engine(url, pool_size=1, max_overflow=0,
+                                   pool_pre_ping=False, connect_args=connect_args)
             start = time.monotonic()
             with engine.connect() as conn:
                 conn.execute(text("SELECT 1"))
@@ -276,11 +242,9 @@ def get_db_config() -> dict:
     if not settings.central_db_host:
         return {"configured": False, "connected": False}
 
-    # Check connection status without creating an engine (avoids async driver issues)
     connected = False
     try:
-        factory = get_central_session_factory()
-        connected = factory is not None
+        connected = get_central_session_factory() is not None
     except Exception:
         pass
 
