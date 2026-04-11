@@ -374,7 +374,8 @@ if ($existingVm) {
             }
 
             # Also import the switch if it exists
-            $existingSwitch = Get-VMSwitch -Name ($_tf["vm_switch_name"] ?? "InsideLLM") -ErrorAction SilentlyContinue
+            $switchName = if ($_tf["vm_switch_name"]) { $_tf["vm_switch_name"] } else { "InsideLLM" }
+            $existingSwitch = Get-VMSwitch -Name $switchName -ErrorAction SilentlyContinue
             if ($existingSwitch) {
                 Write-Host "  Importing existing virtual switch..." -ForegroundColor DarkGray
                 # Switch is now a null_resource, no import needed
