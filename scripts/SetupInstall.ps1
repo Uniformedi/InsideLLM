@@ -296,32 +296,71 @@ if (-not $vmName) { $vmName = $_tf["vm_hostname"]; if (-not $vmName) { $vmName =
 Write-Host "  VM Name: $vmName" -ForegroundColor Green
 
 # Pre-flight: check if a VM with this name already exists on this Hyper-V host
-$existingVm = Get-VM -Name $vmName -ErrorAction SilentlyContinue
+try {
+    $existingVm = Get-VM -Name $vmName -ErrorAction SilentlyContinue
+} catch {
+    $existingVm = $null
+}
+
 if ($existingVm) {
     Write-Host ""
     Write-Host "  WARNING: A VM named '$vmName' already exists on this host!" -ForegroundColor Yellow
     Write-Host "  Status: $($existingVm.State)" -ForegroundColor Yellow
     Write-Host ""
-    Write-Host "  Options:" -ForegroundColor White
-    Write-Host "    1. Import into Terraform:  cd terraform && terraform import hyperv_machine_instance.insidellm $vmName" -ForegroundColor DarkGray
-    Write-Host "    2. Remove the old VM:      Stop-VM '$vmName' -Force; Remove-VM '$vmName' -Force" -ForegroundColor DarkGray
-    Write-Host "    3. Change vm_name in terraform.tfvars to a unique name" -ForegroundColor DarkGray
+    Write-Host "  Choose an action:" -ForegroundColor White
+    Write-Host "    [I] Import — adopt existing VM into Terraform state (default)" -ForegroundColor Green
+    Write-Host "    [R] Remove — delete old VM and create fresh" -ForegroundColor Yellow
+    Write-Host "    [E] Exit   — abort so you can change vm_name in terraform.tfvars" -ForegroundColor DarkGray
     Write-Host ""
-    $choice = Read-Host "  Press Enter to attempt terraform import, or type 'skip' to continue anyway, or 'exit' to abort"
-    if ($choice -eq 'exit') { return }
-    if ($choice -ne 'skip') {
+    $choice = Read-Host "  Enter choice [I/R/E]"
+    $choice = if ($choice) { $choice.ToUpper() } else { "I" }
+
+    if ($choice -eq 'E') { return }
+
+    if ($choice -eq 'R') {
+        Write-Host ""
+        Write-Host "  Removing existing VM '$vmName'..." -ForegroundColor Yellow
+        try {
+            Stop-VM -Name $vmName -Force -TurnOff -ErrorAction SilentlyContinue
+            Remove-VM -Name $vmName -Force
+            Write-Ok "VM '$vmName' removed"
+        } catch {
+            Write-Fail "Failed to remove VM: $_"
+            return
+        }
+    }
+
+    if ($choice -eq 'I') {
         Write-Host ""
         Write-Host "  Importing existing VM into Terraform state..." -ForegroundColor Cyan
         Push-Location $terraformDir
         try {
-            terraform init -input=false 2>$null
-            $importCmd = "terraform import hyperv_machine_instance.insidellm `"$vmName`""
-            if ($varFileArg) { $importCmd = "terraform import $varFileArg hyperv_machine_instance.insidellm `"$vmName`"" }
-            Invoke-Expression $importCmd
+            Write-Host "  Running terraform init..." -ForegroundColor DarkGray
+            terraform init -input=false
+            if ($LASTEXITCODE -ne 0) {
+                Write-Fail "terraform init failed — cannot import"
+                Pop-Location
+                return
+            }
+            # Import the VM
+            $importArgs = @("import")
+            if ($varFileArg) { $importArgs += $varFileArg }
+            $importArgs += "hyperv_machine_instance.insidellm"
+            $importArgs += $vmName
+            Write-Host "  > terraform $($importArgs -join ' ')" -ForegroundColor DarkGray
+            & terraform @importArgs
             if ($LASTEXITCODE -eq 0) {
-                Write-Host "  [OK] VM imported into Terraform state" -ForegroundColor Green
+                Write-Ok "VM '$vmName' imported into Terraform state"
             } else {
-                Write-Host "  [WARN] Import failed — Terraform will attempt to create the VM" -ForegroundColor Yellow
+                Write-Warn "Import failed — continuing to plan (may need manual resolution)"
+            }
+
+            # Also import the switch if it exists
+            $existingSwitch = Get-VMSwitch -Name ($_tf["vm_switch_name"] ?? "InsideLLM") -ErrorAction SilentlyContinue
+            if ($existingSwitch) {
+                Write-Host "  Importing existing virtual switch..." -ForegroundColor DarkGray
+                # Switch is now a null_resource, no import needed
+                Write-Ok "Virtual switch handled by null_resource (no import needed)"
             }
         } finally { Pop-Location }
     }
