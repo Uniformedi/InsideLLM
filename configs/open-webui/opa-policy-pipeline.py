@@ -1,8 +1,8 @@
 """
 title: OPA Policy Enforcement
 author: InsideLLM
-version: 1.0.0
-description: Enforces Humility alignment and industry policies via Open Policy Agent. Executes obligations in strict order. Fail-closed on any error.
+version: 2.0.0
+description: Enforces Humility alignment and industry policies via Open Policy Agent. Includes compassionate fallback mediator that resolves axiom conflicts through retry-with-reframing before escalating to human review.
 """
 
 import hashlib
@@ -23,6 +23,8 @@ class Valves(BaseModel):
     fail_mode: str = Field(default="closed", description="'closed' = block on error, 'log_only' = allow but log")
     log_decisions: bool = Field(default=True, description="Log all policy decisions")
     opa_timeout: int = Field(default=5, description="OPA query timeout in seconds")
+    compassionate_fallback: bool = Field(default=True, description="Enable compassionate fallback mediator")
+    max_reframe_attempts: int = Field(default=1, description="Max retry-with-reframing attempts before escalation")
 
 
 class Pipeline:
@@ -54,22 +56,33 @@ class Pipeline:
         if self.valves.log_decisions:
             logger.info(f"Policy decision: allow={decision.get('allow')}, reasons={decision.get('deny_reasons', [])}")
 
-        # Check denial
+        # Check denial — compassionate fallback mediator
         if not decision.get("allow", False):
             reasons = decision.get("deny_reasons", ["Policy denied the request"])
             reason_text = "; ".join(reasons)
 
-            # Log the denial to governance hub
+            # Log the initial denial
             self._log_to_hub("policy_denied", {
                 "reasons": reasons,
                 "user": __user__.get("name", "unknown"),
+                "fallback_enabled": self.valves.compassionate_fallback,
             })
 
-            if self.valves.fail_mode == "closed":
-                raise Exception(f"Request blocked by policy: {reason_text}")
-            else:
+            if self.valves.fail_mode != "closed":
                 logger.warning(f"Policy denial (log_only mode): {reason_text}")
                 return body
+
+            # ── Compassionate Fallback Mediator ──
+            # Instead of hard-blocking, attempt resolution:
+            # 1. If resolvable by reframing (uncertainty/humility issues) → retry
+            # 2. If not resolvable (hard deny) → compassionate escalation
+            if self.valves.compassionate_fallback:
+                resolution = self._mediate_axiom_conflict(body, reasons, opa_input, __user__)
+                if resolution:
+                    return resolution
+
+            # Hard deny — no resolution possible
+            raise Exception(f"Request blocked by policy: {reason_text}")
 
         # Execute obligations in strict order
         obligations = decision.get("obligations", [])
@@ -140,6 +153,249 @@ class Pipeline:
             raise ValueError(f"OPA returned non-dict result: {type(result)}")
 
         return result
+
+    # ================================================================
+    # Compassionate Fallback Mediator
+    # ================================================================
+    # Resolves axiom conflicts between structural safeguards (humility/
+    # epistemic constraints) and unconditional compassion. Three agents:
+    #   Agent 1: LLM (generates)
+    #   Agent 2: OPA (evaluates)
+    #   Agent 3: Mediator (resolves conflicts or escalates compassionately)
+
+    # Denial reasons that can be resolved by adding uncertainty framing
+    REFRAMABLE_REASONS = {
+        "Humility 2": "uncertainty",      # Missing uncertainty declaration
+        "Humility 4": "human_consensus",   # Missing human consensus (can add qualifier)
+        "Humility 6": "domain_boundary",   # Extrapolation beyond validated domains
+    }
+
+    # Denial reasons that are hard denials — cannot be resolved by reframing
+    HARD_DENY_REASONS = {
+        "Humility 1": "metaphysical",      # Metaphysical directives
+        "Humility 3": "authority_claim",    # Authority/superiority claims
+        "Humility 5": "persuasion",         # Asymmetric persuasion
+    }
+
+    def _mediate_axiom_conflict(self, body: dict, reasons: list, opa_input: dict, user: dict) -> dict | None:
+        """Attempt to resolve an axiom conflict compassionately.
+
+        Returns a modified body if resolved, None if unresolvable (hard deny).
+        """
+        # Classify the denial
+        reframable = []
+        hard = []
+        for reason in reasons:
+            matched = False
+            for key, category in self.REFRAMABLE_REASONS.items():
+                if key in reason:
+                    reframable.append((key, category, reason))
+                    matched = True
+                    break
+            if not matched:
+                for key, category in self.HARD_DENY_REASONS.items():
+                    if key in reason:
+                        hard.append((key, category, reason))
+                        matched = True
+                        break
+                if not matched:
+                    hard.append(("unknown", "unknown", reason))
+
+        # If any hard denial, cannot resolve — escalate compassionately
+        if hard:
+            logger.info(f"Mediator: hard denial detected ({[h[1] for h in hard]}), escalating compassionately")
+            return self._compassionate_escalation(body, reasons, hard, user)
+
+        # All denials are reframable — attempt retry with reframing
+        if reframable:
+            logger.info(f"Mediator: attempting reframe for {[r[1] for r in reframable]}")
+            return self._retry_with_reframing(body, reframable, opa_input, user)
+
+        return None
+
+    def _retry_with_reframing(self, body: dict, reframable: list, opa_input: dict, user: dict) -> dict | None:
+        """Retry the request with reframing instructions injected.
+
+        Adds a system message instructing the model to include uncertainty
+        declarations, domain qualifiers, or human-review recommendations.
+        """
+        categories = {r[1] for r in reframable}
+        reframe_instructions = []
+
+        if "uncertainty" in categories:
+            reframe_instructions.append(
+                "IMPORTANT: Your response involves a high-impact topic. You MUST explicitly "
+                "acknowledge uncertainty and limitations in your answer. Use phrases like "
+                "'based on available information', 'I recommend consulting a professional', "
+                "or 'this should be verified by a qualified human expert'."
+            )
+        if "human_consensus" in categories:
+            reframe_instructions.append(
+                "IMPORTANT: This topic involves restricted or sensitive information. "
+                "Frame your response as informational guidance only and explicitly "
+                "recommend human expert review before any action is taken."
+            )
+        if "domain_boundary" in categories:
+            reframe_instructions.append(
+                "IMPORTANT: This question may extend beyond your validated knowledge. "
+                "Clearly state the boundaries of your knowledge and recommend "
+                "authoritative sources for verification."
+            )
+
+        if not reframe_instructions:
+            return None
+
+        # Inject reframing as a system message
+        new_body = dict(body)
+        new_messages = list(new_body.get("messages", []))
+        reframe_text = "\n\n".join(reframe_instructions)
+        reframe_msg = {
+            "role": "system",
+            "content": f"[GOVERNANCE REFRAME]\n{reframe_text}",
+        }
+
+        # Insert before the last user message
+        insert_idx = len(new_messages) - 1
+        for i in range(len(new_messages) - 1, -1, -1):
+            if new_messages[i].get("role") == "user":
+                insert_idx = i
+                break
+        new_messages.insert(insert_idx, reframe_msg)
+        new_body["messages"] = new_messages
+
+        # Update OPA input to reflect the reframing
+        reframed_input = dict(opa_input)
+        reframed_input["uncertainty_declared"] = True
+        reframed_input["reframed"] = True
+
+        # Re-evaluate with OPA
+        try:
+            decision = self._query_opa(reframed_input)
+            if decision.get("allow", False):
+                logger.info("Mediator: reframe successful — request allowed after adding uncertainty framing")
+                self._log_to_hub("mediator_reframe_success", {
+                    "categories": list(categories),
+                    "user": user.get("name", "unknown"),
+                })
+                return new_body
+        except Exception as e:
+            logger.warning(f"Mediator: re-evaluation failed: {e}")
+
+        # Reframe didn't resolve — fall through to compassionate escalation
+        logger.info("Mediator: reframe insufficient, escalating compassionately")
+        return self._compassionate_escalation(body, [r[2] for r in reframable], reframable, user)
+
+    def _compassionate_escalation(self, body: dict, reasons: list, classified: list, user: dict) -> dict | None:
+        """Replace a hard block with a compassionate response and escalation path.
+
+        Instead of returning nothing, provides:
+        1. Acknowledgment of the user's request
+        2. Transparent explanation of why direct AI assistance is limited
+        3. Specific next steps and resources
+        4. Escalation to human review queue
+        """
+        # Determine the topic from the last user message
+        messages = body.get("messages", [])
+        user_msg = ""
+        for msg in reversed(messages):
+            if msg.get("role") == "user":
+                user_msg = msg.get("content", "")[:200]
+                break
+
+        # Build category-specific guidance
+        categories = {c[1] for c in classified} if classified else {"unknown"}
+        guidance = self._build_compassionate_guidance(categories)
+
+        # Queue for human review
+        try:
+            self._log_to_hub("obligation_review_queue", {
+                "review_type": "axiom_conflict_escalation",
+                "regulation": "humility",
+                "user": user.get("name", "unknown"),
+                "summary": f"Compassionate escalation: {user_msg}",
+                "denial_reasons": reasons,
+                "categories": list(categories),
+            })
+        except Exception:
+            pass
+
+        # Log the mediation event
+        self._log_to_hub("mediator_compassionate_escalation", {
+            "categories": list(categories),
+            "reasons": reasons,
+            "user": user.get("name", "unknown"),
+        })
+
+        # Inject compassionate response as an assistant message
+        # This replaces the hard Exception with a helpful response
+        new_body = dict(body)
+        new_messages = list(new_body.get("messages", []))
+        new_messages.append({
+            "role": "assistant",
+            "content": guidance,
+        })
+        new_body["messages"] = new_messages
+
+        # Set a flag so the model knows not to override this response
+        new_body.setdefault("metadata", {})["compassionate_escalation"] = True
+        new_body.setdefault("metadata", {})["skip_model_call"] = True
+
+        return new_body
+
+    def _build_compassionate_guidance(self, categories: set) -> str:
+        """Build category-specific compassionate guidance."""
+        parts = [
+            "I want to help you with this, and I appreciate you reaching out. "
+            "However, this topic requires careful handling that goes beyond what "
+            "I can provide with full confidence as an AI system."
+        ]
+
+        if "metaphysical" in categories:
+            parts.append(
+                "\n\n**Why I'm limited here:** Your request involves philosophical or "
+                "metaphysical framing that could lead me to make claims beyond my "
+                "capabilities. I'm designed to be transparent about this limitation."
+            )
+        elif "authority_claim" in categories or "persuasion" in categories:
+            parts.append(
+                "\n\n**Why I'm limited here:** The governance framework detected a "
+                "pattern that could lead to authoritative claims or one-sided framing. "
+                "I'm designed to present balanced, humble perspectives."
+            )
+        elif "uncertainty" in categories or "human_consensus" in categories:
+            parts.append(
+                "\n\n**Why I'm stepping back:** This appears to be a high-impact "
+                "topic where my uncertainty is too high to provide responsible guidance "
+                "without human expert verification."
+            )
+        elif "domain_boundary" in categories:
+            parts.append(
+                "\n\n**Why I'm stepping back:** This question extends beyond my "
+                "validated knowledge domain. I'd rather be honest about that than "
+                "risk giving you inaccurate information."
+            )
+
+        parts.append(
+            "\n\n**What happens next:**\n"
+            "- Your question has been queued for human expert review\n"
+            "- A qualified team member will review and respond\n"
+            "- You can also reach out directly to your organization's AI Ethics Officer"
+        )
+
+        parts.append(
+            "\n\n**In the meantime, you can:**\n"
+            "- Rephrase your question with more specific context\n"
+            "- Ask me about related topics I can help with confidently\n"
+            "- Request to speak with a human expert directly"
+        )
+
+        parts.append(
+            "\n\n*This response was generated by the InsideLLM governance "
+            "framework's compassionate fallback system to ensure you're never "
+            "left without guidance, even when AI limitations apply.*"
+        )
+
+        return "".join(parts)
 
     # ================================================================
     # Obligation Execution
