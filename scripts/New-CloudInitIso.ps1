@@ -54,7 +54,10 @@ if ($wslCmd) {
             $wslDir  = (wsl wslpath -a $winDir).Trim()
             $wslIso  = (wsl wslpath -a $winIso).Trim()
             if ($wslDir -and $wslIso) {
-                wsl bash -c "genisoimage -output '$wslIso' -volid '$VolumeLabel' -joliet -rock '$wslDir'" 2>&1
+                $prevEAP = $ErrorActionPreference
+                $ErrorActionPreference = "Continue"
+                wsl bash -c "genisoimage -output '$wslIso' -volid '$VolumeLabel' -joliet -rock '$wslDir' 2>/dev/null"
+                $ErrorActionPreference = $prevEAP
                 if ((Test-Path $OutputIso) -and (Get-Item $OutputIso).Length -gt 0) {
                     Write-Host "ISO created: $OutputIso"
                     return
