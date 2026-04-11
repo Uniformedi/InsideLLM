@@ -287,6 +287,46 @@ if ($tfvarsPath -ne (Join-Path $terraformDir "terraform.tfvars")) {
     $varFileArg = "-var-file=`"$tfvarsPath`""
     Write-Host "  (using -var-file since tfvars is outside terraform/ folder)" -ForegroundColor DarkGray
 }
+
+# Read tfvars to get the VM name for pre-flight checks
+. "$PSScriptRoot\Read-TfVars.ps1"
+$_tf = Read-TfVars -ProjectRoot $projectRoot
+$vmName = $_tf["vm_name"]
+if (-not $vmName) { $vmName = $_tf["vm_hostname"]; if (-not $vmName) { $vmName = "InsideLLM" } }
+Write-Host "  VM Name: $vmName" -ForegroundColor Green
+
+# Pre-flight: check if a VM with this name already exists on this Hyper-V host
+$existingVm = Get-VM -Name $vmName -ErrorAction SilentlyContinue
+if ($existingVm) {
+    Write-Host ""
+    Write-Host "  WARNING: A VM named '$vmName' already exists on this host!" -ForegroundColor Yellow
+    Write-Host "  Status: $($existingVm.State)" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "  Options:" -ForegroundColor White
+    Write-Host "    1. Import into Terraform:  cd terraform && terraform import hyperv_machine_instance.insidellm $vmName" -ForegroundColor DarkGray
+    Write-Host "    2. Remove the old VM:      Stop-VM '$vmName' -Force; Remove-VM '$vmName' -Force" -ForegroundColor DarkGray
+    Write-Host "    3. Change vm_name in terraform.tfvars to a unique name" -ForegroundColor DarkGray
+    Write-Host ""
+    $choice = Read-Host "  Press Enter to attempt terraform import, or type 'skip' to continue anyway, or 'exit' to abort"
+    if ($choice -eq 'exit') { return }
+    if ($choice -ne 'skip') {
+        Write-Host ""
+        Write-Host "  Importing existing VM into Terraform state..." -ForegroundColor Cyan
+        Push-Location $terraformDir
+        try {
+            terraform init -input=false 2>$null
+            $importCmd = "terraform import hyperv_machine_instance.insidellm `"$vmName`""
+            if ($varFileArg) { $importCmd = "terraform import $varFileArg hyperv_machine_instance.insidellm `"$vmName`"" }
+            Invoke-Expression $importCmd
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "  [OK] VM imported into Terraform state" -ForegroundColor Green
+            } else {
+                Write-Host "  [WARN] Import failed — Terraform will attempt to create the VM" -ForegroundColor Yellow
+            }
+        } finally { Pop-Location }
+    }
+}
+
 Write-Host ""
 
 # --- Terraform Init ---
