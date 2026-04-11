@@ -354,8 +354,8 @@ locals {
     ops_uptime_kuma_enable   = var.ops_uptime_kuma_enable
     ops_trivy_enable         = var.ops_trivy_enable
     ops_backup_schedule      = var.ops_backup_schedule
-    grafana_datasources_yml  = var.ops_grafana_enable ? templatefile("${path.module}/../configs/grafana/provisioning/datasources.yml", { postgres_password = local.postgres_password }) : ""
-    grafana_dashboards_yml   = var.ops_grafana_enable ? file("${path.module}/../configs/grafana/provisioning/dashboards.yml") : ""
+    grafana_datasources_yml  = var.ops_grafana_enable ? templatefile("${path.module}/../configs/grafana/provisioning/datasources/datasources.yml", { postgres_password = local.postgres_password }) : ""
+    grafana_dashboards_yml   = var.ops_grafana_enable ? file("${path.module}/../configs/grafana/provisioning/dashboards/dashboards.yml") : ""
     grafana_compliance_json  = var.ops_grafana_enable ? file("${path.module}/../configs/grafana/dashboards/compliance.json") : ""
     grafana_fleet_json       = var.ops_grafana_enable && var.governance_hub_enable ? file("${path.module}/../configs/grafana/dashboards/fleet.json") : ""
     loki_config              = var.ops_grafana_enable ? file("${path.module}/../configs/loki/loki-config.yml") : ""
