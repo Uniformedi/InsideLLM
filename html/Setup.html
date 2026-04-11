@@ -1392,7 +1392,7 @@ function generateTfvars() {
 # =========================================================================
 
 # Hyper-V Host
-hyperv_user     = "${v('hypervUser')}"
+hyperv_user     = "${v('hypervUser').replace(/\\/g, '\\\\')}"
 hyperv_password = "${v('hypervPassword')}"
 hyperv_host     = "127.0.0.1"
 hyperv_port     = 5985
@@ -1429,7 +1429,7 @@ ssh_public_key_path = "${v('sshPublicKeyPath').replace(/\\/g, '\\\\')}"`;
   if (checked('adDomainJoin')) {
     out += `\n\n# Active Directory Domain Join
 ad_domain_join   = true
-ad_join_user     = "${v('adJoinUser')}"
+ad_join_user     = "${v('adJoinUser').replace(/\\/g, '\\\\')}"
 ad_join_password = "${v('adJoinPassword')}"`;
     if (v('adJoinOu')) out += `\nad_join_ou       = "${v('adJoinOu')}"`;
     out += `\nad_dns_register  = ${checked('adDnsRegister')}`;
