@@ -37,6 +37,16 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+# Load defaults from terraform.tfvars if available
+. "$PSScriptRoot\Read-TfVars.ps1"
+$_tf = Read-TfVars
+if ($_tf.Count -gt 0) {
+    Write-Host "  [INFO] Loaded defaults from terraform.tfvars" -ForegroundColor DarkGray
+    if (-not $PSBoundParameters.ContainsKey('VMAddress') -and $_tf["vm_static_ip"]) {
+        $VMAddress = ($_tf["vm_static_ip"] -split '/')[0]
+    }
+}
+
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------

@@ -63,6 +63,19 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+# Load defaults from terraform.tfvars if available
+. "$PSScriptRoot\Read-TfVars.ps1"
+$_tf = Read-TfVars
+if ($_tf.Count -gt 0) {
+    Write-Host "  [INFO] Loaded defaults from terraform.tfvars" -ForegroundColor DarkGray
+    if (-not $PSBoundParameters.ContainsKey('VMName') -and $_tf["vm_name"])           { $VMName = $_tf["vm_name"] }
+    if (-not $PSBoundParameters.ContainsKey('SshUser') -and $_tf["ssh_admin_user"])   { $SshUser = $_tf["ssh_admin_user"] }
+    if (-not $PSBoundParameters.ContainsKey('VMIpAddress') -and $_tf["vm_static_ip"]) {
+        # Strip CIDR notation (/24)
+        $VMIpAddress = ($_tf["vm_static_ip"] -split '/')[0]
+    }
+}
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

@@ -79,6 +79,26 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+# Load defaults from terraform.tfvars if available
+. "$PSScriptRoot\Read-TfVars.ps1"
+$_tf = Read-TfVars
+if ($_tf.Count -gt 0) {
+    Write-Host "  [INFO] Loaded defaults from terraform.tfvars" -ForegroundColor DarkGray
+    if (-not $PSBoundParameters.ContainsKey('Hostname') -and $_tf["vm_hostname"])    { $Hostname = $_tf["vm_hostname"] }
+    if (-not $PSBoundParameters.ContainsKey('Domain') -and $_tf["vm_domain"])        { $Domain = $_tf["vm_domain"] }
+    if (-not $PSBoundParameters.ContainsKey('Owner') -and $_tf["owner"])             { $Owner = $_tf["owner"] }
+    if (-not $PSBoundParameters.ContainsKey('AnthropicApiKey') -and $_tf["anthropic_api_key"]) { $AnthropicApiKey = $_tf["anthropic_api_key"] }
+    if (-not $PSBoundParameters.ContainsKey('EnableHaiku') -and $_tf.ContainsKey("litellm_enable_haiku")) { $EnableHaiku = $_tf["litellm_enable_haiku"] }
+    if (-not $PSBoundParameters.ContainsKey('EnableOpus') -and $_tf.ContainsKey("litellm_enable_opus"))   { $EnableOpus = $_tf["litellm_enable_opus"] }
+    if (-not $PSBoundParameters.ContainsKey('EnableOllama') -and $_tf.ContainsKey("ollama_enable"))       { $EnableOllama = $_tf["ollama_enable"] }
+    if (-not $PSBoundParameters.ContainsKey('OllamaGpu') -and $_tf.ContainsKey("ollama_gpu"))             { $OllamaGpu = $_tf["ollama_gpu"] }
+    if (-not $PSBoundParameters.ContainsKey('GlobalMaxBudget') -and $_tf["litellm_global_max_budget"])    { $GlobalMaxBudget = $_tf["litellm_global_max_budget"] }
+    if (-not $PSBoundParameters.ContainsKey('DefaultUserBudget') -and $_tf["litellm_default_user_budget"]) { $DefaultUserBudget = $_tf["litellm_default_user_budget"] }
+    if (-not $PSBoundParameters.ContainsKey('DefaultUserRpm') -and $_tf["litellm_default_user_rpm"])      { $DefaultUserRpm = $_tf["litellm_default_user_rpm"] }
+    if (-not $PSBoundParameters.ContainsKey('DefaultUserTpm') -and $_tf["litellm_default_user_tpm"])      { $DefaultUserTpm = $_tf["litellm_default_user_tpm"] }
+    if (-not $PSBoundParameters.ContainsKey('WslDistroName') -and $_tf["vm_name"])   { $WslDistroName = $_tf["vm_name"] }
+}
+
 $InstallPath = "/opt/InsideLLM"
 $Fqdn = "$Hostname.$Domain"
 

@@ -58,6 +58,17 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# Load defaults from terraform.tfvars if available
+. "$PSScriptRoot\Read-TfVars.ps1"
+$_tf = Read-TfVars
+if ($_tf.Count -gt 0) {
+    Write-Host "  [INFO] Loaded defaults from terraform.tfvars" -ForegroundColor DarkGray
+    if (-not $PSBoundParameters.ContainsKey('VmIp') -and $_tf["vm_static_ip"])       { $VmIp = ($_tf["vm_static_ip"] -split '/')[0] }
+    if (-not $PSBoundParameters.ContainsKey('Domain') -and $_tf["vm_domain"])        { $Domain = $_tf["vm_domain"] }
+    if (-not $PSBoundParameters.ContainsKey('SshUser') -and $_tf["ssh_admin_user"])  { $SshUser = $_tf["ssh_admin_user"] }
+    if (-not $PSBoundParameters.ContainsKey('Hostname') -and $_tf["vm_hostname"])    { $Hostname = $_tf["vm_hostname"] }
+}
+
 function Write-Step($msg) { Write-Host "`n=== $msg ===" -ForegroundColor Cyan }
 function Write-Ok($msg)   { Write-Host "  [OK] $msg" -ForegroundColor Green }
 function Write-Warn($msg) { Write-Host "  [WARN] $msg" -ForegroundColor Yellow }

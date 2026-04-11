@@ -59,6 +59,17 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+# Load defaults from terraform.tfvars if available
+. "$PSScriptRoot\Read-TfVars.ps1"
+$_tf = Read-TfVars
+if ($_tf.Count -gt 0) {
+    Write-Host "  [INFO] Loaded defaults from terraform.tfvars" -ForegroundColor DarkGray
+    if (-not $PSBoundParameters.ContainsKey('Hostname') -and $_tf["vm_hostname"])    { $Hostname = $_tf["vm_hostname"] }
+    if (-not $PSBoundParameters.ContainsKey('Domain') -and $_tf["vm_domain"])        { $Domain = $_tf["vm_domain"] }
+    if (-not $PSBoundParameters.ContainsKey('Owner') -and $_tf["owner"])             { $Owner = $_tf["owner"] }
+    if (-not $PSBoundParameters.ContainsKey('WslDistroName') -and $_tf["vm_name"])   { $WslDistroName = $_tf["vm_name"] }
+}
+
 $InstallPath = "/opt/InsideLLM"
 $Fqdn = "$Hostname.$Domain"
 
