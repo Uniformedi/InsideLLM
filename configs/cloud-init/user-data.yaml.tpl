@@ -74,6 +74,13 @@ write_files:
     content: |
       ${indent(6, litellm_config)}
 
+  # --- LiteLLM Humility Prompt Callback ---
+  - path: /opt/InsideLLM/litellm-callbacks/humility_prompt.py
+    permissions: "0644"
+    owner: root:root
+    content: |
+      ${indent(6, humility_callback_py)}
+
   # --- Nginx Config ---
   - path: /opt/InsideLLM/nginx/nginx.conf
     permissions: "0644"

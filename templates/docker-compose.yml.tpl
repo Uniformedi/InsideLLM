@@ -61,6 +61,7 @@ services:
       ANTHROPIC_API_KEY: "${anthropic_api_key}"
       LITELLM_LOG: "INFO"
       SERVER_ROOT_PATH: "/litellm"
+      GOVERNANCE_TIER: "${governance_hub_tier}"
       UI_USERNAME: "admin"
       UI_PASSWORD: "${litellm_master_key}"
 %{ if sso_provider == "azure_ad" ~}
@@ -82,6 +83,7 @@ services:
 %{ endif ~}
     volumes:
       - /opt/InsideLLM/litellm-config.yaml:/app/config.yaml
+      - /opt/InsideLLM/litellm-callbacks:/app/callbacks:ro
     command: ["--config", "/app/config.yaml", "--port", "4000"]
     logging:
       driver: json-file

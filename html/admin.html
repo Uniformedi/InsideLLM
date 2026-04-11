@@ -398,6 +398,7 @@
       <div class="tab" onclick="switchGovView('compliance',this)" style="padding:10px 16px;font-size:11px">Compliance</div>
       <div class="tab" onclick="switchGovView('changes',this)" style="padding:10px 16px;font-size:11px">Changes</div>
       <div class="tab" onclick="switchGovView('keywords',this)" style="padding:10px 16px;font-size:11px">Keywords</div>
+      <div class="tab" onclick="switchGovView('prompts',this)" style="padding:10px 16px;font-size:11px">System Prompts</div>
       <div class="tab" onclick="switchGovView('syncaudit',this)" style="padding:10px 16px;font-size:11px">Sync &amp; Audit</div>
     </div>
 
@@ -470,6 +471,39 @@
           <button class="btn btn-approve" onclick="saveKeywordTemplate()">Save Changes</button>
         </div>
       </div>
+    </div>
+
+    <!-- System Prompts -->
+    <div class="gov-view" id="gov-prompts">
+      <div class="section-head">Active System Prompts <span class="accent">// injected into every LLM call</span></div>
+      <div class="tile-grid" id="promptTiles"></div>
+      <div id="promptEditor" style="margin-top:20px">
+        <div class="wiz-row">
+          <div class="wiz-field" style="flex:0 0 140px">
+            <label>Tier</label>
+            <select id="promptTierSelect" style="width:100%;padding:8px;background:var(--bg-deep);border:1px solid var(--border);border-radius:4px;color:var(--text)">
+              <option value="tier1">Tier 1 (Full Axioms)</option>
+              <option value="tier2">Tier 2 (Standard)</option>
+              <option value="tier3">Tier 3 (Lightweight)</option>
+            </select>
+          </div>
+          <div class="wiz-field" style="flex:1">
+            <label>Your Name</label>
+            <input type="text" id="promptAuthor" placeholder="Your name (for audit)">
+          </div>
+        </div>
+        <div class="wiz-field" style="margin-top:8px">
+          <label>Prompt Text</label>
+          <textarea id="promptText" style="width:100%;height:200px;padding:10px;background:var(--bg-deep);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:13px;font-family:var(--font-body);resize:vertical" placeholder="Enter the system meta-prompt..."></textarea>
+        </div>
+        <div class="wiz-actions" style="margin-top:10px">
+          <button class="btn btn-action" onclick="createAndActivatePrompt()">Save &amp; Activate</button>
+          <button class="btn" onclick="loadPromptForTier()">Load Current</button>
+          <span class="wiz-result" id="promptResult"></span>
+        </div>
+      </div>
+      <div class="section-head" style="margin-top:24px">Version History</div>
+      <div id="promptHistory" class="loading">Select a tier above...</div>
     </div>
 
     <!-- Sync & Audit -->
@@ -950,6 +984,7 @@ function switchGovView(name, el) {
   if (name === 'compliance' && !govViewLoaded.compliance) { loadComplianceDashboard(); govViewLoaded.compliance = true; }
   if (name === 'changes') loadChanges('pending');
   if (name === 'keywords' && !govViewLoaded.keywords) { loadKeywordTemplates(); govViewLoaded.keywords = true; }
+  if (name === 'prompts' && !govViewLoaded.prompts) { loadSystemPrompts(); govViewLoaded.prompts = true; }
   if (name === 'syncaudit' && !govViewLoaded.syncaudit) { loadSyncAudit(); govViewLoaded.syncaudit = true; }
 }
 
@@ -1203,6 +1238,110 @@ async function saveKeywordTemplate() {
   } catch (e) {
     result.innerHTML = `<span style="color:var(--red)">Error: ${e.message}</span>`;
   }
+}
+
+// ================================================================
+// GOVERNANCE — System Prompts
+// ================================================================
+async function loadSystemPrompts() {
+  const data = await api('/api/v1/prompts');
+  const tiles = document.getElementById('promptTiles');
+  if (!data?.prompts?.length) {
+    tiles.innerHTML = '<div class="tile"><div class="label">System Prompts</div><div class="value amber">Not Seeded</div><div class="sub"><button class="btn btn-action" onclick="seedPrompts()" style="font-size:10px">Seed Defaults</button></div></div>';
+    return;
+  }
+
+  // Show one tile per tier with active prompt info
+  const tiers = ['tier1', 'tier2', 'tier3'];
+  const tierLabels = { tier1: 'Tier 1 (Full)', tier2: 'Tier 2 (Standard)', tier3: 'Tier 3 (Light)' };
+  tiles.innerHTML = tiers.map(t => {
+    const active = data.prompts.find(p => p.tier === t && p.is_active);
+    const versions = data.prompts.filter(p => p.tier === t).length;
+    if (active) {
+      return `<div class="tile"><div class="label">${tierLabels[t]}</div><div class="value green">v${active.version}</div><div class="sub">${active.prompt_text.slice(0,60)}...</div></div>`;
+    }
+    return `<div class="tile"><div class="label">${tierLabels[t]}</div><div class="value amber">Inactive</div><div class="sub">${versions} versions</div></div>`;
+  }).join('');
+}
+
+async function loadPromptForTier() {
+  const tier = document.getElementById('promptTierSelect').value;
+  const data = await api(`/api/v1/prompts/active?tier=${tier}`);
+  if (data?.prompt_text) {
+    document.getElementById('promptText').value = data.prompt_text;
+    document.getElementById('promptResult').innerHTML = `<span style="color:var(--green)">Loaded v${data.version} for ${tier}</span>`;
+  } else {
+    document.getElementById('promptResult').innerHTML = `<span style="color:var(--amber)">No active prompt for ${tier}</span>`;
+  }
+
+  // Load history
+  const all = await api(`/api/v1/prompts?tier=${tier}`);
+  const hist = document.getElementById('promptHistory');
+  if (all?.prompts?.length) {
+    hist.innerHTML = `<table class="data-table"><thead><tr><th>Version</th><th>Active</th><th>Created By</th><th>Created</th><th>Activated</th><th>Actions</th></tr></thead><tbody>` +
+      all.prompts.map(p => `<tr>
+        <td>v${p.version}</td>
+        <td>${p.is_active ? '<span class="badge badge-ok">Active</span>' : ''}</td>
+        <td>${p.created_by}</td>
+        <td>${p.created_at?.slice(0,16).replace('T',' ') || '--'}</td>
+        <td>${p.activated_at?.slice(0,16).replace('T',' ') || '--'}</td>
+        <td>${!p.is_active ? `<button class="btn btn-action" onclick="activatePromptVersion(${p.id})" style="font-size:10px">Activate</button>` : ''}</td>
+      </tr>`).join('') +
+      '</tbody></table>';
+  } else {
+    hist.innerHTML = '<div class="loading">No prompts for this tier.</div>';
+  }
+}
+
+async function createAndActivatePrompt() {
+  const tier = document.getElementById('promptTierSelect').value;
+  const text = document.getElementById('promptText').value.trim();
+  const author = document.getElementById('promptAuthor').value.trim() || 'admin';
+  const result = document.getElementById('promptResult');
+
+  if (!text) { result.innerHTML = '<span style="color:var(--red)">Prompt text is required</span>'; return; }
+
+  result.innerHTML = '<span style="color:var(--amber)">Saving...</span>';
+  try {
+    // Create new version
+    const createResp = await fetch(`${GOV()}/api/v1/prompts`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ tier, prompt_text: text, created_by: author }),
+    });
+    const created = await createResp.json();
+    if (!created.id) { result.innerHTML = `<span style="color:var(--red)">${created.detail || 'Create failed'}</span>`; return; }
+
+    // Activate it
+    const actResp = await fetch(`${GOV()}/api/v1/prompts/${created.id}/activate`, { method: 'POST' });
+    const activated = await actResp.json();
+    result.innerHTML = `<span style="color:var(--green)">v${created.version} activated for ${tier} — pushed to Redis</span>`;
+    govViewLoaded.prompts = false;
+    loadSystemPrompts();
+    loadPromptForTier();
+  } catch (e) {
+    result.innerHTML = `<span style="color:var(--red)">Error: ${e.message}</span>`;
+  }
+}
+
+async function activatePromptVersion(id) {
+  const result = document.getElementById('promptResult');
+  result.innerHTML = '<span style="color:var(--amber)">Activating...</span>';
+  try {
+    const resp = await fetch(`${GOV()}/api/v1/prompts/${id}/activate`, { method: 'POST' });
+    const data = await resp.json();
+    result.innerHTML = `<span style="color:var(--green)">v${data.version} activated — pushed to Redis</span>`;
+    govViewLoaded.prompts = false;
+    loadSystemPrompts();
+    loadPromptForTier();
+  } catch (e) {
+    result.innerHTML = `<span style="color:var(--red)">Error: ${e.message}</span>`;
+  }
+}
+
+async function seedPrompts() {
+  await fetch(`${GOV()}/api/v1/prompts/seed`, { method: 'POST' });
+  govViewLoaded.prompts = false;
+  loadSystemPrompts();
 }
 
 // ================================================================
@@ -1969,7 +2108,7 @@ function goToSyncAudit() {
   govTab.classList.add('active');
   document.getElementById('panel-governance').classList.add('active');
   govViewLoaded = {};
-  switchGovView('syncaudit', document.querySelectorAll('#panel-governance .tab')[4]); // 5th sub-tab
+  switchGovView('syncaudit', document.querySelectorAll('#panel-governance .tab')[5]); // 6th sub-tab
 }
 
 // ================================================================

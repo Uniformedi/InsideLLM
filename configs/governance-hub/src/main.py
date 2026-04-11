@@ -10,7 +10,7 @@ from sqlalchemy import text
 from .config import settings
 from .db.local_db import AsyncSessionLocal, SyncSessionLocal, engine
 from .db.models import Base
-from .routers import advisor, audit, auth, changes, config_snapshots, connectors, fleet, framework, keyword_templates, obligations, restore, schema, sync
+from .routers import advisor, audit, auth, changes, config_snapshots, connectors, fleet, framework, keyword_templates, obligations, prompts, restore, schema, sync
 from .services.config_service import capture_snapshot
 from .services.sync_service import collect_telemetry, export_to_central
 
@@ -50,6 +50,7 @@ app.include_router(connectors.router)
 app.include_router(obligations.router)
 app.include_router(framework.router)
 app.include_router(keyword_templates.router)
+app.include_router(prompts.router)
 
 scheduler = AsyncIOScheduler()
 
@@ -188,6 +189,16 @@ async def startup():
                 logger.info(f"Framework already seeded ({count} sections)")
     except Exception as e:
         logger.warning(f"Framework seeding skipped: {e}")
+
+    # Seed default system prompts if none exist
+    try:
+        from .services.prompt_service import seed_defaults
+        async with AsyncSessionLocal() as db:
+            seeded = await seed_defaults(db)
+            if seeded:
+                logger.info(f"Seeded {seeded} default system prompts")
+    except Exception as e:
+        logger.warning(f"System prompt seeding skipped: {e}")
 
     # Initial config snapshot
     try:

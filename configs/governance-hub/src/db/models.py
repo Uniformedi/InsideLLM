@@ -309,6 +309,20 @@ class DeploymentTfvars(Base):
     updated_at = Column(DateTime(timezone=True), default=datetime.utcnow)
 
 
+class SystemPrompt(Base):
+    """Governance-managed system meta-prompts injected into every LLM call."""
+    __tablename__ = "governance_system_prompts"
+
+    id = Column(Integer, primary_key=True)
+    tier = Column(String(20), nullable=False)  # tier1, tier2, tier3
+    prompt_text = Column(Text, nullable=False)
+    is_active = Column(Boolean, default=False)
+    version = Column(Integer, default=1)
+    created_by = Column(String(255), default="system")
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    activated_at = Column(DateTime(timezone=True))
+
+
 class ComplianceAttestation(Base):
     """Manual attestation records for non-automated framework sections."""
     __tablename__ = "governance_compliance_attestations"
