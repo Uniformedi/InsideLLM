@@ -62,6 +62,14 @@ services:
       LITELLM_LOG: "INFO"
       SERVER_ROOT_PATH: "/litellm"
       GOVERNANCE_TIER: "${governance_hub_tier}"
+      POLICY_ENGINE_ENABLE: "${policy_engine_enable}"
+      POLICY_ENGINE_FAIL_MODE: "${policy_engine_fail_mode}"
+%{ if policy_engine_enable ~}
+      OPA_URL: "http://opa:8181"
+%{ endif ~}
+%{ if governance_hub_enable ~}
+      GOVERNANCE_HUB_URL: "http://governance-hub:8090"
+%{ endif ~}
       UI_USERNAME: "admin"
       UI_PASSWORD: "${litellm_master_key}"
 %{ if sso_provider == "azure_ad" ~}
