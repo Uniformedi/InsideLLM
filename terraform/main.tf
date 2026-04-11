@@ -308,6 +308,7 @@ locals {
     governance_hub_sync_schedule    = var.governance_hub_sync_schedule
     governance_hub_supervisor_emails = var.governance_hub_supervisor_emails
     governance_hub_advisor_model    = var.governance_hub_advisor_model
+    governance_hub_registration_token = var.governance_hub_registration_token
     governance_hub_secret           = local.governance_hub_secret
     governance_hub_industry         = var.industry
     governance_hub_tier             = var.governance_tier

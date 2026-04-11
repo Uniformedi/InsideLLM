@@ -375,6 +375,9 @@ services:
       GOVERNANCE_HUB_LITELLM_URL: "http://litellm:4000"
       GOVERNANCE_HUB_LITELLM_API_KEY: "${litellm_master_key}"
       GOVERNANCE_HUB_ADVISOR_MODEL: "${governance_hub_advisor_model}"
+%{ if governance_hub_registration_token != "" }
+      GOVERNANCE_HUB_REGISTRATION_TOKEN: "${governance_hub_registration_token}"
+%{ endif }
       GOVERNANCE_HUB_INDUSTRY: "${governance_hub_industry}"
       GOVERNANCE_HUB_GOVERNANCE_TIER: "${governance_hub_tier}"
       GOVERNANCE_HUB_DATA_CLASSIFICATION: "${governance_hub_classification}"

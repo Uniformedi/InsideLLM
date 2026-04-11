@@ -685,6 +685,13 @@ variable "governance_hub_advisor_model" {
   default     = "claude-sonnet"
 }
 
+variable "governance_hub_registration_token" {
+  description = "Fleet registration token for auto-registering this instance with an existing fleet (generated from Fleet tab → Registration Token)"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
 # =============================================================================
 # TLS CONFIGURATION
 # =============================================================================
