@@ -1,7 +1,7 @@
 # Inside LLM — Architecture & Product Use Case
 
 **Version:** 3.1.0 | **Author:** Dan Medina, Uniformedi LLC | **Date:** April 2026
-**Source:** [github.com/Uniformedi/InsideLLM](https://github.com/Uniformedi/InsideLLM) | **License:** MIT
+**Source:** [github.com/Uniformedi/InsideLLM](https://github.com/Uniformedi/InsideLLM) | **License:** [BSL 1.1](LICENSE) (converts to Apache 2.0 on April 11, 2030)
 
 > **Ready to deploy?** Open the [Setup Wizard](html/Setup.html) for a guided, step-by-step configuration experience.
 
@@ -1446,7 +1446,7 @@ InsideLLM/
 +-- README.md                           # This document
 +-- README.html                         # Visual landing page
 +-- VERSION                             # Platform version (e.g., 3.1.0)
-+-- LICENSE                             # MIT License
++-- LICENSE                             # BSL 1.1 (converts to Apache 2.0 on 2030-04-11)
 +-- terraform/                          # Terraform infrastructure-as-code
 |   +-- main.tf                         # Root module: VM + provisioning
 |   +-- variables.tf                    # All input variables
@@ -2023,8 +2023,17 @@ $env:ANTHROPIC_AUTH_TOKEN = "<your-litellm-key>"
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+This project is licensed under the [Business Source License 1.1](LICENSE).
 
-Copyright (c) 2026 Uniformedi
+**What this means:**
+
+- **Self-hosting for your own organization:** Always permitted, no restrictions
+- **Modifying and forking:** Permitted
+- **Offering InsideLLM as a competing commercial product, managed service, or hosted platform:** Requires a commercial license from Uniformedi LLC
+- **On April 11, 2030:** This version automatically converts to Apache License 2.0
+
+For commercial licensing inquiries, contact: licensing@uniformedi.com
+
+Copyright (c) 2026 Uniformedi LLC
 
 Source code: [https://github.com/Uniformedi/InsideLLM](https://github.com/Uniformedi/InsideLLM)
