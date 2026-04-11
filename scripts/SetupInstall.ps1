@@ -246,15 +246,30 @@ Write-Host "  VM Directory: $VmDir"
 Write-Host "  VHD Directory: $VhdDir"
 Write-Host ""
 
-$setupHtmlPath = Join-Path $PSScriptRoot "..\html\Setup.html"
-$terraformDir  = Join-Path $PSScriptRoot "..\terraform"
-$tfvarsPath    = Join-Path $terraformDir "terraform.tfvars"
+# Resolve project root (one level above scripts/)
+$projectRoot   = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$setupHtmlPath = Join-Path $projectRoot "html\Setup.html"
+$terraformDir  = Join-Path $projectRoot "terraform"
+
+# Look for terraform.tfvars in multiple locations
+$tfvarsPath = $null
+$tfvarsCandidates = @(
+    (Join-Path $terraformDir "terraform.tfvars"),   # terraform/ subfolder
+    (Join-Path $projectRoot "terraform.tfvars")      # project root
+)
+foreach ($candidate in $tfvarsCandidates) {
+    if (Test-Path $candidate) {
+        $tfvarsPath = $candidate
+        break
+    }
+}
 
 # Check if terraform.tfvars exists — if not, prompt to create it first
-if (-not (Test-Path $tfvarsPath)) {
+if (-not $tfvarsPath) {
     Write-Host "  Next step:" -ForegroundColor Yellow
-    Write-Host "  Open the Setup Wizard and save the output as:" -ForegroundColor White
-    Write-Host "    $tfvarsPath" -ForegroundColor Cyan
+    Write-Host "  Open the Setup Wizard and save the output to one of:" -ForegroundColor White
+    Write-Host "    $($tfvarsCandidates[0])" -ForegroundColor Cyan
+    Write-Host "    $($tfvarsCandidates[1])" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "  Setup Wizard: $setupHtmlPath" -ForegroundColor DarkGray
     Write-Host ""
@@ -264,7 +279,14 @@ if (-not (Test-Path $tfvarsPath)) {
     return
 }
 
-Write-Host "  terraform.tfvars found — proceeding to deploy." -ForegroundColor Green
+Write-Host "  terraform.tfvars found at: $tfvarsPath" -ForegroundColor Green
+
+# If tfvars is outside terraform/, use -var-file to point Terraform at it
+$varFileArg = ""
+if ($tfvarsPath -ne (Join-Path $terraformDir "terraform.tfvars")) {
+    $varFileArg = "-var-file=`"$tfvarsPath`""
+    Write-Host "  (using -var-file since tfvars is outside terraform/ folder)" -ForegroundColor DarkGray
+}
 Write-Host ""
 
 # --- Terraform Init ---
@@ -293,7 +315,9 @@ try {
     Write-Host "================================================================" -ForegroundColor Cyan
     Write-Host ""
 
-    terraform plan -out=tfplan
+    $planCmd = "terraform plan -out=tfplan $varFileArg".Trim()
+    Write-Host "  > $planCmd" -ForegroundColor DarkGray
+    Invoke-Expression $planCmd
     if ($LASTEXITCODE -ne 0) {
         Write-Host ""
         Write-Host "  terraform plan failed. Fix the errors above and retry." -ForegroundColor Red
