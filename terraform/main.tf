@@ -295,6 +295,7 @@ locals {
     grafana_admin_password          = local.grafana_password
     postgres_password_plain         = local.postgres_password
     policy_engine_enable            = var.policy_engine_enable
+    policy_engine_fail_mode         = var.policy_engine_fail_mode
     governance_hub_enable           = var.governance_hub_enable
     governance_hub_central_db_type  = var.governance_hub_central_db_type
     governance_hub_central_db_host  = var.governance_hub_central_db_host
