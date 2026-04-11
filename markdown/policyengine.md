@@ -2,6 +2,11 @@
 # InsideLLM Governance & Policy Enforcement
 ## Normative Requirements Specification (v1.0)
 
+> **SAIVAS Attribution:** The Humility mandatory alignment policy implements the
+> SAIVAS (Sentient AI Value Alignment Standard) framework, originally published in
+> *Uniform Gnosis, Volume I* by Dan Medina. Copyright (c) 2026 Dan Medina.
+> All rights reserved. [uniformgnosis.com](https://uniformgnosis.com/Uniform_Gnosis_Volume_I)
+
 ---
 
 ## 0. Scope and Non‑Goals

@@ -7,6 +7,11 @@ Falls back to a hardcoded minimal prompt if Redis is unavailable.
 
 The prompt is prepended as the first system message. A sentinel marker
 prevents double-injection on retries.
+
+Implements the SAIVAS (Sentient AI Value Alignment Standard) framework.
+SAIVAS originally published in "Uniform Gnosis, Volume I" by Dan Medina.
+Copyright (c) 2026 Dan Medina. All rights reserved.
+https://uniformgnosis.com/Uniform_Gnosis_Volume_I
 """
 
 import os

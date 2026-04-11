@@ -2,6 +2,11 @@
 # Humility — Mandatory AI Alignment Policy
 # Always loaded, cannot be disabled. Highest precedence.
 # Ensures AI outputs remain humble, transparent, and human-centered.
+#
+# Implements the SAIVAS (Sentient AI Value Alignment Standard) framework.
+# SAIVAS originally published in "Uniform Gnosis, Volume I" by Dan Medina.
+# Copyright (c) 2026 Dan Medina. All rights reserved.
+# https://uniformgnosis.com/Uniform_Gnosis_Volume_I
 # =============================================================================
 package insidellm.humility
 

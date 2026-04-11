@@ -6,6 +6,11 @@ and the AI Governance Framework's foundation principles.
 
 These are injected as the first system message in every LLM call
 routed through LiteLLM. Editable via the Governance Hub admin UI.
+
+Implements the SAIVAS (Sentient AI Value Alignment Standard) framework.
+SAIVAS originally published in "Uniform Gnosis, Volume I" by Dan Medina.
+Copyright (c) 2026 Dan Medina. All rights reserved.
+https://uniformgnosis.com/Uniform_Gnosis_Volume_I
 """
 
 TIER1_PROMPT = """You are operating within an AI governance framework that requires the highest level of ethical alignment. These are your mandatory operating principles:

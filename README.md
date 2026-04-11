@@ -1447,6 +1447,7 @@ InsideLLM/
 +-- README.html                         # Visual landing page
 +-- VERSION                             # Platform version (e.g., 3.1.0)
 +-- LICENSE                             # BSL 1.1 (converts to Apache 2.0 on 2030-04-11)
++-- NOTICE                              # IP provenance, SAIVAS attribution, third-party licenses
 +-- terraform/                          # Terraform infrastructure-as-code
 |   +-- main.tf                         # Root module: VM + provisioning
 |   +-- variables.tf                    # All input variables
@@ -2035,5 +2036,9 @@ This project is licensed under the [Business Source License 1.1](LICENSE).
 For commercial licensing inquiries, contact: licensing@uniformedi.com
 
 Copyright (c) 2026 Uniformedi LLC
+
+The Humility alignment policy implements the **SAIVAS** (Sentient AI Value Alignment Standard)
+framework, originally published in [*Uniform Gnosis, Volume I*](https://uniformgnosis.com/Uniform_Gnosis_Volume_I)
+by Dan Medina. Copyright (c) 2026 Dan Medina. All rights reserved.
 
 Source code: [https://github.com/Uniformedi/InsideLLM](https://github.com/Uniformedi/InsideLLM)

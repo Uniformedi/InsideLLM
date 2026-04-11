@@ -3,6 +3,11 @@ title: OPA Policy Enforcement
 author: InsideLLM
 version: 2.0.0
 description: Enforces Humility alignment and industry policies via Open Policy Agent. Includes compassionate fallback mediator that resolves axiom conflicts through retry-with-reframing before escalating to human review.
+
+Humility implements the SAIVAS (Sentient AI Value Alignment Standard) framework.
+SAIVAS originally published in "Uniform Gnosis, Volume I" by Dan Medina.
+Copyright (c) 2026 Dan Medina. All rights reserved.
+https://uniformgnosis.com/Uniform_Gnosis_Volume_I
 """
 
 import hashlib

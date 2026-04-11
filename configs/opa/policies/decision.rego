@@ -2,6 +2,9 @@
 # Decision Aggregation Policy
 # Merges Humility (mandatory) + Industry (optional) into a single decision.
 # Precedence: Humility denials override everything.
+#
+# Humility implements the SAIVAS framework from "Uniform Gnosis, Volume I"
+# by Dan Medina. Copyright (c) 2026 Dan Medina. All rights reserved.
 # =============================================================================
 package insidellm.policy
 

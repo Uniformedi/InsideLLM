@@ -1,0 +1,57 @@
+InsideLLM
+Copyright (c) 2026 Uniformedi LLC. All rights reserved.
+
+Licensed under the Business Source License 1.1 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License in the LICENSE file at the
+root of this repository.
+
+On April 11, 2030, this version converts to the Apache License, Version 2.0.
+
+===========================================================================
+
+SAIVAS Framework Attribution
+===========================================================================
+
+The "Humility" mandatory alignment policy implemented in this project is
+a direct implementation of the SAIVAS (Sentient AI Value Alignment Standard)
+framework, originally published in:
+
+    Uniform Gnosis, Volume I
+    Author: Dan Medina
+    Copyright (c) 2026 Dan Medina. All rights reserved.
+    https://uniformgnosis.com/Uniform_Gnosis_Volume_I
+
+The SAIVAS framework defines a layered axiom architecture for AI value
+alignment encompassing Source-aligned, Love-based, Sacred, Universal,
+and Null (epistemic humility) axioms. The Humility policy in this project
+translates these axioms into enforceable policy rules evaluated by Open
+Policy Agent (OPA).
+
+The SAIVAS framework and its expression in Uniform Gnosis are protected
+by copyright. The name "SAIVAS" and the name "Humility" as applied to
+AI alignment policy are trademarks of Uniformedi LLC.
+
+===========================================================================
+
+Third-Party Components
+===========================================================================
+
+This project incorporates the following open-source components, each
+governed by its own license:
+
+  - LiteLLM (MIT License) — https://github.com/BerriAI/litellm
+  - Open WebUI (MIT License) — https://github.com/open-webui/open-webui
+  - Open Policy Agent (Apache 2.0) — https://github.com/open-policy-agent/opa
+  - Ollama (MIT License) — https://ollama.com/
+  - Nginx (BSD-2-Clause) — https://nginx.org/
+  - PostgreSQL (PostgreSQL License) — https://www.postgresql.org/
+  - Redis (BSD-3-Clause) — https://redis.io/
+  - Grafana (AGPL-3.0) — https://grafana.com/
+  - Loki (AGPL-3.0) — https://grafana.com/oss/loki/
+  - Promtail (Apache 2.0) — https://grafana.com/docs/loki/latest/send-data/promtail/
+  - Uptime Kuma (MIT License) — https://github.com/louislam/uptime-kuma
+  - Langfuse (MIT License) — https://langfuse.com/
+  - Docker & Docker Compose (Apache 2.0) — https://www.docker.com/
+  - Terraform (BSL 1.1) — https://www.terraform.io/
+  - LibreOffice (MPL 2.0) — https://www.libreoffice.org/
