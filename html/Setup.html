@@ -1403,7 +1403,7 @@ hyperv_insecure = true
 anthropic_api_key = "${v('anthropicApiKey')}"
 
 # VM Configuration
-vm_name              = "${v('govHubInstanceName') || v('hostname') || 'InsideLLM'}"
+vm_name              = "${v('hostname') || 'InsideLLM'}"
 vm_processor_count   = ${v('vmCpus')}
 vm_memory_startup_bytes = ${ramBytes}
 vm_disk_size_bytes      = ${diskBytes}
