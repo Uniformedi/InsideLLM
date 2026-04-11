@@ -47,15 +47,19 @@ if ($wslCmd) {
         $geniso = wsl bash -c "command -v genisoimage 2>/dev/null && echo FOUND"
         if ($geniso -match "FOUND") {
             Write-Host "Creating ISO with WSL genisoimage..."
+            # Remove any stale ISO first so we can verify fresh creation
+            if (Test-Path $OutputIso) { Remove-Item $OutputIso -Force }
             $winDir  = $SourceDir.Replace('\', '/')
             $winIso  = $OutputIso.Replace('\', '/')
             $wslDir  = (wsl wslpath -a $winDir).Trim()
             $wslIso  = (wsl wslpath -a $winIso).Trim()
             if ($wslDir -and $wslIso) {
-                wsl bash -c "genisoimage -output '$wslIso' -volid '$VolumeLabel' -joliet -rock '$wslDir'"
-                if (Test-Path $OutputIso) {
+                wsl bash -c "genisoimage -output '$wslIso' -volid '$VolumeLabel' -joliet -rock '$wslDir'" 2>&1
+                if ((Test-Path $OutputIso) -and (Get-Item $OutputIso).Length -gt 0) {
                     Write-Host "ISO created: $OutputIso"
                     return
+                } else {
+                    Write-Host "WSL genisoimage failed (permission denied or empty output) — falling back to native..."
                 }
             }
         }
