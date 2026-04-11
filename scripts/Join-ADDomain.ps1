@@ -99,7 +99,7 @@ try {
     $currentHostname = ($hostCheck | Select-Object -First 1).Trim()
     Write-Ok "Connected to $currentHostname ($VmIp)"
 } catch {
-    Write-Fail "Cannot SSH to ${SshUser}@${VmIp} — check the IP, username, and key path."
+    Write-Fail "Cannot SSH to ${SshUser}@${VmIp} - check the IP, username, and key path."
     Write-Host "  Key path: $SshKeyPath"
     exit 1
 }
@@ -216,7 +216,7 @@ echo "SSSD configured"
 "@
 
 $sssdResult = Invoke-Ssh $sssdCmd
-Write-Ok "SSSD configured — AD users can log in with short names"
+Write-Ok "SSSD configured - AD users can log in with short names"
 
 # ============================================================================
 # Step 7: Register in DNS
@@ -266,10 +266,10 @@ echo "DNS registration complete"
         if ($resolved) {
             Write-Ok "$Hostname.$Domain resolves to $($resolved.IPAddress)"
         } else {
-            Write-Warn "DNS resolution not yet working — may take a few minutes to propagate"
+            Write-Warn "DNS resolution not yet working - may take a few minutes to propagate"
         }
     } catch {
-        Write-Warn "Could not verify DNS from this host — check with: nslookup $Hostname.$Domain"
+        Write-Warn "Could not verify DNS from this host - check with: nslookup $Hostname.$Domain"
     }
 } else {
     Write-Host "`n  Skipping DNS registration (--SkipDnsRegistration)" -ForegroundColor DarkGray

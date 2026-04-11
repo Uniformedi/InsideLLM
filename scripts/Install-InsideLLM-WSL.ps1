@@ -1175,7 +1175,7 @@ if (-not $SkipPortForwarding) {
             -Enabled True | Out-Null
         Write-Ok "Firewall rule added for $adapterAlias"
     } else {
-        Write-Warn "WSL vEthernet adapter not found — manually run: New-NetFirewallRule -DisplayName 'WSL' -Direction Inbound -InterfaceAlias 'vEthernet (Default Switch)' -Action Allow"
+        Write-Warn "WSL vEthernet adapter not found - manually run: New-NetFirewallRule -DisplayName 'WSL' -Direction Inbound -InterfaceAlias 'vEthernet (Default Switch)' -Action Allow"
     }
 
     $wslIp = (Invoke-Wsl "hostname -I" | ForEach-Object { $_.Trim().Split(" ")[0] })

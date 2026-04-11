@@ -142,7 +142,7 @@ if (Test-Path $vhdxPath) {
 
 if (($SkipImageDownload -or $vhdxRecent) -and (Test-Path $vhdxPath)) {
     $ageMsg = if ($vhdxRecent) { " (modified $([math]::Round($vhdxAge.TotalDays,1)) days ago)" } else { "" }
-    Write-Ok "VHDX already exists at $vhdxPath$ageMsg — skipping download and conversion"
+    Write-Ok "VHDX already exists at $vhdxPath$ageMsg - skipping download and conversion"
 } else {
     if (-not (Test-Path $imgPath)) {
         Write-Host "  Downloading Ubuntu 24.04 cloud image (~700MB)..."
@@ -282,7 +282,7 @@ foreach ($candidate in $tfvarsCandidates) {
     }
 }
 
-# Check if terraform.tfvars exists — if not, prompt to create it first
+# Check if terraform.tfvars exists - if not, prompt to create it first
 if (-not $tfvarsPath) {
     Write-Host "  Next step:" -ForegroundColor Yellow
     Write-Host "  Open the Setup Wizard and save the output to one of:" -ForegroundColor White
@@ -326,9 +326,9 @@ if ($existingVm) {
     Write-Host "  Status: $($existingVm.State)" -ForegroundColor Yellow
     Write-Host ""
     Write-Host "  Choose an action:" -ForegroundColor White
-    Write-Host "    [I] Import — adopt existing VM into Terraform state (default)" -ForegroundColor Green
-    Write-Host "    [R] Remove — delete old VM and create fresh" -ForegroundColor Yellow
-    Write-Host "    [E] Exit   — abort so you can change vm_name in terraform.tfvars" -ForegroundColor DarkGray
+    Write-Host "    [I] Import - adopt existing VM into Terraform state (default)" -ForegroundColor Green
+    Write-Host "    [R] Remove - delete old VM and create fresh" -ForegroundColor Yellow
+    Write-Host "    [E] Exit   - abort so you can change vm_name in terraform.tfvars" -ForegroundColor DarkGray
     Write-Host ""
     $choice = Read-Host "  Enter choice [I/R/E]"
     $choice = if ($choice) { $choice.ToUpper() } else { "I" }
@@ -356,7 +356,7 @@ if ($existingVm) {
             Write-Host "  Running terraform init..." -ForegroundColor DarkGray
             terraform init -input=false
             if ($LASTEXITCODE -ne 0) {
-                Write-Fail "terraform init failed — cannot import"
+                Write-Fail "terraform init failed - cannot import"
                 Pop-Location
                 return
             }
@@ -370,7 +370,7 @@ if ($existingVm) {
             if ($LASTEXITCODE -eq 0) {
                 Write-Ok "VM '$vmName' imported into Terraform state"
             } else {
-                Write-Warn "Import failed — continuing to plan (may need manual resolution)"
+                Write-Warn "Import failed - continuing to plan (may need manual resolution)"
             }
 
             # Also import the switch if it exists

@@ -59,7 +59,7 @@ if ($wslCmd) {
                     Write-Host "ISO created: $OutputIso"
                     return
                 } else {
-                    Write-Host "WSL genisoimage failed (permission denied or empty output) — falling back to native..."
+                    Write-Host "WSL genisoimage failed (permission denied or empty output) - falling back to native..."
                 }
             }
         }
