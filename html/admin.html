@@ -552,6 +552,7 @@
       Instance Registry <span class="accent">// all deployments</span>
       <span style="margin-left:auto;display:flex;gap:8px;align-items:center">
         <span id="syncResult" class="wiz-result"></span>
+        <button class="btn btn-approve" onclick="generateNewInstanceTfvars()">+ New Instance</button>
         <button class="btn btn-action" onclick="generateRegToken()">Registration Token</button>
         <button class="btn btn-action" onclick="takeSnapshot()">Take Snapshot</button>
         <button class="btn btn-action" onclick="triggerSync()">Sync Now</button>
@@ -1530,6 +1531,44 @@ async function saveFleetDb() {
       loadFleetDbConfig();
     } else {
       result.innerHTML = `<span style="color:var(--red)">Failed: ${res.message || 'Unknown error'}</span>`;
+    }
+  } catch (e) {
+    result.innerHTML = `<span style="color:var(--red)">Error: ${e.message}</span>`;
+  }
+}
+
+async function generateNewInstanceTfvars() {
+  const result = document.getElementById('syncResult');
+  result.innerHTML = '<span style="color:var(--amber)">Preparing new instance config...</span>';
+
+  try {
+    // Take a fresh snapshot first
+    await fetch(`${GOV()}/api/v1/config/snapshot`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({created_by: 'new-instance-wizard'}),
+      signal: AbortSignal.timeout(10000),
+    });
+
+    // Get the latest snapshot config via clone-from-node (this instance)
+    const health = await (await fetch(`${GOV()}/health`, {signal: AbortSignal.timeout(5000)})).json();
+    const instanceId = health.instance_id || 'InsideLLM';
+
+    const resp = await fetch(`${GOV()}/api/v1/restore/clone-from-node`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({source_instance_id: instanceId}),
+      signal: AbortSignal.timeout(10000),
+    });
+    const data = await resp.json();
+
+    if (data.config) {
+      // Clear instance-specific values so the wizard prompts for them
+      data.config.instance_name = '';
+      data.config.instance_id = '';
+      localStorage.setItem('insidellm_clone_config', JSON.stringify(data));
+      window.open('/setup?mode=clone', '_blank');
+      result.innerHTML = '<span style="color:var(--green)">Setup Wizard opened — configure the new instance</span>';
+    } else {
+      result.innerHTML = '<span style="color:var(--red)">No config snapshot available. Take a snapshot first.</span>';
     }
   } catch (e) {
     result.innerHTML = `<span style="color:var(--red)">Error: ${e.message}</span>`;
