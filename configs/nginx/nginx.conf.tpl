@@ -72,6 +72,12 @@ http {
         server uptime-kuma:3001;
     }
 %{ endif ~}
+%{ if chat_enable ~}
+
+    upstream mattermost {
+        server mattermost:8065;
+    }
+%{ endif ~}
 
     # --- HTTP -> HTTPS redirect ---
     server {
@@ -276,6 +282,30 @@ http {
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
         }
+%{ endif ~}
+%{ if chat_enable ~}
+        # --- Mattermost (embedded browser chat) ---
+        # Mattermost is served at /chat and expects the SITEURL to include the
+        # subpath. proxy_pass without trailing slash preserves /chat prefix.
+        location /chat {
+            proxy_pass http://mattermost;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Forwarded-Ssl on;
+            proxy_buffers 256 16k;
+            proxy_buffer_size 16k;
+            client_max_body_size 100m;
+            proxy_read_timeout 600s;
+            proxy_connect_timeout 90s;
+            proxy_send_timeout 300s;
+            proxy_pass_header Set-Cookie;
+        }
+
 %{ endif ~}
 
         # --- Admin Portal ---

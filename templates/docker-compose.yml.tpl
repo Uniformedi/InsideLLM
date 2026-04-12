@@ -420,6 +420,9 @@ services:
       GOVERNANCE_HUB_DATA_CLASSIFICATION: "${governance_hub_classification}"
       GOVERNANCE_HUB_ADMIN_AUTH_MODE: "${admin_auth_mode}"
       GOVERNANCE_HUB_AUTH_SECRET: "${governance_hub_secret}"
+      GOVERNANCE_HUB_CHAT_ENABLE: "${chat_enable}"
+      GOVERNANCE_HUB_CHAT_TEAM_NAME: "${chat_team_name}"
+      GOVERNANCE_HUB_CHAT_DEFAULT_CHANNEL: "${chat_default_channel}"
 %{ if admin_auth_mode == "ldap" }
       GOVERNANCE_HUB_AD_DOMAIN: "${ad_domain}"
       GOVERNANCE_HUB_AD_ADMIN_GROUPS: "${ad_admin_groups}"
@@ -605,6 +608,88 @@ services:
       timeout: 5s
       retries: 3
       start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - insidellm-internal
+
+%{ endif ~}
+%{ if chat_enable ~}
+  # -------------------------------------------------------------------------
+  # Mattermost DB Init — Creates 'mattermost' database in Postgres (idempotent)
+  # -------------------------------------------------------------------------
+  mattermost-db-init:
+    image: postgres:16-alpine
+    container_name: insidellm-mattermost-db-init
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: "${postgres_password}"
+    entrypoint:
+      - sh
+      - -c
+      - |
+        psql -h postgres -U litellm -d litellm -tc "SELECT 1 FROM pg_database WHERE datname='mattermost'" | grep -q 1 || \
+        psql -h postgres -U litellm -d litellm -c "CREATE DATABASE mattermost OWNER litellm"
+    networks:
+      - insidellm-internal
+
+  # -------------------------------------------------------------------------
+  # Mattermost — Embedded browser chat (FOSS, MIT Team Edition)
+  # -------------------------------------------------------------------------
+  mattermost:
+    image: mattermost/mattermost-team-edition:latest
+    container_name: insidellm-mattermost
+    restart: always
+    depends_on:
+      mattermost-db-init:
+        condition: service_completed_successfully
+    environment:
+      MM_SQLSETTINGS_DRIVERNAME: "postgres"
+      MM_SQLSETTINGS_DATASOURCE: "postgres://litellm:${postgres_password}@postgres:5432/mattermost?sslmode=disable&connect_timeout=10"
+      MM_SERVICESETTINGS_SITEURL: "${chat_site_url}"
+      MM_SERVICESETTINGS_LISTENADDRESS: ":8065"
+      MM_SERVICESETTINGS_ENABLELOCALMODE: "true"
+      MM_SERVICESETTINGS_ENABLEUSERACCESSTOKENS: "true"
+      MM_SERVICESETTINGS_ALLOWCORSFROM: "${chat_site_url}"
+      MM_SERVICESETTINGS_ALLOWCOOKIESFORSUBDOMAINS: "false"
+      MM_SERVICESETTINGS_WEBSOCKETURL: "wss://${server_name}/chat"
+      MM_TEAMSETTINGS_SITENAME: "InsideLLM Chat"
+      MM_TEAMSETTINGS_ENABLETEAMCREATION: "false"
+      MM_TEAMSETTINGS_ENABLEUSERCREATION: "true"
+      MM_TEAMSETTINGS_ENABLEOPENSERVER: "false"
+      MM_FILESETTINGS_DRIVERNAME: "local"
+      MM_FILESETTINGS_DIRECTORY: "/mattermost/data/"
+      MM_PLUGINSETTINGS_ENABLE: "true"
+      MM_PLUGINSETTINGS_ENABLEUPLOADS: "false"
+      MM_LOGSETTINGS_CONSOLELEVEL: "INFO"
+      MM_LOGSETTINGS_FILELEVEL: "INFO"
+      MM_METRICSSETTINGS_ENABLE: "false"
+%{ if admin_auth_mode == "oidc" ~}
+      MM_GITLABSETTINGS_ENABLE: "true"
+      MM_GITLABSETTINGS_ID: "${sso_client_id}"
+      MM_GITLABSETTINGS_SECRET: "${sso_client_secret}"
+      MM_GITLABSETTINGS_AUTHENDPOINT: "${oidc_issuer_url}/oauth2/v2.0/authorize"
+      MM_GITLABSETTINGS_TOKENENDPOINT: "${oidc_issuer_url}/oauth2/v2.0/token"
+      MM_GITLABSETTINGS_USERAPIENDPOINT: "https://graph.microsoft.com/oidc/userinfo"
+%{ endif ~}
+    volumes:
+      - /opt/InsideLLM/data/mattermost/config:/mattermost/config
+      - /opt/InsideLLM/data/mattermost/data:/mattermost/data
+      - /opt/InsideLLM/data/mattermost/logs:/mattermost/logs
+      - /opt/InsideLLM/data/mattermost/plugins:/mattermost/plugins
+      - /opt/InsideLLM/data/mattermost/client-plugins:/mattermost/client/plugins
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8065/api/v4/system/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
     logging:
       driver: json-file
       options:

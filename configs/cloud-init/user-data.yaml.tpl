@@ -392,6 +392,10 @@ runcmd:
     ufw allow 443/tcp
     ufw allow 3389/tcp comment "xRDP"
     ufw allow 4000/tcp comment "LiteLLM Admin"
+    ufw allow 5050/tcp comment "pgAdmin"
+%{ if ollama_enable ~}
+    ufw allow 11434/tcp comment "Ollama API"
+%{ endif ~}
     ufw --force enable
 
 %{ if ad_domain_join ~}

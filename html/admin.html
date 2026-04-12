@@ -177,6 +177,18 @@
       background: rgba(34,211,238,0.1); padding: 1px 5px; border-radius: 3px;
     }
 
+    /* Specifications panel — uniform column widths across every table */
+    #panel-specs .data-table { table-layout: fixed; width: 100%; }
+    #panel-specs .data-table th:nth-child(1),
+    #panel-specs .data-table td:nth-child(1) { width: 26%; }
+    #panel-specs .data-table th:nth-child(2),
+    #panel-specs .data-table td:nth-child(2) { width: 16%; }
+    #panel-specs .data-table th:nth-child(3),
+    #panel-specs .data-table td:nth-child(3) { width: 22%; }
+    #panel-specs .data-table th:nth-child(4),
+    #panel-specs .data-table td:nth-child(4) { width: 36%; }
+    #panel-specs .data-table td { word-wrap: break-word; overflow-wrap: break-word; }
+
     /* Status badges */
     .badge {
       display: inline-block; padding: 2px 8px; border-radius: 10px;
@@ -212,6 +224,36 @@
     .card p { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
     .card a { color: var(--cyan); font-family: var(--font-mono); font-size: 12px; text-decoration: none; }
     .card a:hover { text-decoration: underline; }
+
+    /* Service Endpoints — big button cards */
+    #serviceCards { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+    .service-btn {
+      display: flex; flex-direction: column; gap: 10px;
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px;
+      padding: 22px 20px; min-height: 150px; cursor: pointer; text-decoration: none;
+      color: inherit; transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+    }
+    .service-btn:hover {
+      transform: translateY(-2px); border-color: var(--cyan);
+      background: rgba(34,211,238,0.04);
+      box-shadow: 0 6px 18px rgba(0,0,0,0.25), 0 0 0 1px rgba(34,211,238,0.25);
+    }
+    .service-btn:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+    .service-btn .service-head { display: flex; align-items: center; gap: 12px; }
+    .service-btn .icon {
+      width: 44px; height: 44px; border-radius: 8px; display: flex;
+      align-items: center; justify-content: center; font-size: 14px;
+      font-weight: 700; color: #fff; font-family: var(--font-mono); flex-shrink: 0;
+    }
+    .service-btn .service-name { font-size: 16px; font-weight: 600; color: var(--text); }
+    .service-btn .service-desc { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+    .service-btn .service-links { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; }
+    .service-btn .service-links a {
+      font-family: var(--font-mono); font-size: 11px; color: var(--cyan);
+      background: rgba(34,211,238,0.08); padding: 3px 8px; border-radius: 4px;
+      text-decoration: none;
+    }
+    .service-btn .service-links a:hover { background: rgba(34,211,238,0.18); text-decoration: none; }
 
     /* Buttons */
     .btn {
@@ -604,14 +646,20 @@
     <table class="data-table">
       <thead><tr><th>Path</th><th>Upstream</th><th>Purpose</th></tr></thead>
       <tbody>
-        <tr><td><code>/</code></td><td>Open WebUI</td><td>Chat interface (WebSocket enabled)</td></tr>
-        <tr><td><code>/v1/</code></td><td>LiteLLM</td><td>OpenAI-compatible API for Claude Code CLI</td></tr>
-        <tr><td><code>/litellm/</code></td><td>LiteLLM</td><td>Admin API, dashboard, team/key management</td></tr>
-        <tr><td><code>/netdata/</code></td><td>Netdata</td><td>Infrastructure monitoring</td></tr>
-        <tr><td><code>/grafana/</code></td><td>Grafana</td><td>Compliance &amp; fleet dashboards</td></tr>
-        <tr><td><code>/governance/</code></td><td>Governance Hub</td><td>Change management, sync, advisor API</td></tr>
-        <tr><td><code>/docforge/</code></td><td>DocForge</td><td>File generation &amp; conversion API</td></tr>
-        <tr><td><code>/status/</code></td><td>Uptime Kuma</td><td>Service health monitoring</td></tr>
+        <tr><td colspan="3" style="background:var(--panel-2);font-family:var(--font-mono);font-size:11px;color:var(--cyan);letter-spacing:0.08em">API ENDPOINTS</td></tr>
+        <tr><td><a href="/v1/" target="_blank"><code>/v1/</code></a></td><td>LiteLLM</td><td>OpenAI-compatible API for Claude Code CLI</td></tr>
+        <tr><td><a href="/docforge/" target="_blank"><code>/docforge/</code></a></td><td>DocForge</td><td>File generation &amp; conversion API</td></tr>
+        <tr><td colspan="3" style="background:var(--panel-2);font-family:var(--font-mono);font-size:11px;color:var(--cyan);letter-spacing:0.08em">WEBSITE URLS</td></tr>
+        <tr><td><a href="/" target="_blank"><code>/</code></a></td><td>Open WebUI</td><td>Chat interface (WebSocket enabled)</td></tr>
+        <tr><td><a href="/litellm/" target="_blank"><code>/litellm/</code></a></td><td>LiteLLM</td><td>Admin dashboard, team/key management</td></tr>
+        <tr><td><a href="/governance/" target="_blank"><code>/governance/</code></a></td><td>Governance Hub</td><td>Change management, sync, advisor (UI + API)</td></tr>
+        <tr><td><a href="/netdata/" target="_blank"><code>/netdata/</code></a></td><td>Netdata</td><td>Infrastructure monitoring</td></tr>
+        <tr><td><a href="/grafana/" target="_blank"><code>/grafana/</code></a></td><td>Grafana</td><td>Compliance &amp; fleet dashboards</td></tr>
+        <tr><td><a href="/status/" target="_blank"><code>/status/</code></a></td><td>Uptime Kuma</td><td>Service health monitoring</td></tr>
+        <tr><td><a href="/chat/" target="_blank"><code>/chat/</code></a></td><td>Mattermost</td><td>Team chat landing (login / team picker)</td></tr>
+        <tr><td><a href="/chat/insidellm/channels/general" target="_blank"><code>/chat/insidellm/channels/general</code></a></td><td>Mattermost</td><td>Default team &amp; channel (direct link)</td></tr>
+        <tr><td><a href="/chat/admin_console" target="_blank"><code>/chat/admin_console</code></a></td><td>Mattermost</td><td>Sysadmin console (first registrant only)</td></tr>
+        <tr><td><a href="/governance/chat" target="_blank"><code>/governance/chat</code></a></td><td>Governance Hub</td><td>Embedded chat iframe inside governance console</td></tr>
       </tbody>
     </table>
 
@@ -642,12 +690,12 @@
     <table class="data-table">
       <thead><tr><th>Port</th><th>Service</th><th>Access</th></tr></thead>
       <tbody>
-        <tr><td><code>443</code></td><td>Nginx (HTTPS)</td><td>Primary entry — all services via path routing</td></tr>
-        <tr><td><code>80</code></td><td>Nginx (HTTP)</td><td>Redirects to HTTPS</td></tr>
-        <tr><td><code>4000</code></td><td>LiteLLM</td><td>Direct API + Swagger UI</td></tr>
-        <tr><td><code>5050</code></td><td>pgAdmin</td><td>Database administration</td></tr>
+        <tr><td><a data-port="443" data-scheme="https"><code>443</code></a></td><td>Nginx (HTTPS)</td><td>Primary entry — all services via path routing</td></tr>
+        <tr><td><a data-port="80" data-scheme="http"><code>80</code></a></td><td>Nginx (HTTP)</td><td>Redirects to HTTPS</td></tr>
+        <tr><td><a data-port="4000" data-scheme="https"><code>4000</code></a></td><td>LiteLLM</td><td>Direct API + Swagger UI</td></tr>
+        <tr><td><a data-port="5050" data-scheme="http"><code>5050</code></a></td><td>pgAdmin</td><td>Database administration</td></tr>
         <tr><td><code>3389</code></td><td>xRDP</td><td>Remote desktop access</td></tr>
-        <tr><td><code>11434</code></td><td>Ollama</td><td>Local LLM API (if enabled)</td></tr>
+        <tr><td><a data-port="11434" data-scheme="http"><code>11434</code></a></td><td>Ollama</td><td>Local LLM API (if enabled)</td></tr>
       </tbody>
     </table>
   </div>
@@ -812,6 +860,15 @@ const hostInput = document.getElementById('hostInput');
 hostInput.value = window.location.hostname || 'localhost';
 const H = () => hostInput.value.trim() || window.location.hostname || 'localhost';
 const GOV = () => `${window.location.protocol}//${H()}/governance`;
+
+document.querySelectorAll('a[data-port]').forEach(a => {
+  const port = a.dataset.port;
+  const scheme = a.dataset.scheme || 'https';
+  const host = window.location.hostname || 'localhost';
+  const isDefault = (scheme === 'https' && port === '443') || (scheme === 'http' && port === '80');
+  a.href = `${scheme}://${host}${isDefault ? '' : ':' + port}`;
+  a.target = '_blank';
+});
 
 // ================================================================
 // Theme switching
@@ -1894,13 +1951,26 @@ function buildServiceCards() {
     { icon: 'GH', bg: '#1e40af', name: 'Governance Hub', desc: 'Central sync, change management, AI advisor, fleet management', links: [`https://${h}/governance/health`, `https://${h}/governance/docs`] },
     { icon: 'OL', bg: '#7e22ce', name: 'Ollama', desc: 'Local LLM inference (if enabled)', links: [`http://${h}:11434`, `http://${h}:11434/api/tags`] },
     { icon: 'NX', bg: '#475569', name: 'Nginx', desc: 'TLS termination, reverse proxy, security headers', links: [`https://${h}/nginx-health`] },
+    { icon: 'MM', bg: '#16a34a', name: 'Mattermost', desc: 'Team chat (if enabled). Channels, DMs, file sharing.', links: [`https://${h}/chat/`, `https://${h}/chat/insidellm/channels/general`, `https://${h}/chat/admin_console`, `https://${h}/governance/chat`] },
   ];
+  const labelFor = (url) => {
+    try {
+      const u = new URL(url);
+      const path = (u.pathname || '/') + (u.search || '');
+      return u.port ? `:${u.port}${path === '/' ? '' : path}` : path;
+    } catch { return url; }
+  };
   document.getElementById('serviceCards').innerHTML = services.map(s => `
-    <div class="card">
-      <h4><span class="icon" style="background:${s.bg}">${s.icon}</span>${s.name}</h4>
-      <p>${s.desc}</p>
-      ${s.links.map(l => `<a href="${l}" target="_blank" style="display:block;margin-bottom:2px">${l}</a>`).join('')}
-    </div>
+    <a class="service-btn" href="${s.links[0]}" target="_blank" rel="noopener">
+      <div class="service-head">
+        <span class="icon" style="background:${s.bg}">${s.icon}</span>
+        <span class="service-name">${s.name}</span>
+      </div>
+      <div class="service-desc">${s.desc}</div>
+      <div class="service-links" onclick="event.stopPropagation()">
+        ${s.links.map(l => `<a href="${l}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${labelFor(l)}</a>`).join('')}
+      </div>
+    </a>
   `).join('');
 }
 

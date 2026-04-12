@@ -63,6 +63,11 @@ class Settings(BaseSettings):
     oidc_client_id: str = ""
     oidc_client_secret: str = ""
 
+    # Chat (Mattermost embed)
+    chat_enable: bool = False
+    chat_team_name: str = "insidellm"
+    chat_default_channel: str = "general"
+
     model_config = {"env_prefix": "GOVERNANCE_HUB_"}
 
     @property

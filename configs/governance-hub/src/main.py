@@ -10,7 +10,7 @@ from sqlalchemy import text
 from .config import settings
 from .db.local_db import AsyncSessionLocal, SyncSessionLocal, engine
 from .db.models import Base
-from .routers import advisor, audit, auth, changes, config_snapshots, connectors, fleet, framework, keyword_templates, obligations, prompts, restore, schema, sync
+from .routers import advisor, audit, auth, changes, chat, config_snapshots, connectors, fleet, framework, keyword_templates, obligations, prompts, restore, schema, sync
 from .services.config_service import capture_snapshot
 from .services.sync_service import collect_telemetry, export_to_central
 
@@ -53,12 +53,22 @@ app.include_router(framework.router)
 app.include_router(keyword_templates.router)
 app.include_router(prompts.router)
 
+if settings.chat_enable:
+    app.include_router(chat.router)
+
 scheduler = AsyncIOScheduler()
 
 
 @app.get("/", response_class=HTMLResponse)
 async def landing():
     """Governance Hub landing page with links to admin UI and API docs."""
+    chat_link = (
+        '<a href="/governance/chat">'
+        '<span class="icon" style="background:#16a34a">CH</span>'
+        '<div><div class="label">Team Chat</div>'
+        '<div class="desc">Mattermost — real-time channels, DMs, file sharing for governance users</div></div>'
+        '</a>'
+    ) if settings.chat_enable else ""
     return f"""<!DOCTYPE html>
 <html><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -99,6 +109,7 @@ async def landing():
       <span class="icon" style="background:#2563eb">CC</span>
       <div><div class="label">Command Center</div><div class="desc">Governance dashboard, change management, fleet overview, monitoring</div></div>
     </a>
+    {chat_link}
     <a href="/governance/docs">
       <span class="icon" style="background:#059669">API</span>
       <div><div class="label">API Documentation</div><div class="desc">Swagger UI — all governance, fleet, sync, and restore endpoints</div></div>

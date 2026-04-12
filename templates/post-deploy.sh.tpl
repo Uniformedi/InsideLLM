@@ -783,6 +783,10 @@ log "  Grafana:      https://$VM_IP/grafana/"
 %{ if ops_uptime_kuma_enable ~}
 log "  Uptime Kuma:  https://$VM_IP/status/"
 %{ endif ~}
+%{ if chat_enable ~}
+log "  Team Chat:    https://$VM_IP/chat/"
+log "    (first user to sign up becomes Mattermost sysadmin)"
+%{ endif ~}
 log ""
 log "  First user to register on Open WebUI"
 log "  becomes the admin."

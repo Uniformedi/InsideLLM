@@ -840,3 +840,25 @@ variable "dlp_scan_responses" {
   type        = bool
   default     = true
 }
+
+# =============================================================================
+# CHAT — Mattermost embedded team chat (FOSS, MIT Team Edition)
+# =============================================================================
+
+variable "chat_enable" {
+  description = "Deploy Mattermost chat server embedded under /chat/ (browser-based team chat for governance-hub users)"
+  type        = bool
+  default     = false
+}
+
+variable "chat_team_name" {
+  description = "Mattermost default team URL slug"
+  type        = string
+  default     = "insidellm"
+}
+
+variable "chat_default_channel" {
+  description = "Default Mattermost channel created inside the team"
+  type        = string
+  default     = "general"
+}

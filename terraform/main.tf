@@ -346,6 +346,10 @@ locals {
     dlp_block_standalone_dates   = var.dlp_block_standalone_dates
     dlp_scan_responses           = var.dlp_scan_responses
     dlp_custom_patterns          = jsonencode(var.dlp_custom_patterns)
+    chat_enable                  = var.chat_enable
+    chat_team_name               = var.chat_team_name
+    chat_default_channel         = var.chat_default_channel
+    chat_site_url                = "https://${local.vm_fqdn}/chat"
   })
 }
 
@@ -360,6 +364,7 @@ locals {
     ops_uptime_kuma_enable  = var.ops_uptime_kuma_enable
     governance_hub_enable   = var.governance_hub_enable
     admin_auth_mode        = var.sso_provider != "none" ? "oidc" : var.ad_domain_join ? "ldap" : "none"
+    chat_enable             = var.chat_enable
   })
 }
 
@@ -411,6 +416,7 @@ locals {
     policy_engine_fail_mode      = var.policy_engine_fail_mode
     opa_zip_b64                  = var.policy_engine_enable ? filebase64(data.archive_file.opa_policies[0].output_path) : ""
     opa_policy_pipeline_py       = var.policy_engine_enable ? file("${path.module}/../configs/open-webui/opa-policy-pipeline.py") : ""
+    ollama_enable                = var.ollama_enable && !var.ollama_separate_vm
     ad_domain_join               = var.ad_domain_join
     ad_join_user                 = var.ad_join_user
     ad_join_password             = var.ad_join_password
@@ -430,6 +436,7 @@ locals {
       keyword_categories       = var.keyword_categories
       governance_hub_enable    = var.governance_hub_enable
       policy_engine_enable     = var.policy_engine_enable
+      chat_enable              = var.chat_enable
     })
   })
 
