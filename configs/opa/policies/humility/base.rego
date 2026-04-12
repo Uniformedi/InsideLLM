@@ -1,7 +1,13 @@
 # =============================================================================
-# Humility — Mandatory AI Alignment Policy
+# Humility — Mandatory AI Alignment Policy (InsideLLM enterprise overlay)
 # Always loaded, cannot be disabled. Highest precedence.
-# Ensures AI outputs remain humble, transparent, and human-centered.
+#
+# CANONICAL SOURCE: https://github.com/uniformedi/humility-guardrail
+#   policies/humility/base.rego (package: humility)
+# This file re-publishes the same rules under package `insidellm.humility`
+# so that industry overlays (HIPAA, SOX, FDCPA, FERPA, GLBA) can stack on
+# top via the InsideLLM decision entry point. Keep rules in sync with the
+# canonical source; see docs/DECOUPLING.md.
 #
 # Implements the SAIVAS (Sentient AI Value Alignment Standard) framework.
 # SAIVAS originally published in "Uniform Gnosis, Volume I" by Dan Medina.

@@ -253,6 +253,17 @@ locals {
     anthropic_api_key       = var.anthropic_api_key
     enable_haiku            = var.litellm_enable_haiku
     enable_opus             = var.litellm_enable_opus
+    openai_enable           = var.openai_api_key != ""
+    gemini_enable           = var.gemini_api_key != ""
+    mistral_enable          = var.mistral_api_key != ""
+    cohere_enable           = var.cohere_api_key != ""
+    azure_openai_enable     = var.azure_openai_api_key != "" && var.azure_openai_endpoint != "" && var.azure_openai_deployment != ""
+    azure_openai_endpoint   = var.azure_openai_endpoint
+    azure_openai_api_version = var.azure_openai_api_version
+    azure_openai_deployment = var.azure_openai_deployment
+    bedrock_enable          = var.aws_bedrock_access_key_id != "" && var.aws_bedrock_secret_access_key != ""
+    bedrock_region          = var.aws_bedrock_region
+    bedrock_model           = var.aws_bedrock_model
     default_user_budget     = var.litellm_default_user_budget
     default_user_rpm        = var.litellm_default_user_rpm
     default_user_tpm        = var.litellm_default_user_tpm
@@ -272,6 +283,16 @@ locals {
     postgres_password  = local.postgres_password
     litellm_master_key = local.litellm_master_key
     anthropic_api_key  = var.anthropic_api_key
+    openai_api_key                = var.openai_api_key
+    gemini_api_key                = var.gemini_api_key
+    mistral_api_key               = var.mistral_api_key
+    cohere_api_key                = var.cohere_api_key
+    azure_openai_api_key          = var.azure_openai_api_key
+    azure_openai_endpoint         = var.azure_openai_endpoint
+    azure_openai_api_version      = var.azure_openai_api_version
+    aws_bedrock_access_key_id     = var.aws_bedrock_access_key_id
+    aws_bedrock_secret_access_key = var.aws_bedrock_secret_access_key
+    aws_bedrock_region            = var.aws_bedrock_region
     webui_secret       = local.webui_secret
     sso_provider       = var.sso_provider
     sso_env            = local.sso_env

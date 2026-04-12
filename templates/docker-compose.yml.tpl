@@ -59,6 +59,16 @@ services:
       REDIS_PORT: "6379"
       LITELLM_MASTER_KEY: "${litellm_master_key}"
       ANTHROPIC_API_KEY: "${anthropic_api_key}"
+      OPENAI_API_KEY: "${openai_api_key}"
+      GEMINI_API_KEY: "${gemini_api_key}"
+      MISTRAL_API_KEY: "${mistral_api_key}"
+      COHERE_API_KEY: "${cohere_api_key}"
+      AZURE_OPENAI_API_KEY: "${azure_openai_api_key}"
+      AZURE_API_BASE: "${azure_openai_endpoint}"
+      AZURE_API_VERSION: "${azure_openai_api_version}"
+      AWS_ACCESS_KEY_ID: "${aws_bedrock_access_key_id}"
+      AWS_SECRET_ACCESS_KEY: "${aws_bedrock_secret_access_key}"
+      AWS_REGION_NAME: "${aws_bedrock_region}"
       LITELLM_LOG: "INFO"
       SERVER_ROOT_PATH: "/litellm"
       GOVERNANCE_TIER: "${governance_hub_tier}"
@@ -104,7 +114,12 @@ services:
     volumes:
       - /opt/InsideLLM/litellm-config.yaml:/app/config.yaml
       - /opt/InsideLLM/litellm-callbacks:/app/callbacks:ro
-    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    # Install humility-guardrail (canonical SAIVAS implementation) on startup,
+    # then hand off to the LiteLLM entrypoint. See
+    # https://github.com/uniformedi/humility-guardrail
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - "pip install --quiet humility-guardrail==0.1.0 && exec litellm --config /app/config.yaml --port 4000"
     logging:
       driver: json-file
       options:

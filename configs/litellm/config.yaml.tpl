@@ -26,6 +26,64 @@ model_list:
       api_key: os.environ/ANTHROPIC_API_KEY
 %{ endif ~}
 
+%{ if openai_enable ~}
+  # --- OpenAI ---
+  - model_name: gpt-4o
+    litellm_params:
+      model: openai/gpt-4o
+      api_key: os.environ/OPENAI_API_KEY
+  - model_name: gpt-4o-mini
+    litellm_params:
+      model: openai/gpt-4o-mini
+      api_key: os.environ/OPENAI_API_KEY
+%{ endif ~}
+
+%{ if gemini_enable ~}
+  # --- Google Gemini ---
+  - model_name: gemini-1.5-pro
+    litellm_params:
+      model: gemini/gemini-1.5-pro
+      api_key: os.environ/GEMINI_API_KEY
+  - model_name: gemini-1.5-flash
+    litellm_params:
+      model: gemini/gemini-1.5-flash
+      api_key: os.environ/GEMINI_API_KEY
+%{ endif ~}
+
+%{ if mistral_enable ~}
+  # --- Mistral ---
+  - model_name: mistral-large
+    litellm_params:
+      model: mistral/mistral-large-latest
+      api_key: os.environ/MISTRAL_API_KEY
+%{ endif ~}
+
+%{ if cohere_enable ~}
+  # --- Cohere ---
+  - model_name: command-r-plus
+    litellm_params:
+      model: cohere/command-r-plus
+      api_key: os.environ/COHERE_API_KEY
+%{ endif ~}
+
+%{ if azure_openai_enable ~}
+  # --- Azure OpenAI ---
+  - model_name: azure-${azure_openai_deployment}
+    litellm_params:
+      model: azure/${azure_openai_deployment}
+      api_key: os.environ/AZURE_OPENAI_API_KEY
+      api_base: ${azure_openai_endpoint}
+      api_version: "${azure_openai_api_version}"
+%{ endif ~}
+
+%{ if bedrock_enable ~}
+  # --- AWS Bedrock ---
+  - model_name: bedrock-claude
+    litellm_params:
+      model: bedrock/${bedrock_model}
+      aws_region_name: ${bedrock_region}
+%{ endif ~}
+
 %{ if ollama_enable ~}
 %{ for model in ollama_models ~}
   # --- Local Ollama: ${model} ---
@@ -103,5 +161,12 @@ general_settings:
 # =============================================================================
 environment_variables:
   ANTHROPIC_API_KEY: os.environ/ANTHROPIC_API_KEY
+  OPENAI_API_KEY: os.environ/OPENAI_API_KEY
+  GEMINI_API_KEY: os.environ/GEMINI_API_KEY
+  MISTRAL_API_KEY: os.environ/MISTRAL_API_KEY
+  COHERE_API_KEY: os.environ/COHERE_API_KEY
+  AZURE_OPENAI_API_KEY: os.environ/AZURE_OPENAI_API_KEY
+  AWS_ACCESS_KEY_ID: os.environ/AWS_ACCESS_KEY_ID
+  AWS_SECRET_ACCESS_KEY: os.environ/AWS_SECRET_ACCESS_KEY
   LITELLM_MASTER_KEY: os.environ/LITELLM_MASTER_KEY
   DATABASE_URL: os.environ/DATABASE_URL

@@ -213,6 +213,31 @@ def get_db_config() -> dict:
     }
 
 
+_SETTINGS_OVERRIDES_DDL = """
+CREATE TABLE IF NOT EXISTS governance_settings_overrides (
+    id SERIAL PRIMARY KEY,
+    key VARCHAR(255) NOT NULL UNIQUE,
+    value TEXT NOT NULL,
+    updated_by VARCHAR(255) DEFAULT 'system',
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+)
+"""
+
+
+def _ensure_settings_overrides_table(db=None) -> None:
+    """Create the settings overrides table if it does not exist.
+
+    Runs DDL on the engine directly with autocommit so the table is visible to
+    all subsequent sessions. The optional `db` argument is accepted for
+    backward compatibility but is not used.
+    """
+    from ..db.local_db import sync_engine
+
+    with sync_engine.connect() as conn:
+        conn.execute(text(_SETTINGS_OVERRIDES_DDL))
+        conn.commit()
+
+
 def save_db_config(config: dict) -> dict:
     """Save central DB config to the local database (settings overrides table)."""
     from ..db.local_db import SyncSessionLocal
@@ -230,6 +255,7 @@ def save_db_config(config: dict) -> dict:
 
     try:
         with SyncSessionLocal() as db:
+            _ensure_settings_overrides_table(db)
             for key, value in mapping.items():
                 existing = db.execute(
                     text("SELECT id FROM governance_settings_overrides WHERE key = :k"),
@@ -277,6 +303,7 @@ def load_settings_overrides() -> None:
 
     try:
         with SyncSessionLocal() as db:
+            _ensure_settings_overrides_table(db)
             result = db.execute(text("SELECT key, value FROM governance_settings_overrides"))
             overrides = {row[0]: row[1] for row in result}
             if overrides:

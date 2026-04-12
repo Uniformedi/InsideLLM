@@ -219,6 +219,89 @@ variable "anthropic_api_key" {
 }
 
 # =============================================================================
+# ADDITIONAL VENDOR API KEYS (optional — empty disables that vendor)
+# =============================================================================
+
+variable "openai_api_key" {
+  description = "OpenAI API key (https://platform.openai.com). Empty = disabled."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "gemini_api_key" {
+  description = "Google Gemini API key (https://aistudio.google.com). Empty = disabled."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "mistral_api_key" {
+  description = "Mistral API key (https://console.mistral.ai). Empty = disabled."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "cohere_api_key" {
+  description = "Cohere API key (https://dashboard.cohere.com). Empty = disabled."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "azure_openai_api_key" {
+  description = "Azure OpenAI API key. Empty = disabled."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "azure_openai_endpoint" {
+  description = "Azure OpenAI endpoint, e.g. https://my-resource.openai.azure.com"
+  type        = string
+  default     = ""
+}
+
+variable "azure_openai_api_version" {
+  description = "Azure OpenAI API version"
+  type        = string
+  default     = "2024-08-01-preview"
+}
+
+variable "azure_openai_deployment" {
+  description = "Azure OpenAI deployment name (model)"
+  type        = string
+  default     = ""
+}
+
+variable "aws_bedrock_access_key_id" {
+  description = "AWS access key ID for Bedrock. Empty = disabled."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "aws_bedrock_secret_access_key" {
+  description = "AWS secret access key for Bedrock."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "aws_bedrock_region" {
+  description = "AWS region for Bedrock (e.g. us-east-1)"
+  type        = string
+  default     = "us-east-1"
+}
+
+variable "aws_bedrock_model" {
+  description = "Bedrock model ID, e.g. anthropic.claude-3-5-sonnet-20241022-v2:0"
+  type        = string
+  default     = "anthropic.claude-3-5-sonnet-20241022-v2:0"
+}
+
+# =============================================================================
 # LITELLM CONFIGURATION
 # =============================================================================
 

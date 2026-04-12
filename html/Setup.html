@@ -226,6 +226,85 @@
       <input type="text" id="postgresPassword" placeholder="Auto-generated if empty">
     </div>
 
+    <h3 style="font-size:1.1em;color:#2b6cb0;margin:24px 0 6px">Additional Vendor API Keys (optional)</h3>
+    <p class="desc" style="margin:0 0 12px">Enable any additional LLM provider by supplying its credentials. Empty fields are skipped — Anthropic remains the default.</p>
+
+    <details style="margin-bottom:10px;border:1px solid #cbd5e0;border-radius:6px;padding:10px 14px">
+      <summary style="cursor:pointer;font-weight:600">OpenAI</summary>
+      <div class="field" style="margin-top:10px">
+        <label>OpenAI API Key</label>
+        <div class="hint">From <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com</a></div>
+        <input type="text" id="openaiApiKey" placeholder="sk-...">
+      </div>
+    </details>
+
+    <details style="margin-bottom:10px;border:1px solid #cbd5e0;border-radius:6px;padding:10px 14px">
+      <summary style="cursor:pointer;font-weight:600">Google Gemini</summary>
+      <div class="field" style="margin-top:10px">
+        <label>Gemini API Key</label>
+        <div class="hint">From <a href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com</a></div>
+        <input type="text" id="geminiApiKey" placeholder="AIza...">
+      </div>
+    </details>
+
+    <details style="margin-bottom:10px;border:1px solid #cbd5e0;border-radius:6px;padding:10px 14px">
+      <summary style="cursor:pointer;font-weight:600">Mistral</summary>
+      <div class="field" style="margin-top:10px">
+        <label>Mistral API Key</label>
+        <div class="hint">From <a href="https://console.mistral.ai" target="_blank">console.mistral.ai</a></div>
+        <input type="text" id="mistralApiKey" placeholder="...">
+      </div>
+    </details>
+
+    <details style="margin-bottom:10px;border:1px solid #cbd5e0;border-radius:6px;padding:10px 14px">
+      <summary style="cursor:pointer;font-weight:600">Cohere</summary>
+      <div class="field" style="margin-top:10px">
+        <label>Cohere API Key</label>
+        <div class="hint">From <a href="https://dashboard.cohere.com/api-keys" target="_blank">dashboard.cohere.com</a></div>
+        <input type="text" id="cohereApiKey" placeholder="...">
+      </div>
+    </details>
+
+    <details style="margin-bottom:10px;border:1px solid #cbd5e0;border-radius:6px;padding:10px 14px">
+      <summary style="cursor:pointer;font-weight:600">Azure OpenAI</summary>
+      <div class="field" style="margin-top:10px">
+        <label>Azure OpenAI API Key</label>
+        <input type="text" id="azureOpenaiApiKey" placeholder="...">
+      </div>
+      <div class="field">
+        <label>Endpoint</label>
+        <input type="text" id="azureOpenaiEndpoint" placeholder="https://my-resource.openai.azure.com">
+      </div>
+      <div class="field">
+        <label>Deployment Name</label>
+        <input type="text" id="azureOpenaiDeployment" placeholder="gpt-4o">
+      </div>
+      <div class="field">
+        <label>API Version</label>
+        <input type="text" id="azureOpenaiApiVersion" value="2024-08-01-preview">
+      </div>
+    </details>
+
+    <details style="margin-bottom:10px;border:1px solid #cbd5e0;border-radius:6px;padding:10px 14px">
+      <summary style="cursor:pointer;font-weight:600">AWS Bedrock</summary>
+      <div class="field" style="margin-top:10px">
+        <label>AWS Access Key ID</label>
+        <input type="text" id="awsBedrockAccessKey" placeholder="AKIA...">
+      </div>
+      <div class="field">
+        <label>AWS Secret Access Key</label>
+        <input type="text" id="awsBedrockSecretKey" placeholder="...">
+      </div>
+      <div class="field">
+        <label>Region</label>
+        <input type="text" id="awsBedrockRegion" value="us-east-1">
+      </div>
+      <div class="field">
+        <label>Bedrock Model ID</label>
+        <input type="text" id="awsBedrockModel" value="anthropic.claude-3-5-sonnet-20241022-v2:0">
+      </div>
+    </details>
+
     <div class="btn-row">
       <button class="btn btn-secondary" onclick="prevStep()">Back</button>
       <button class="btn btn-primary" onclick="validateStep2() && nextStep()">Next</button>
@@ -1401,6 +1480,20 @@ hyperv_insecure = true
 
 # Anthropic API
 anthropic_api_key = "${v('anthropicApiKey')}"
+
+# Additional Vendor API Keys (empty = vendor disabled)
+openai_api_key                = "${v('openaiApiKey')}"
+gemini_api_key                = "${v('geminiApiKey')}"
+mistral_api_key               = "${v('mistralApiKey')}"
+cohere_api_key                = "${v('cohereApiKey')}"
+azure_openai_api_key          = "${v('azureOpenaiApiKey')}"
+azure_openai_endpoint         = "${v('azureOpenaiEndpoint')}"
+azure_openai_api_version      = "${v('azureOpenaiApiVersion')}"
+azure_openai_deployment       = "${v('azureOpenaiDeployment')}"
+aws_bedrock_access_key_id     = "${v('awsBedrockAccessKey')}"
+aws_bedrock_secret_access_key = "${v('awsBedrockSecretKey')}"
+aws_bedrock_region            = "${v('awsBedrockRegion')}"
+aws_bedrock_model             = "${v('awsBedrockModel')}"
 
 # VM Configuration
 vm_name              = "${v('hostname') || 'InsideLLM'}"
