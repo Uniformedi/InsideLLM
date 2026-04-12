@@ -314,6 +314,17 @@ locals {
     governance_hub_industry         = var.industry
     governance_hub_tier             = var.governance_tier
     governance_hub_classification   = var.data_classification
+    # --- DLP guardrail (LiteLLM-level) ---
+    dlp_enabled                  = var.dlp_enable
+    dlp_mode                     = var.dlp_mode
+    dlp_block_ssn                = var.dlp_block_ssn
+    dlp_block_credit_cards       = var.dlp_block_credit_cards
+    dlp_block_phi                = var.dlp_block_phi
+    dlp_block_credentials        = var.dlp_block_credentials
+    dlp_block_bank_accounts      = var.dlp_block_bank_accounts
+    dlp_block_standalone_dates   = var.dlp_block_standalone_dates
+    dlp_scan_responses           = var.dlp_scan_responses
+    dlp_custom_patterns          = jsonencode(var.dlp_custom_patterns)
   })
 }
 
@@ -345,7 +356,9 @@ locals {
     tls_key            = local.tls_key
     dlp_pipeline_py    = file("${path.module}/../configs/open-webui/dlp-pipeline.py")
     admin_html         = file("${path.module}/../html/admin.html")
-    humility_callback_py = file("${path.module}/../configs/litellm/callbacks/humility_prompt.py")
+    humility_callback_py    = file("${path.module}/../configs/litellm/callbacks/humility_prompt.py")
+    humility_guardrail_py   = file("${path.module}/../configs/litellm/callbacks/humility_guardrail.py")
+    dlp_guardrail_py        = file("${path.module}/../configs/litellm/callbacks/dlp_guardrail.py")
     setup_html         = file("${path.module}/../html/Setup.html")
     deployment_tfvars_b64 = base64encode(local.deployment_tfvars)
     xrdp_password      = local.xrdp_password

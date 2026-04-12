@@ -723,3 +723,37 @@ variable "owner" {
   type        = string
   default     = "Your Company Name"
 }
+
+# =============================================================================
+# DLP GUARDRAIL — extra knobs (the LiteLLM-level guardrail reuses
+# dlp_enable / dlp_block_* / dlp_custom_patterns declared above)
+# =============================================================================
+
+variable "dlp_mode" {
+  description = "DLP action mode: 'block' rejects matching requests, 'redact' replaces matches with [REDACTED-*]."
+  type        = string
+  default     = "block"
+
+  validation {
+    condition     = contains(["block", "redact"], var.dlp_mode)
+    error_message = "dlp_mode must be 'block' or 'redact'."
+  }
+}
+
+variable "dlp_block_bank_accounts" {
+  description = "Block messages containing bank account / routing numbers"
+  type        = bool
+  default     = true
+}
+
+variable "dlp_block_standalone_dates" {
+  description = "Block standalone dates (MM/DD/YYYY, YYYY-MM-DD) that may be dates of birth"
+  type        = bool
+  default     = true
+}
+
+variable "dlp_scan_responses" {
+  description = "Also scan model responses and redact echoed sensitive data"
+  type        = bool
+  default     = true
+}

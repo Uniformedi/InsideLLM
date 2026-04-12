@@ -70,6 +70,18 @@ services:
 %{ if governance_hub_enable ~}
       GOVERNANCE_HUB_URL: "http://governance-hub:8090"
 %{ endif ~}
+      # --- DLP Guardrail (Layer 2 — gateway-level, covers all clients) ---
+      DLP_ENABLED: "${dlp_enabled}"
+      DLP_MODE: "${dlp_mode}"
+      DLP_BLOCK_SSN: "${dlp_block_ssn}"
+      DLP_BLOCK_CREDIT_CARDS: "${dlp_block_credit_cards}"
+      DLP_BLOCK_PHI: "${dlp_block_phi}"
+      DLP_BLOCK_CREDENTIALS: "${dlp_block_credentials}"
+      DLP_BLOCK_BANK_ACCOUNTS: "${dlp_block_bank_accounts}"
+      DLP_BLOCK_STANDALONE_DATES: "${dlp_block_standalone_dates}"
+      DLP_SCAN_RESPONSES: "${dlp_scan_responses}"
+      DLP_LOG_DETECTIONS: "true"
+      DLP_CUSTOM_PATTERNS: '${dlp_custom_patterns}'
       UI_USERNAME: "admin"
       UI_PASSWORD: "${litellm_master_key}"
 %{ if sso_provider == "azure_ad" ~}

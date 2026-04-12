@@ -74,12 +74,26 @@ write_files:
     content: |
       ${indent(6, litellm_config)}
 
-  # --- LiteLLM Humility Prompt Callback ---
+  # --- LiteLLM Humility Prompt Callback (Layer 1: soft guidance) ---
   - path: /opt/InsideLLM/litellm-callbacks/humility_prompt.py
     permissions: "0644"
     owner: root:root
     content: |
       ${indent(6, humility_callback_py)}
+
+  # --- LiteLLM Humility Guardrail (Layer 2: hard enforcement) ---
+  - path: /opt/InsideLLM/litellm-callbacks/humility_guardrail.py
+    permissions: "0644"
+    owner: root:root
+    content: |
+      ${indent(6, humility_guardrail_py)}
+
+  # --- LiteLLM DLP Guardrail (gateway-level, covers all clients) ---
+  - path: /opt/InsideLLM/litellm-callbacks/dlp_guardrail.py
+    permissions: "0644"
+    owner: root:root
+    content: |
+      ${indent(6, dlp_guardrail_py)}
 
   # --- Nginx Config ---
   - path: /opt/InsideLLM/nginx/nginx.conf

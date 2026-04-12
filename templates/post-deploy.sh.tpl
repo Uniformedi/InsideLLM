@@ -44,9 +44,18 @@ wait_for_service "$LITELLM_URL/health/liveliness" "LiteLLM"
 wait_for_service "http://localhost:8080/health" "Open WebUI"
 
 # ---------------------------------------------------------------------------
-# Register DLP pipeline as a global filter in Open WebUI
+# Register the legacy Open WebUI DLP pipeline as INACTIVE.
+#
+# As of platform 3.x, DLP runs at the LiteLLM gateway via
+# callbacks/dlp_guardrail.py — that path is faster (one fewer hop), covers
+# all clients (CLI/API, not just the WebUI), and avoids double-scanning.
+#
+# The WebUI pipeline is still installed but registered inactive so admins
+# can flip it on for belt-and-suspenders if they want a frontend pre-filter
+# (e.g. to block before the message even crosses into LiteLLM's address
+# space). Operators can toggle it via Admin > Functions.
 # ---------------------------------------------------------------------------
-log "Registering DLP pipeline as a global filter..."
+log "Registering legacy WebUI DLP pipeline (inactive — LiteLLM guardrail is the active path)..."
 
 docker exec insidellm-open-webui python3 -c "
 import sys
@@ -60,33 +69,30 @@ SYSTEM_USER = '00000000-0000-0000-0000-000000000000'
 with open('/app/backend/pipelines/dlp-pipeline.py', 'r') as f:
     code = f.read()
 
-# Update if already registered, otherwise create new
 existing = Functions.get_function_by_id(FUNC_ID)
 if existing:
-    Functions.update_function_by_id(FUNC_ID, {
-        'content': code,
-        'is_active': True,
-        'is_global': True
-    })
-    print('DLP filter updated and activated')
+    # Preserve the operator's current is_active setting on upgrades; only
+    # refresh the code so they don't get silently downgraded.
+    Functions.update_function_by_id(FUNC_ID, {'content': code})
+    print('DLP filter code refreshed (active state preserved)')
 else:
     form = FunctionForm(
         id=FUNC_ID,
-        name='DLP Filter Pipeline',
+        name='DLP Filter Pipeline (legacy WebUI-only)',
         content=code,
         meta=FunctionMeta(
-            description='Data Loss Prevention filter that scans messages and files for PII, PHI, SSNs, credit cards, API keys, and connection strings.',
+            description='Legacy WebUI-only DLP. As of 3.x the active DLP runs in LiteLLM and covers all clients. Enable this only if you want an additional frontend pre-filter.',
             manifest={}
         )
     )
     result = Functions.insert_new_function(SYSTEM_USER, 'filter', form)
     if result:
-        Functions.update_function_by_id(result.id, {'is_active': True, 'is_global': True})
-        print(f'DLP filter registered and activated (id={result.id})')
+        Functions.update_function_by_id(result.id, {'is_active': False, 'is_global': False})
+        print(f'DLP filter registered as INACTIVE (id={result.id}); LiteLLM guardrail is the active path')
     else:
         print('ERROR: Failed to register DLP filter')
         sys.exit(1)
-" >> "$LOG" 2>&1 || log "WARNING: DLP pipeline registration failed — register manually via Admin > Functions"
+" >> "$LOG" 2>&1 || log "WARNING: DLP pipeline registration failed — manage manually via Admin > Functions"
 
 # ---------------------------------------------------------------------------
 # Create teams in LiteLLM
