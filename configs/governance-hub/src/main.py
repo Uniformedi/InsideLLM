@@ -21,6 +21,7 @@ app = FastAPI(
     title="InsideLLM Governance Hub",
     version="1.0.0",
     description="Enterprise AI governance management — sync, change management, and AI-powered advisory.",
+    root_path="/governance",
 )
 
 

@@ -214,6 +214,9 @@ http {
 %{ endif ~}
 %{ if ops_uptime_kuma_enable ~}
         # --- Uptime Kuma Service Monitoring ---
+        # Uptime Kuma serves assets/socket.io from absolute root paths, so we
+        # both rewrite HTML refs (sub_filter) and expose the absolute paths it
+        # expects (/assets/, /socket.io/, /icon.svg, etc.) under the same upstream.
         location /status/ {
             proxy_pass http://uptime-kuma/;
             proxy_http_version 1.1;
@@ -224,8 +227,32 @@ http {
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
             proxy_buffering off;
-            # Rewrite Uptime Kuma redirects to include the /status/ prefix
             proxy_redirect / /status/;
+
+            # Rewrite absolute asset/api references in HTML so the browser
+            # requests them under /status/... instead of the nginx root.
+            sub_filter_once off;
+            sub_filter_types text/html application/javascript;
+            sub_filter 'href="/'   'href="/status/';
+            sub_filter 'src="/'    'src="/status/';
+            sub_filter '"/assets/' '"/status/assets/';
+            sub_filter '"/socket.io' '"/status/socket.io';
+        }
+
+        # Uptime Kuma websocket + assets at absolute paths (fallback for clients
+        # that didn't pick up the rewritten HTML, e.g. status page bookmarks).
+        location /assets/ {
+            proxy_pass http://uptime-kuma;
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+        }
+        location /socket.io/ {
+            proxy_pass http://uptime-kuma;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_set_header Host $host;
+            proxy_read_timeout 86400s;
         }
 
 %{ endif ~}
@@ -268,9 +295,10 @@ http {
         }
 
         # --- Health check ---
-        location /nginx-health {
-            return 200 'OK';
-            add_header Content-Type text/plain;
+        location = /nginx-health {
+            access_log off;
+            default_type text/plain;
+            return 200 "OK\n";
         }
     }
 }
