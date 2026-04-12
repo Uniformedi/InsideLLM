@@ -245,7 +245,7 @@
     <li><a href="#appendix">Quick Reference</a></li>
   </ol>
   <div style="margin-top:20px;text-align:center">
-    <a href="Setup.html" style="display:block;background:#38a169;color:#fff;padding:10px 16px;border-radius:6px;font-size:0.88em;font-weight:700;text-decoration:none;transition:background 0.2s;" onmouseover="this.style.background='#2f855a'" onmouseout="this.style.background='#38a169'">Launch Setup Wizard</a>
+    <a href="html/Setup.html" style="display:block;background:#38a169;color:#fff;padding:10px 16px;border-radius:6px;font-size:0.88em;font-weight:700;text-decoration:none;transition:background 0.2s;" onmouseover="this.style.background='#2f855a'" onmouseout="this.style.background='#38a169'">Launch Setup Wizard (html/Setup.html)</a>
   </div>
   <div class="sidebar-footer">Dan Medina, Uniformedi LLC<br>Version 3.1.0 &mdash; April 2026</div>
 </nav>
@@ -261,7 +261,7 @@
   <br>
   <span class="version-badge"><a href="https://github.com/Uniformedi/InsideLLM" style="color: inherit; text-decoration: underline;">GitHub</a> &mdash; BSL 1.1</span>
   <br><br>
-  <a href="Setup.html" style="display:inline-block;background:#38a169;color:#fff;padding:12px 32px;border-radius:6px;font-size:1.05em;font-weight:700;text-decoration:none;letter-spacing:0.3px;transition:background 0.2s;" onmouseover="this.style.background='#2f855a'" onmouseout="this.style.background='#38a169'">Launch Setup Wizard</a>
+  <a href="html/Setup.html" style="display:inline-block;background:#38a169;color:#fff;padding:12px 32px;border-radius:6px;font-size:1.05em;font-weight:700;text-decoration:none;letter-spacing:0.3px;transition:background 0.2s;" onmouseover="this.style.background='#2f855a'" onmouseout="this.style.background='#38a169'">Launch Setup Wizard</a>
 </header>
 
 <div class="container">
@@ -573,24 +573,19 @@ Exposed Host Ports:
            |
            v
   +------------------+
-  | Open WebUI       |
-  | DLP Pipeline     |---- INLET: Scan message text + uploaded files
-  | (pre-processing) |     - Excel, CSV, PDF, Word, PPTX scanned
+  | LiteLLM Proxy    |  1. DLP INLET: Scan message + inlined files
+  | (DLP Gateway)    |     - Excel, CSV, PDF, Word, PPTX scanned
   |                  |     - SSN? BLOCK
   |                  |     - Credit card? BLOCK
   |                  |     - PHI? BLOCK
   |                  |     - API keys? BLOCK
   |                  |     - Custom patterns? BLOCK
+  |                  |  2. Authenticate user (SSO token / API key)
+  |                  |  3. Check budget (PostgreSQL: $5/day remaining?)
+  |                  |  4. Check rate limit (Redis: 30 RPM / 100K TPM?)
+  |                  |  5. Route to correct Claude model
   +--------+---------+
            | Message + clean files pass DLP
-           v
-  +------------------+
-  | LiteLLM Proxy    |  1. Authenticate user (SSO token / API key)
-  |                  |  2. Check budget (PostgreSQL: $5/day remaining?)
-  |                  |  3. Check rate limit (Redis: 30 RPM / 100K TPM?)
-  |                  |  4. Route to correct Claude model
-  +--------+---------+
-           |
            v
   +------------------+
   | Anthropic API    |  Claude generates response
@@ -598,16 +593,11 @@ Exposed Host Ports:
            |
            v
   +------------------+
-  | LiteLLM Proxy    |  5. Record token usage + cost in PostgreSQL
-  |                  |  6. Log to Langfuse (audit trail)
-  |                  |  7. Update Redis rate limit counters
-  +--------+---------+
-           |
-           v
-  +------------------+
-  | Open WebUI       |
-  | DLP Pipeline     |---- OUTLET: Scan assistant response
-  | (post-processing)|     - Redact any echoed-back PII/PHI/creds
+  | LiteLLM Proxy    |  6. DLP OUTLET: Scan assistant response
+  | (DLP Gateway)    |     - Redact any echoed-back PII/PHI/creds
+  |                  |  7. Record token usage + cost in PostgreSQL
+  |                  |  8. Log to Langfuse (audit trail)
+  |                  |  9. Update Redis rate limit counters
   +--------+---------+
            |
            v
@@ -647,7 +637,7 @@ Exposed Host Ports:
   <h3>Why These Technologies?</h3>
   <div class="cards">
     <div class="card"><h4>LiteLLM</h4><p>Only FOSS proxy with per-user budgets + SSO. OpenAI-compatible API (works with Claude Code). Built-in admin UI for non-technical admins.</p></div>
-    <div class="card"><h4>Open WebUI</h4><p>ChatGPT-like UX (zero learning curve). Pipeline system enables custom DLP filters. RAG built-in for document Q&amp;A out of the box.</p></div>
+    <div class="card"><h4>Open WebUI</h4><p>ChatGPT-like UX (zero learning curve). RAG built-in for document Q&amp;A with local embeddings. Tools/functions admin UI for custom integrations.</p></div>
     <div class="card"><h4>PostgreSQL</h4><p>Enterprise-proven, ACID-compliant. Perfect for financial data (spend tracking).</p></div>
     <div class="card"><h4>Redis</h4><p>Sub-millisecond rate limit enforcement. Budget tracking and LiteLLM operational state. Does not cache LLM responses.</p></div>
     <div class="card"><h4>Nginx</h4><p>Industry standard for TLS termination. WebSocket support for streaming responses.</p></div>
@@ -818,7 +808,7 @@ All 5 containers running. Stack operational.</pre>
   <p><strong>Role:</strong> User-facing chat interface with pipeline extensibility.</p>
   <ul>
     <li><strong>ChatGPT-like interface</strong> &mdash; zero learning curve for end users</li>
-    <li><strong>Pipeline system</strong> &mdash; hosts the DLP filter that scans messages and uploaded files</li>
+    <li><strong>RAG + Tools integration</strong> &mdash; document Q&A with local embeddings, and admin UI for custom tools</li>
     <li><strong>RAG (Retrieval-Augmented Generation)</strong> &mdash; users upload documents and ask questions against them using local <code>sentence-transformers/all-MiniLM-L6-v2</code> embeddings (no external API needed). Full-context mode injects entire file contents into the prompt for maximum accuracy.</li>
     <li><strong>User management</strong> &mdash; self-registration with role-based access</li>
     <li><strong>Community sharing disabled</strong> &mdash; no data leaves the organization</li>
@@ -854,9 +844,9 @@ Port 80 (HTTP)                   Port 443 (HTTPS)
   <h2><span class="section-num">08</span> Data Loss Prevention (DLP)</h2>
 
   <h3>Overview</h3>
-  <p>The DLP system is implemented as an <strong>Open WebUI Filter Pipeline</strong> (v2.0) &mdash; a
-  Python module that intercepts every message and uploaded file at two critical
-  points in the conversation flow. It is the primary compliance control in the stack.</p>
+  <p>The DLP system is implemented as a <strong>LiteLLM gateway callback</strong> (<code>dlp_guardrail.py</code>) that
+  scans all traffic at the API gateway level. It intercepts every message and uploaded file at two critical
+  points in the conversation flow, covering <strong>all clients</strong> (Open WebUI, Claude Code CLI, direct API consumers). It is the primary compliance control in the stack.</p>
 
   <div class="diagram">
     <span class="diagram-label">DLP Pipeline Flow</span>
@@ -911,9 +901,10 @@ Port 80 (HTTP)                   Port 443 (HTTPS)
   </div>
 
   <h3>File Upload Scanning</h3>
-  <p>The DLP pipeline runs <strong>before</strong> Open WebUI's RAG pipeline, meaning files are
-  scanned at the raw content level before any text extraction or embedding occurs.
-  If a file contains sensitive data, it is blocked before the LLM ever sees it.</p>
+  <p>Open WebUI extracts text from uploaded files and inlines it into the messages array before
+  the request leaves the frontend. The DLP gateway callback scans both the inlined file content
+  and user messages before they reach Anthropic. If sensitive data is detected, the request is
+  blocked or redacted before the LLM ever sees it.</p>
   <table>
     <thead><tr><th>Format</th><th>Library</th><th>What Gets Scanned</th></tr></thead>
     <tbody>
@@ -1022,7 +1013,7 @@ Please remove the sensitive data and try again.</pre>
   <p>Administrators can add arbitrary regex patterns via Terraform variables or the Open WebUI admin panel at runtime &mdash; no redeployment needed.</p>
 
   <h3>DLP Configuration</h3>
-  <p><strong>1. Terraform Variables (deploy-time)</strong></p>
+  <p>DLP is configured via <strong>Terraform variables (deploy-time)</strong>, which are passed to the LiteLLM gateway callback on container startup:</p>
   <div class="code-block">
     <span class="lang-label">HCL</span>
     <pre># terraform.tfvars
@@ -1037,9 +1028,8 @@ dlp_custom_patterns    = {
 }</pre>
   </div>
 
-  <p><strong>2. Open WebUI Admin Panel (runtime)</strong></p>
-  <p>All DLP settings &mdash; including those set at deploy-time &mdash; can be adjusted at runtime without redeployment. Settings marked with <strong>(runtime only)</strong> below are not configurable via Terraform and must be changed in the admin panel.</p>
-  <p>Navigate to <strong>Admin &gt; Pipelines &gt; DLP Filter &gt; Valves</strong>:</p>
+  <p>For runtime configuration changes, administrators can use <strong>Governance Hub</strong> to create <code>settings_overrides</code> entries that adjust DLP behavior without redeployment. Runtime-only settings are managed via Governance Hub.</p>
+  <p>Alternatively, for the legacy Open WebUI pipeline (if enabled as an optional frontend pre-filter), navigate to <strong>Admin &gt; Pipelines &gt; DLP Filter &gt; Valves</strong>:</p>
   <table>
     <thead><tr><th>Setting</th><th>Default</th><th>Description</th></tr></thead>
     <tbody>
@@ -1076,16 +1066,15 @@ What is NOT logged: The actual sensitive values</pre>
   (openpyxl for Excel, pypdf for PDF, docx2txt for Word, python-pptx for PowerPoint, stdlib csv
   for CSV/TSV, and plain reads for text-based formats).</p>
 
-  <h3>Auto-Registration on Deployment</h3>
-  <p>The DLP pipeline is <strong>automatically registered</strong> as a global filter function in
-  Open WebUI during the post-deployment step. No manual configuration is needed &mdash;
-  <code>terraform apply</code> handles everything:</p>
+  <h3>Deployment</h3>
+  <p>The DLP gateway callback is configured at LiteLLM container startup via <code>config.yaml.tpl</code>, which is rendered from <code>dlp_*</code> Terraform variables. No manual registration is needed &mdash; <code>terraform apply</code> handles everything:</p>
   <ol>
-    <li>Services start and pass health checks</li>
-    <li><code>post-deploy.sh</code> registers the DLP pipeline as an Open WebUI Function</li>
-    <li>The function is activated globally (applies to all users and models)</li>
-    <li>On subsequent deploys, the function is updated in-place (idempotent)</li>
+    <li><code>terraform apply</code> renders <code>config.yaml.tpl</code> with DLP settings</li>
+    <li>LiteLLM container starts and loads the callback class</li>
+    <li>All inbound/outbound traffic is scanned immediately</li>
+    <li>Configuration changes require container restart</li>
   </ol>
+  <p>The legacy Open WebUI pipeline (if enabled as an optional frontend filter) is registered as an Open WebUI Function during post-deployment; it is registered <strong>inactive</strong> by default and can be manually activated via <strong>Admin &gt; Functions</strong> if desired.</p>
 </section>
 
 <!-- ================================================================ -->
@@ -1159,15 +1148,15 @@ What is NOT logged: The actual sensitive values</pre>
   </div>
 
   <h3>DLP + RAG Integration</h3>
-  <p>The DLP pipeline and RAG system work together in sequence:</p>
+  <p>The DLP gateway and RAG system work together in sequence:</p>
   <ol>
-    <li><strong>DLP scans first</strong> &mdash; uploaded files are checked for sensitive data before processing</li>
-    <li><strong>RAG processes clean files</strong> &mdash; only files that pass DLP are embedded and stored</li>
-    <li><strong>Full context injection</strong> &mdash; Claude receives the complete file content alongside the user's question</li>
+    <li><strong>Open WebUI RAG extracts text</strong> &mdash; uploaded files are processed by the RAG engine and their text content is inlined into the messages array</li>
+    <li><strong>DLP scans inlined content</strong> &mdash; the LiteLLM gateway callback scans the inlined file text and user messages for sensitive data</li>
+    <li><strong>Full context injection</strong> &mdash; Claude receives the complete file content alongside the user's question (only if it passes DLP)</li>
     <li><strong>DLP scans the response</strong> &mdash; the outlet filter checks Claude's response for any echoed-back PII</li>
   </ol>
-  <p>If a file contains sensitive data (SSNs, credit cards, PHI), the DLP filter blocks the
-  entire request before RAG or Claude ever see the file contents.</p>
+  <p>If a file contains sensitive data (SSNs, credit cards, PHI), the DLP gateway callback blocks the
+  entire request before Claude ever sees the file contents.</p>
 </section>
 
 <!-- ================================================================ -->
@@ -1411,7 +1400,7 @@ okta_domain        = "your-org.okta.com"</pre>
     <div class="layer"><span class="layer-num">Layer 4</span><span class="layer-name">Authentication</span><span class="layer-desc">Azure AD / Okta SSO (OIDC). Per-user API keys (team-scoped). Master key for admin. SSH key-only access.</span></div>
     <div class="layer"><span class="layer-num">Layer 5</span><span class="layer-name">Authorization</span><span class="layer-desc">Team-based model access (not all users get Opus). Role-based UI access (admin / user). Community sharing disabled.</span></div>
     <div class="layer"><span class="layer-num">Layer 6</span><span class="layer-name">Supply Chain Security</span><span class="layer-desc">SCFW (Supply Chain Firewall) wraps pip inside WSL2. Blocks known-malicious PyPI packages (Datadog dataset). Warns on packages &lt; 24 hours old. OSV.dev vulnerability advisory checks.</span></div>
-    <div class="layer"><span class="layer-num">Layer 7</span><span class="layer-name">Data Protection</span><span class="layer-desc">DLP pipeline: PII, PHI, credentials blocked/redacted. Inlet scanning (messages + uploaded files). Outlet scanning (assistant responses + RAG excerpts).</span></div>
+    <div class="layer"><span class="layer-num">Layer 7</span><span class="layer-name">Data Protection</span><span class="layer-desc">DLP gateway callback: PII, PHI, credentials blocked/redacted. Scans inlined file content (messages + extracted text). Outlet scanning (assistant responses + RAG excerpts).</span></div>
     <div class="layer"><span class="layer-num">Layer 8</span><span class="layer-name">Cost Protection</span><span class="layer-desc">Per-user daily budgets ($5/day default). Global monthly cap ($100/month). Rate limiting: 30 RPM / 100K TPM. 80% budget alert via Slack.</span></div>
     <div class="layer"><span class="layer-num">Layer 9</span><span class="layer-name">Audit &amp; Observability</span><span class="layer-desc">Netdata real-time monitoring (containers, host, DB, Redis). Langfuse callbacks on every LLM call. DLP detection logging (without sensitive data). PostgreSQL spend tracking. Docker health checks.</span></div>
   </div>
@@ -1488,7 +1477,7 @@ okta_domain        = "your-org.okta.com"</pre>
   <h2><span class="section-num">12</span> Deployment &amp; Operations</h2>
 
   <h3>Setup Wizard (Recommended)</h3>
-  <p>Open <strong><a href="Setup.html">Setup.html</a></strong> in your browser for a guided, step-by-step
+  <p>Open <strong><a href="html/Setup.html">html/Setup.html</a></strong> in your browser for a guided, step-by-step
   configuration wizard. It walks you through all deployment options and generates the config file
   (<code>terraform.tfvars</code> or PowerShell command) ready to download.</p>
 
@@ -1567,7 +1556,7 @@ sudo docker compose up -d open-webui</pre>
   <ul>
     <li><strong>Data is preserved</strong> &mdash; PostgreSQL, Redis, and Open WebUI data live on Docker volumes (<code>/opt/InsideLLM/data/</code>), so container recreation does not lose data</li>
     <li><strong>Configuration is preserved</strong> &mdash; config files are bind-mounted from the host filesystem, not baked into images</li>
-    <li><strong>DLP pipeline persists</strong> &mdash; the pipeline is stored in Open WebUI's database and survives container updates</li>
+    <li><strong>DLP configuration persists</strong> &mdash; the gateway callback is configured via <code>config.yaml</code> and environment variables; changes survive container updates</li>
     <li><strong>Downtime</strong> &mdash; expect 30&ndash;60 seconds of downtime while containers restart. Services with health checks will wait for dependencies before starting</li>
     <li><strong>Rollback</strong> &mdash; if an update causes issues, you can pin a specific image version in <code>/opt/InsideLLM/docker-compose.yml</code> (e.g., <code>ghcr.io/open-webui/open-webui:v0.5.10</code>) and recreate</li>
   </ul>
@@ -1621,7 +1610,7 @@ curl -sk https://localhost/health                     # Open WebUI (via Nginx)</
 &#9474;   &#9500;&#9472;&#9472; nginx/
 &#9474;   &#9474;   &#9492;&#9472;&#9472; nginx.conf.tpl              # Reverse proxy + TLS
 &#9474;   &#9492;&#9472;&#9472; open-webui/
-&#9474;       &#9492;&#9472;&#9472; dlp-pipeline.py             # DLP filter (messages + files)
+&#9474;       &#9492;&#9472;&#9472; dlp-pipeline.py             # DLP filter (legacy, inactive by default)
 &#9492;&#9472;&#9472; scripts/
     &#9500;&#9472;&#9472; docker-compose.yml.tpl          # All 5 services definition
     &#9492;&#9472;&#9472; post-deploy.sh.tpl              # Team creation, systemd setup</pre>
@@ -1754,7 +1743,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\Install-InsideLLM-WSL.ps1 -An
       <tr><td><code>litellm_default_user_budget</code></td><td><code>5.0</code></td><td>Per-user daily cap (USD)</td></tr>
       <tr><td><code>litellm_default_user_rpm</code></td><td><code>30</code></td><td>Requests per minute per user</td></tr>
       <tr><td><code>litellm_default_user_tpm</code></td><td><code>100000</code></td><td>Tokens per minute per user</td></tr>
-      <tr><td><code>dlp_enable</code></td><td><code>true</code></td><td>Enable DLP pipeline</td></tr>
+      <tr><td><code>dlp_enable</code></td><td><code>true</code></td><td>Enable DLP gateway callback</td></tr>
       <tr><td><code>dlp_block_ssn</code></td><td><code>true</code></td><td>Block SSNs</td></tr>
       <tr><td><code>dlp_block_credit_cards</code></td><td><code>true</code></td><td>Block credit card numbers</td></tr>
       <tr><td><code>dlp_block_phi</code></td><td><code>true</code></td><td>Block PHI (HIPAA)</td></tr>

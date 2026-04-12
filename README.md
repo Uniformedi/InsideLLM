@@ -46,7 +46,7 @@
 - **Supply Chain Firewall (SCFW)** -- Datadog's [supply-chain-firewall](https://github.com/DataDog/supply-chain-firewall) wraps `pip` to block known-malicious PyPI packages before installation
 - **Local LLM support (Ollama)** -- run open-source models locally alongside Claude (Qwen 2.5 Coder 14B + Qwen 2.5 14B by default)
 - **GPU acceleration** -- native GPU via WSL2, or GPU-PV/DDA passthrough for Hyper-V (`scripts/Setup-GPU-Passthrough.ps1`)
-- **Setup Wizard** -- interactive HTML form that generates your config file (`Setup.html`)
+- **Setup Wizard** -- interactive HTML form that generates your config file (`html/Setup.html`)
 - **Port forwarding script** -- expose all services to LAN clients (`scripts/Port-Forward-InsideLLM.ps1`)
 - **Renamed from claude-wrapper to InsideLLM** -- all paths, services, and defaults updated
 - **VM sizing updated** -- 8 vCPU / 32 GB RAM default (sized for Ollama), with guidance for lighter deployments
@@ -270,24 +270,19 @@ Exposed Host Ports:
            |
            v
   +------------------+
-  | Open WebUI       |
-  | DLP Pipeline     |---- INLET: Scan message text + uploaded files
-  | (pre-processing) |     - Excel, CSV, PDF, Word, PPTX scanned
+  | LiteLLM Proxy    |  1. DLP INLET: Scan message + inlined files
+  | (DLP Gateway)    |     - Excel, CSV, PDF, Word, PPTX scanned
   |                  |     - SSN? BLOCK
   |                  |     - Credit card? BLOCK
   |                  |     - PHI? BLOCK
   |                  |     - API keys? BLOCK
   |                  |     - Custom patterns? BLOCK
+  |                  |  2. Authenticate user (SSO token / API key)
+  |                  |  3. Check budget (PostgreSQL: $5/day remaining?)
+  |                  |  4. Check rate limit (Redis: 30 RPM / 100K TPM?)
+  |                  |  5. Route to correct Claude model
   +--------+---------+
            | Message + clean files pass DLP
-           v
-  +------------------+
-  | LiteLLM Proxy    |  1. Authenticate user (SSO token / API key)
-  |                  |  2. Check budget (PostgreSQL: $5/day remaining?)
-  |                  |  3. Check rate limit (Redis: 30 RPM / 100K TPM?)
-  |                  |  4. Route to correct Claude model
-  +--------+---------+
-           |
            v
   +------------------+
   | Anthropic API    |  Claude generates response
@@ -295,16 +290,11 @@ Exposed Host Ports:
            |
            v
   +------------------+
-  | LiteLLM Proxy    |  5. Record token usage + cost in PostgreSQL
-  |                  |  6. Log to Langfuse (audit trail)
-  |                  |  7. Update Redis rate limit counters
-  +--------+---------+
-           |
-           v
-  +------------------+
-  | Open WebUI       |
-  | DLP Pipeline     |---- OUTLET: Scan assistant response
-  | (post-processing)|     - Redact any echoed-back PII/PHI/creds
+  | LiteLLM Proxy    |  6. DLP OUTLET: Scan assistant response
+  | (DLP Gateway)    |     - Redact any echoed-back PII/PHI/creds
+  |                  |  7. Record token usage + cost in PostgreSQL
+  |                  |  8. Log to Langfuse (audit trail)
+  |                  |  9. Update Redis rate limit counters
   +--------+---------+
            |
            v
@@ -520,7 +510,7 @@ Anthropic prompt caching is handled automatically by LiteLLM when applicable.
 **Role:** User-facing chat interface with pipeline extensibility.
 
 - **ChatGPT-like interface** -- zero learning curve for end users
-- **Pipeline system** -- hosts the DLP filter that scans messages and uploaded files
+- **RAG + Tools integration** -- document Q&A with local embeddings, and admin UI for custom tools
 - **RAG (Retrieval-Augmented Generation)** -- users upload documents and ask
   questions against them using local `sentence-transformers/all-MiniLM-L6-v2`
   embeddings (no external API needed). Full-context mode injects entire file
@@ -557,9 +547,9 @@ Port 80 (HTTP)                   Port 443 (HTTPS)
 
 ### Overview
 
-The DLP system is implemented as an **Open WebUI Filter Pipeline** (v2.0) -- a
-Python module that intercepts every message and uploaded file at two critical
-points in the conversation flow. It is the primary compliance control in the stack.
+The DLP system is implemented as a **LiteLLM gateway callback** (`dlp_guardrail.py`) that
+scans all traffic at the API gateway level. It intercepts every message and uploaded file at two critical
+points in the conversation flow, covering **all clients** (Open WebUI, Claude Code CLI, direct API consumers). It is the primary compliance control in the stack.
 
 ```
 +=============================================================+
@@ -613,9 +603,10 @@ points in the conversation flow. It is the primary compliance control in the sta
 
 ### File Upload Scanning
 
-The DLP pipeline runs **before** Open WebUI's RAG pipeline, meaning files are
-scanned at the raw content level before any text extraction or embedding occurs.
-If a file contains sensitive data, it is blocked before the LLM ever sees it.
+Open WebUI extracts text from uploaded files and inlines it into the messages array before
+the request leaves the frontend. The DLP gateway callback scans both the inlined file content
+and user messages before they reach Anthropic. If sensitive data is detected, the request is
+blocked or redacted before the LLM ever sees it.
 
 ```
 Supported File Formats:
@@ -719,9 +710,8 @@ the Open WebUI admin panel at runtime -- no redeployment needed.
 
 ### DLP Configuration
 
-DLP is configurable at **two levels**:
-
-**1. Terraform Variables (deploy-time)**
+DLP is configured via **Terraform variables (deploy-time)**, which are passed to the LiteLLM
+gateway callback on container startup:
 
 ```hcl
 # terraform.tfvars
@@ -736,13 +726,12 @@ dlp_custom_patterns    = {
 }
 ```
 
-**2. Open WebUI Admin Panel (runtime)**
+For runtime configuration changes, administrators can use **Governance Hub** to create
+`settings_overrides` entries that adjust DLP behavior without redeployment. Runtime-only
+settings (per the table below) are managed via Governance Hub:
 
-All DLP settings -- including those set at deploy-time -- can be adjusted at
-runtime without redeployment. Settings marked with **(runtime only)** below
-are not configurable via Terraform and must be changed in the admin panel.
-
-Navigate to **Admin > Pipelines > DLP Filter > Valves**:
+Alternatively, for the legacy Open WebUI pipeline (if enabled as an optional frontend pre-filter),
+navigate to **Admin > Pipelines > DLP Filter > Valves**:
 
 | Setting | Default | Description |
 |---------|---------|-------------|
@@ -782,16 +771,20 @@ extracting text using format-specific parsers (openpyxl for Excel, pypdf for
 PDF, docx2txt for Word, python-pptx for PowerPoint, stdlib csv for CSV/TSV,
 and plain reads for text-based formats).
 
-### Auto-Registration on Deployment
+### Deployment
 
-The DLP pipeline is **automatically registered** as a global filter function in
-Open WebUI during the post-deployment step. No manual configuration is needed --
+The DLP gateway callback is configured at LiteLLM container startup via `config.yaml.tpl`,
+which is rendered from `dlp_*` Terraform variables. No manual registration is needed --
 `terraform apply` handles everything:
 
-1. Services start and pass health checks
-2. `post-deploy.sh` registers the DLP pipeline as an Open WebUI Function
-3. The function is activated globally (applies to all users and models)
-4. On subsequent deploys, the function is updated in-place (idempotent)
+1. `terraform apply` renders `config.yaml.tpl` with DLP settings
+2. LiteLLM container starts and loads the callback class
+3. All inbound/outbound traffic is scanned immediately
+4. Configuration changes require container restart
+
+The legacy Open WebUI pipeline (if enabled as an optional frontend filter) is registered
+as an Open WebUI Function during post-deployment; it is registered **inactive** by default
+and can be manually activated via **Admin > Functions** if desired.
 
 ---
 
@@ -858,15 +851,15 @@ The stack uses **local sentence-transformers** instead of OpenAI's embedding API
 
 ### DLP + RAG Integration
 
-The DLP pipeline and RAG system work together in sequence:
+The DLP gateway and RAG system work together in sequence:
 
-1. **DLP scans first** -- uploaded files are checked for sensitive data before processing
-2. **RAG processes clean files** -- only files that pass DLP are embedded and stored
-3. **Full context injection** -- Claude receives the complete file content alongside the user's question
+1. **Open WebUI RAG extracts text** -- uploaded files are processed by the RAG engine and their text content is inlined into the messages array
+2. **DLP scans inlined content** -- the LiteLLM gateway callback scans the inlined file text and user messages for sensitive data
+3. **Full context injection** -- Claude receives the complete file content alongside the user's question (only if it passes DLP)
 4. **DLP scans the response** -- the outlet filter checks Claude's response for any echoed-back PII
 
-If a file contains sensitive data (SSNs, credit cards, PHI), the DLP filter blocks the
-entire request before RAG or Claude ever see the file contents.
+If a file contains sensitive data (SSNs, credit cards, PHI), the DLP gateway callback blocks the
+entire request before Claude ever sees the file contents.
 
 ---
 
@@ -1217,8 +1210,8 @@ LAYER 6: Supply Chain Security
 
 LAYER 7: Data Protection (DLP)
 +------------------------------------------------------------+
-| DLP pipeline: PII, PHI, credentials blocked/redacted      |
-| Inlet scanning (messages + uploaded files)                |
+| DLP gateway callback: PII, PHI, credentials blocked/redacted|
+| Scans inlined file content (messages + extracted text)    |
 | Outlet scanning (assistant responses + RAG excerpts)      |
 | Custom patterns for org-specific data                     |
 +------------------------------------------------------------+
@@ -1311,7 +1304,7 @@ automatically via LiteLLM's built-in alerting system.
 
 ### Setup Wizard (Recommended)
 
-Open **`Setup.html`** in your browser for a guided, step-by-step configuration wizard.
+Open **`html/Setup.html`** in your browser for a guided, step-by-step configuration wizard.
 It walks you through all deployment options and generates the config file
 (`terraform.tfvars` or PowerShell command) ready to download. No command-line
 knowledge needed to configure -- just fill in the form and click Download.
@@ -1404,8 +1397,8 @@ sudo docker compose up -d open-webui
   does not lose data
 - **Configuration is preserved** -- config files are bind-mounted from the
   host filesystem, not baked into images
-- **DLP pipeline persists** -- the pipeline is stored in Open WebUI's
-  database and survives container updates
+- **DLP configuration persists** -- the gateway callback is configured via `config.yaml`
+  and environment variables; changes survive container updates
 - **Downtime** -- expect 30-60 seconds of downtime while containers restart.
   Services with health checks will wait for dependencies before starting
 - **Rollback** -- if an update causes issues, you can pin a specific image
@@ -1493,8 +1486,8 @@ InsideLLM/
     |   +-- policies/humility/          # Mandatory alignment policy (Rego)
     |   +-- policies/industry/          # HIPAA, FDCPA, SOX, PCI, FERPA, GLBA
     |   +-- policies/decision.rego      # Decision aggregation
-    +-- open-webui/                     # DLP pipeline + 6 tool integrations
-    |   +-- dlp-pipeline.py             # DLP filter (messages + files)
+    +-- open-webui/                     # Optional frontend filters + 6 tool integrations
+    |   +-- dlp-pipeline.py             # DLP filter (legacy, inactive by default)
     |   +-- docforge-tool.py            # File generation/conversion
     |   +-- governance-advisor-tool.py  # AI governance analysis
     |   +-- fleet-management-tool.py    # Cross-instance management
@@ -1876,6 +1869,12 @@ User Message → DLP Pipeline → OPA Pipeline → LiteLLM → Claude
 
 ### Humility Policy (Mandatory)
 
+The Humility policy is implemented as a standalone MIT-licensed pip package
+([`humility-guardrail`](https://github.com/uniformedi/humility-guardrail)) that the LiteLLM
+container installs at startup. The InsideLLM callbacks (`humility_prompt.py` and `humility_guardrail.py`)
+are thin subclasses that add Redis prompt loading, OPA delegation, and governance-hub audit logging
+on top of the canonical implementation.
+
 Always loaded, cannot be disabled. Denies when:
 - Metaphysical context produces directives
 - High-confidence output lacks uncertainty declaration
@@ -1973,7 +1972,7 @@ The PowerShell native fallback writes a minimal ISO 9660 image using .NET `Syste
 | `litellm_default_user_budget` | `5.0` | Per-user daily cap (USD) |
 | `litellm_default_user_rpm` | `30` | Requests per minute per user |
 | `litellm_default_user_tpm` | `100000` | Tokens per minute per user |
-| `dlp_enable` | `true` | Enable DLP pipeline |
+| `dlp_enable` | `true` | Enable DLP gateway callback |
 | `dlp_block_ssn` | `true` | Block SSNs |
 | `dlp_block_credit_cards` | `true` | Block credit card numbers |
 | `dlp_block_phi` | `true` | Block PHI (HIPAA) |
