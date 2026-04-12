@@ -313,6 +313,62 @@ $vmName = $_tf["vm_name"]
 if (-not $vmName) { $vmName = $_tf["vm_hostname"]; if (-not $vmName) { $vmName = "InsideLLM" } }
 Write-Host "  VM Name: $vmName" -ForegroundColor Green
 
+# =============================================================================
+# Pre-flight: Hyper-V Virtual Switch selection
+# =============================================================================
+Write-Step "Hyper-V Virtual Switch"
+
+$cfgSwitchName = if ($_tf["vm_switch_name"]) { $_tf["vm_switch_name"] } else { "InsideLLM" }
+
+# Discover existing switches that have external (or internal) network access
+$externalSwitches = @(Get-VMSwitch -ErrorAction SilentlyContinue | Where-Object { $_.SwitchType -eq 'External' })
+
+if ($externalSwitches.Count -gt 0) {
+    Write-Host "  Found $($externalSwitches.Count) existing External virtual switch(es):" -ForegroundColor White
+    Write-Host ""
+    for ($i = 0; $i -lt $externalSwitches.Count; $i++) {
+        $sw = $externalSwitches[$i]
+        $adapter = ($sw.NetAdapterInterfaceDescription | Out-String).Trim()
+        if (-not $adapter) { $adapter = "(unknown adapter)" }
+        $marker = if ($sw.Name -eq $cfgSwitchName) { " <-- current tfvars" } else { "" }
+        Write-Host "    [$($i + 1)] $($sw.Name)  -  $adapter$marker" -ForegroundColor Cyan
+    }
+    Write-Host "    [N] Create a new switch named '$cfgSwitchName'" -ForegroundColor Yellow
+    Write-Host ""
+    $switchChoice = Read-Host "  Select a switch [1-$($externalSwitches.Count)/N]"
+
+    if ($switchChoice -and $switchChoice.ToUpper() -ne 'N') {
+        $idx = 0
+        if ([int]::TryParse($switchChoice, [ref]$idx) -and $idx -ge 1 -and $idx -le $externalSwitches.Count) {
+            $chosen = $externalSwitches[$idx - 1]
+            Write-Ok "Using existing switch: $($chosen.Name)"
+
+            # Update in-memory tfvars and patch the file so Terraform sees the right switch
+            if ($chosen.Name -ne $cfgSwitchName) {
+                $_tf["vm_switch_name"] = $chosen.Name
+                $_tf["vm_switch_type"] = "External"
+                # Patch tfvars file
+                $tfContent = Get-Content $tfvarsPath -Raw
+                $tfContent = $tfContent -replace '(?m)^vm_switch_name\s*=\s*"[^"]*"', "vm_switch_name    = `"$($chosen.Name)`""
+                $tfContent = $tfContent -replace '(?m)^vm_switch_type\s*=\s*"[^"]*"', 'vm_switch_type    = "External"'
+                Set-Content -Path $tfvarsPath -Value $tfContent -NoNewline
+                Write-Ok "Updated terraform.tfvars with switch '$($chosen.Name)'"
+            }
+        } else {
+            Write-Fail "Invalid selection. Exiting."
+            Read-Host "  Press Enter to exit"
+            return
+        }
+    } else {
+        Write-Host "  Will create new switch '$cfgSwitchName' during terraform apply" -ForegroundColor DarkGray
+    }
+} else {
+    Write-Host "  No existing External virtual switches found." -ForegroundColor DarkGray
+    Write-Host "  A new switch '$cfgSwitchName' will be created during terraform apply." -ForegroundColor DarkGray
+}
+
+Write-Host ""
+
 # Pre-flight: check if a VM with this name already exists on this Hyper-V host
 try {
     $existingVm = Get-VM -Name $vmName -ErrorAction SilentlyContinue
