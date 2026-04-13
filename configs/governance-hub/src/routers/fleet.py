@@ -4,10 +4,13 @@ from pydantic import BaseModel
 from ..middleware.auth import verify_api_key
 from ..services.fleet_service import (
     compare_instances,
+    deregister_instance,
     get_fleet_summary,
     get_instance_detail,
+    get_instance_overrides,
     initialize_central_db,
     list_instances,
+    set_instance_overrides,
     test_db_connection,
     get_db_config,
     save_db_config,
@@ -42,6 +45,52 @@ async def get_instance(instance_id: str):
     if not detail:
         raise HTTPException(status_code=404, detail="Instance not found or central DB not configured")
     return detail
+
+
+class InstanceOverrides(BaseModel):
+    alert_webhook: str | None = None
+    updated_by: str = "admin"
+
+
+@router.get("/instances/{instance_id}/settings")
+async def read_instance_settings(instance_id: str):
+    """Get per-instance settings overrides stored in the central fleet DB."""
+    data = await get_instance_overrides(instance_id)
+    if data is None:
+        raise HTTPException(status_code=503, detail="Central DB not configured")
+    return data
+
+
+@router.put("/instances/{instance_id}/settings")
+async def write_instance_settings(instance_id: str, overrides: InstanceOverrides):
+    """Upsert per-instance settings overrides (e.g. alert_webhook).
+
+    Stored in governance_instance_overrides. Note: this records *intent* only.
+    Live propagation to the target instance's running containers is out of
+    scope; redeploy or rerun terraform apply on that instance for overrides to
+    take effect.
+    """
+    result = await set_instance_overrides(
+        instance_id,
+        alert_webhook=overrides.alert_webhook,
+        updated_by=overrides.updated_by,
+    )
+    if not result["success"]:
+        raise HTTPException(status_code=503, detail=result["message"])
+    return result
+
+
+@router.delete("/instances/{instance_id}")
+async def delete_instance(instance_id: str):
+    """Deregister an instance (soft delete — status set to 'deregistered').
+
+    History (telemetry, changes) is preserved for audit. The instance stops
+    appearing in active fleet counts and tiles.
+    """
+    result = await deregister_instance(instance_id)
+    if not result["success"]:
+        raise HTTPException(status_code=404, detail=result["message"])
+    return result
 
 
 @router.get("/summary")

@@ -1904,7 +1904,7 @@ async function loadFleet() {
   const latestVersion = summary?.latest_version || currentVersion;
 
   if (allInstances.length) {
-    table.innerHTML = `<table class="data-table"><thead><tr><th>Instance</th><th>Version</th><th>Industry</th><th>Tier</th><th>Classification</th><th>Last Sync</th><th>Compliance</th><th>Spend</th><th>Actions</th></tr></thead><tbody>` +
+    table.innerHTML = `<table class="data-table"><thead><tr><th>Instance</th><th>Version</th><th>Industry</th><th>Tier</th><th>Classification</th><th>Last Sync</th><th>Compliance</th><th>Spend</th><th>Alert Webhook</th><th>Actions</th></tr></thead><tbody>` +
       allInstances.map(i => {
         const tel = i.latest_telemetry || {};
         const scoreVal = tel.compliance_score;
@@ -1916,6 +1916,15 @@ async function loadFleet() {
         const ver = i.platform_version || (i._local ? currentVersion : 'unknown');
         const outdated = latestVersion && ver && ver !== 'unknown' && ver !== latestVersion;
         const verBadge = outdated ? `<span class="badge badge-warn">outdated</span>` : '';
+        const hook = (i.overrides && i.overrides.alert_webhook) || '';
+        const hookPreview = hook ? `<code title="${hook.replace(/"/g, '&quot;')}">${hook.length > 28 ? hook.slice(0, 25) + '...' : hook}</code>` : '<span style="color:var(--text-muted)">--</span>';
+        const nameEsc = i.instance_name.replace(/'/g, "\\'");
+        const webhookCell = i._local
+          ? `<span style="color:var(--text-muted);font-family:var(--font-mono);font-size:11px">set in tfvars</span>`
+          : `<div style="display:flex;gap:6px;align-items:center">
+              ${hookPreview}
+              <button class="btn btn-action" style="padding:2px 8px;font-size:11px" onclick="editAlertWebhook('${i.instance_id}','${nameEsc}', ${JSON.stringify(hook)})">Edit</button>
+            </div>`;
         return `<tr>
           <td><strong>${i.instance_name}</strong>${localBadge}</td>
           <td><code>${ver}</code> ${verBadge}</td>
@@ -1925,8 +1934,12 @@ async function loadFleet() {
           <td>${syncTime}</td>
           <td>${score}</td>
           <td>${spend}</td>
+          <td>${webhookCell}</td>
           <td>${i._local ? '<span style="color:var(--text-muted);font-family:var(--font-mono);font-size:11px">Local</span>' :
-            `<button class="btn btn-action" onclick="openCloneModal('${i.instance_id}','${i.instance_name}')">Clone Config</button>`}</td>
+            `<div style="display:flex;gap:6px;flex-wrap:wrap">
+              <button class="btn btn-action" onclick="openCloneModal('${i.instance_id}','${nameEsc}')">Clone Config</button>
+              <button class="btn btn-deny" onclick="deregisterInstance('${i.instance_id}','${nameEsc}')">Deregister</button>
+            </div>`}</td>
         </tr>`;
       }).join('') +
       `</tbody></table>`;
@@ -1977,6 +1990,57 @@ function buildServiceCards() {
 // ================================================================
 // Clone Config modal
 // ================================================================
+async function editAlertWebhook(instanceId, instanceName, current) {
+  const next = prompt(
+    `Alert Webhook for "${instanceName}"\n\n`
+    + `This records intent in the central fleet DB — the target instance still `
+    + `needs a redeploy (or manual env edit) for the new webhook to take effect.\n\n`
+    + `Leave blank to clear. Paste Slack/Teams incoming-webhook URL:`,
+    current || ''
+  );
+  if (next === null) return;
+  const payload = { alert_webhook: next.trim() === '' ? null : next.trim() };
+  try {
+    const res = await fetch(`/governance/api/v1/fleet/instances/${encodeURIComponent(instanceId)}/settings`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      alert(`Save failed: ${body.detail || res.statusText}`);
+      return;
+    }
+    loadFleet();
+  } catch (e) {
+    alert(`Save failed: ${e.message}`);
+  }
+}
+
+async function deregisterInstance(instanceId, instanceName) {
+  const msg = `Deregister "${instanceName}" (${instanceId})?\n\n`
+    + `This marks the instance as inactive in the central fleet DB. `
+    + `Telemetry and change history are preserved for audit, but it will `
+    + `stop appearing in fleet counts and tiles.\n\n`
+    + `If you also want to destroy the running VM, run "terraform destroy" `
+    + `on that node after deregistering.`;
+  if (!confirm(msg)) return;
+  try {
+    const res = await fetch(`/governance/api/v1/fleet/instances/${encodeURIComponent(instanceId)}`, {
+      method: 'DELETE',
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      alert(`Deregister failed: ${body.detail || res.statusText}`);
+      return;
+    }
+    alert(body.message || 'Instance deregistered');
+    loadFleet();
+  } catch (e) {
+    alert(`Deregister failed: ${e.message}`);
+  }
+}
+
 async function openCloneModal(instanceId, instanceName) {
   document.getElementById('cloneSourceId').value = instanceId;
   document.getElementById('cloneSourceName').value = instanceName;

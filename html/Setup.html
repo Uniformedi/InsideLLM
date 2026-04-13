@@ -726,6 +726,11 @@
       </div>
 
       <div id="adJoinFields" style="display:none">
+        <div class="field">
+          <label>Domain Controller IP</label>
+          <div class="hint">IP address of the AD domain controller. Automatically set as the first DNS server so the VM can resolve <code>_ldap._tcp.&lt;domain&gt;</code> SRV records.</div>
+          <input type="text" id="adDcIp" placeholder="10.0.0.10" oninput="syncAdDcIpToDns()">
+        </div>
         <div class="row">
           <div class="field">
             <label>Domain Join Username</label>
@@ -976,10 +981,16 @@ function prevStep() {
 // ================================================================
 // Deployment path toggle
 // ================================================================
-function selectDeploy(path) {
+function selectDeploy(path, evt) {
   deployPath = path;
   document.querySelectorAll('#deployToggle label').forEach(l => l.classList.remove('selected'));
-  event.currentTarget.classList.add('selected');
+  const triggerEl = (evt && evt.currentTarget) || (typeof event !== 'undefined' && event && event.currentTarget) || null;
+  if (triggerEl) {
+    triggerEl.classList.add('selected');
+  } else {
+    const target = document.querySelector(`#deployToggle input[value="${path}"]`);
+    if (target && target.closest('label')) target.closest('label').classList.add('selected');
+  }
 
   const info = document.getElementById('deployInfo');
   const hvFields = document.getElementById('hypervNetworkFields');
@@ -1253,7 +1264,25 @@ function getKeywordCategories() {
 function toggleAdJoin() {
   const on = document.getElementById('adDomainJoin').checked;
   document.getElementById('adJoinFields').style.display = on ? 'block' : 'none';
+  if (on) syncAdDcIpToDns();
   updateAdAuthHint();
+}
+
+let _lastAdDcIp = '';
+function syncAdDcIpToDns() {
+  const adOn = document.getElementById('adDomainJoin') && document.getElementById('adDomainJoin').checked;
+  const dcEl = document.getElementById('adDcIp');
+  const dnsEl = document.getElementById('vmDns');
+  if (!adOn || !dcEl || !dnsEl) return;
+  const dc = dcEl.value.trim();
+  if (!dc) return;
+  let current = dnsEl.value.split(',').map(s => s.trim()).filter(Boolean);
+  if (_lastAdDcIp && _lastAdDcIp !== dc) {
+    current = current.filter(ip => ip !== _lastAdDcIp);
+  }
+  const deduped = current.filter(ip => ip !== dc);
+  dnsEl.value = [dc, ...deduped].join(', ');
+  _lastAdDcIp = dc;
 }
 
 function updateAdAuthHint() {

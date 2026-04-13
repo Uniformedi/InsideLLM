@@ -196,6 +196,27 @@ class _PostgreSQL:
         WHERE token = :token
     """
 
+    deregister_instance = """
+        UPDATE governance_instances
+        SET status = 'deregistered'
+        WHERE instance_id = :iid
+    """
+
+    get_instance_overrides = """
+        SELECT instance_id, alert_webhook, updated_at, updated_by
+        FROM governance_instance_overrides
+        WHERE instance_id = :iid
+    """
+
+    upsert_instance_overrides = """
+        INSERT INTO governance_instance_overrides (instance_id, alert_webhook, updated_at, updated_by)
+        VALUES (:iid, :alert_webhook, NOW(), :updated_by)
+        ON CONFLICT (instance_id) DO UPDATE SET
+            alert_webhook = EXCLUDED.alert_webhook,
+            updated_at = NOW(),
+            updated_by = EXCLUDED.updated_by
+    """
+
 
 class _MSSQL:
     """Microsoft SQL Server dialect."""
@@ -367,6 +388,23 @@ class _MSSQL:
         WHERE token = :token
     """
 
+    deregister_instance = _PostgreSQL.deregister_instance
+
+    get_instance_overrides = _PostgreSQL.get_instance_overrides
+
+    upsert_instance_overrides = """
+        MERGE governance_instance_overrides AS target
+        USING (SELECT :iid AS instance_id) AS source
+        ON target.instance_id = source.instance_id
+        WHEN MATCHED THEN UPDATE SET
+            alert_webhook = :alert_webhook,
+            updated_at = GETDATE(),
+            updated_by = :updated_by
+        WHEN NOT MATCHED THEN INSERT
+            (instance_id, alert_webhook, updated_at, updated_by)
+        VALUES (:iid, :alert_webhook, GETDATE(), :updated_by);
+    """
+
 
 class _MariaDB:
     """MariaDB / MySQL dialect."""
@@ -450,6 +488,17 @@ class _MariaDB:
     create_registration_token = _PostgreSQL.create_registration_token
     validate_registration_token = _PostgreSQL.validate_registration_token
     mark_token_used = _PostgreSQL.mark_token_used
+    deregister_instance = _PostgreSQL.deregister_instance
+    get_instance_overrides = _PostgreSQL.get_instance_overrides
+
+    upsert_instance_overrides = """
+        INSERT INTO governance_instance_overrides (instance_id, alert_webhook, updated_at, updated_by)
+        VALUES (:iid, :alert_webhook, NOW(), :updated_by)
+        ON DUPLICATE KEY UPDATE
+            alert_webhook = VALUES(alert_webhook),
+            updated_at = NOW(),
+            updated_by = VALUES(updated_by)
+    """
 
 
 def _get_dialect_class():

@@ -27,16 +27,89 @@ async def list_instances() -> list[dict]:
         for row in result.mappings():
             tel = db.execute(text(SQL.latest_telemetry), {"iid": row["instance_id"]})
             tel_row = tel.mappings().first()
+            overrides = None
+            try:
+                ov = db.execute(text(SQL.get_instance_overrides), {"iid": row["instance_id"]})
+                ov_row = ov.mappings().first()
+                if ov_row:
+                    overrides = {
+                        "alert_webhook": ov_row.get("alert_webhook"),
+                        "updated_at": ov_row["updated_at"].isoformat() if ov_row.get("updated_at") else None,
+                        "updated_by": ov_row.get("updated_by"),
+                    }
+            except Exception:
+                pass
             instances.append({
                 **dict(row),
                 "last_sync_at": row["last_sync_at"].isoformat() if row["last_sync_at"] else None,
                 "created_at": row["created_at"].isoformat() if row["created_at"] else None,
                 "latest_telemetry": dict(tel_row) if tel_row else None,
+                "overrides": overrides,
             })
         return instances
 
     result = await run_central_query(_query)
     return result if result is not None else []
+
+
+async def get_instance_overrides(instance_id: str) -> dict | None:
+    """Fetch per-instance setting overrides from the central DB."""
+    from ..db.central_sql import SQL
+
+    def _query(db):
+        result = db.execute(text(SQL.get_instance_overrides), {"iid": instance_id})
+        row = result.mappings().first()
+        if not row:
+            return {"instance_id": instance_id, "alert_webhook": None, "updated_at": None, "updated_by": None}
+        return {
+            "instance_id": row["instance_id"],
+            "alert_webhook": row.get("alert_webhook"),
+            "updated_at": row["updated_at"].isoformat() if row.get("updated_at") else None,
+            "updated_by": row.get("updated_by"),
+        }
+
+    return await run_central_query(_query)
+
+
+async def set_instance_overrides(instance_id: str, alert_webhook: str | None, updated_by: str = "admin") -> dict:
+    """Upsert per-instance setting overrides in the central DB."""
+    from ..db.central_sql import SQL
+
+    def _query(db):
+        db.execute(text(SQL.upsert_instance_overrides), {
+            "iid": instance_id,
+            "alert_webhook": alert_webhook,
+            "updated_by": updated_by,
+        })
+        db.commit()
+        return {"rowcount": 1}
+
+    outcome = await run_central_query(_query)
+    if outcome is None:
+        return {"success": False, "message": "Central DB not configured"}
+    return {"success": True, "message": f"Overrides saved for '{instance_id}'"}
+
+
+async def deregister_instance(instance_id: str) -> dict:
+    """Soft-deregister an instance by setting status='deregistered' in the central DB.
+
+    Returns {'success': bool, 'message': str}. History (telemetry, changes) is
+    preserved for audit; the fleet count and active tiles exclude deregistered
+    instances because they filter on status='active'.
+    """
+    from ..db.central_sql import SQL
+
+    def _query(db):
+        result = db.execute(text(SQL.deregister_instance), {"iid": instance_id})
+        db.commit()
+        return {"rowcount": result.rowcount}
+
+    outcome = await run_central_query(_query)
+    if outcome is None:
+        return {"success": False, "message": "Central DB not configured"}
+    if outcome.get("rowcount", 0) == 0:
+        return {"success": False, "message": f"Instance '{instance_id}' not found"}
+    return {"success": True, "message": f"Instance '{instance_id}' deregistered"}
 
 
 async def get_instance_detail(instance_id: str) -> dict | None:
@@ -419,6 +492,12 @@ _TABLES_POSTGRESQL = [
         used_at TIMESTAMP,
         is_used BOOLEAN DEFAULT FALSE
     )""",
+    """CREATE TABLE IF NOT EXISTS governance_instance_overrides (
+        instance_id VARCHAR(100) PRIMARY KEY,
+        alert_webhook TEXT,
+        updated_at TIMESTAMP DEFAULT NOW(),
+        updated_by VARCHAR(100)
+    )""",
 ]
 
 _TABLES_MSSQL = [
@@ -526,6 +605,13 @@ _TABLES_MSSQL = [
         used_at DATETIME2,
         is_used BIT DEFAULT 0
     )""",
+    """IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'governance_instance_overrides')
+    CREATE TABLE governance_instance_overrides (
+        instance_id VARCHAR(100) PRIMARY KEY,
+        alert_webhook NVARCHAR(MAX),
+        updated_at DATETIME2 DEFAULT GETDATE(),
+        updated_by VARCHAR(100)
+    )""",
 ]
 
 _TABLES_MARIADB = [
@@ -624,6 +710,12 @@ _TABLES_MARIADB = [
         used_by VARCHAR(100),
         used_at DATETIME,
         is_used BOOLEAN DEFAULT FALSE
+    )""",
+    """CREATE TABLE IF NOT EXISTS governance_instance_overrides (
+        instance_id VARCHAR(100) PRIMARY KEY,
+        alert_webhook TEXT,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_by VARCHAR(100)
     )""",
 ]
 
