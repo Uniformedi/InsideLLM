@@ -360,18 +360,21 @@ runcmd:
   - |
     mkdir -p /etc/systemd/journald.conf.d
     systemctl restart systemd-journald
-    CRON_ENTRIES="*/15 * * * * /usr/local/bin/disk-monitor.sh"
+    CRON_TMP=$(mktemp)
+    crontab -l 2>/dev/null > "$CRON_TMP" || true
+    printf '%%s\n' "*/15 * * * * /usr/local/bin/disk-monitor.sh" >> "$CRON_TMP"
 %{ if ops_backup_schedule == "daily" ~}
-    CRON_ENTRIES="$CRON_ENTRIES\n0 2 * * * /opt/InsideLLM/backup-postgres.sh"
+    printf '%%s\n' "0 2 * * * /opt/InsideLLM/backup-postgres.sh" >> "$CRON_TMP"
 %{ endif ~}
 %{ if ops_backup_schedule == "weekly" ~}
-    CRON_ENTRIES="$CRON_ENTRIES\n0 2 * * 0 /opt/InsideLLM/backup-postgres.sh"
+    printf '%%s\n' "0 2 * * 0 /opt/InsideLLM/backup-postgres.sh" >> "$CRON_TMP"
 %{ endif ~}
 %{ if ops_trivy_enable ~}
-    CRON_ENTRIES="$CRON_ENTRIES\n0 5 * * * /opt/InsideLLM/trivy-scan.sh"
+    printf '%%s\n' "0 5 * * * /opt/InsideLLM/trivy-scan.sh" >> "$CRON_TMP"
 %{ endif ~}
-    CRON_ENTRIES="$CRON_ENTRIES\n*/15 * * * * docker exec insidellm-postgres psql -U litellm -d litellm -c 'SELECT refresh_keyword_views()' > /dev/null 2>&1"
-    (crontab -l 2>/dev/null; echo -e "$CRON_ENTRIES") | crontab -
+    printf '%%s\n' "*/15 * * * * docker exec insidellm-postgres psql -U litellm -d litellm -c 'SELECT refresh_keyword_views()' > /dev/null 2>&1" >> "$CRON_TMP"
+    crontab "$CRON_TMP"
+    rm -f "$CRON_TMP"
 
   # --- Configure xrdp for Remote Desktop ---
   - |
@@ -469,22 +472,22 @@ runcmd:
       echo "$JOIN_PASS" | kinit "$JOIN_USER@$DOMAIN_UPPER" 2>/dev/null
 
       # Dynamic DNS update
-      nsupdate -g << DNSEOF 2>> /var/log/InsideLLM-deploy.log || true
-      server $DNS_SERVER
-      zone $DOMAIN
-      update delete $HOSTNAME.$DOMAIN. A
-      update add $HOSTNAME.$DOMAIN. 3600 A $VM_IP
-      send
-      DNSEOF
+      nsupdate -g <<DNSEOF 2>> /var/log/InsideLLM-deploy.log || true
+    server $DNS_SERVER
+    zone $DOMAIN
+    update delete $HOSTNAME.$DOMAIN. A
+    update add $HOSTNAME.$DOMAIN. 3600 A $VM_IP
+    send
+    DNSEOF
 
       # Also register a PTR record if possible
       IP_REVERSE=$(echo "$VM_IP" | awk -F. '{print $4"."$3"."$2"."$1}')
-      nsupdate -g << PTREOF 2>> /var/log/InsideLLM-deploy.log || true
-      server $DNS_SERVER
-      update delete $IP_REVERSE.in-addr.arpa. PTR
-      update add $IP_REVERSE.in-addr.arpa. 3600 PTR $HOSTNAME.$DOMAIN.
-      send
-      PTREOF
+      nsupdate -g <<PTREOF 2>> /var/log/InsideLLM-deploy.log || true
+    server $DNS_SERVER
+    update delete $IP_REVERSE.in-addr.arpa. PTR
+    update add $IP_REVERSE.in-addr.arpa. 3600 PTR $HOSTNAME.$DOMAIN.
+    send
+    PTREOF
 
       kdestroy 2>/dev/null || true
       echo "[$(date)] DNS registration complete" >> /var/log/InsideLLM-deploy.log
