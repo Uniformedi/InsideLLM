@@ -207,6 +207,20 @@
     <h2><span class="step-num">2</span> API Key &amp; Secrets</h2>
     <p class="desc">Your Anthropic API key is required. Other secrets are auto-generated if left blank.</p>
 
+    <details style="margin-bottom:14px;border:1px solid #cbd5e0;border-radius:6px;padding:10px 14px;background:#f7fafc">
+      <summary style="cursor:pointer;font-weight:600">Generate secrets yourself (PowerShell)</summary>
+      <p style="margin:10px 0 6px;font-size:0.9em;color:#4a5568">Run these in PowerShell to pre-generate the secrets below instead of letting Terraform create them. Using cryptographically strong RNG.</p>
+      <p style="margin:10px 0 4px;font-size:0.85em;font-weight:600;color:#2d3748">LiteLLM Master Key (sk-... format, 48 chars)</p>
+<pre style="margin:0;background:#1a202c;color:#e2e8f0;padding:10px 12px;border-radius:4px;font-size:0.82em;overflow-x:auto"><code>$b=[byte[]]::new(36); [System.Security.Cryptography.RandomNumberGenerator]::Fill($b); 'sk-' + ([Convert]::ToBase64String($b) -replace '[+/=]','').Substring(0,48)</code></pre>
+      <p style="margin:10px 0 4px;font-size:0.85em;font-weight:600;color:#2d3748">PostgreSQL Password (32 chars, URL-safe)</p>
+<pre style="margin:0;background:#1a202c;color:#e2e8f0;padding:10px 12px;border-radius:4px;font-size:0.82em;overflow-x:auto"><code>$b=[byte[]]::new(24); [System.Security.Cryptography.RandomNumberGenerator]::Fill($b); ([Convert]::ToBase64String($b) -replace '[+/=]','').Substring(0,32)</code></pre>
+      <p style="margin:10px 0 4px;font-size:0.85em;font-weight:600;color:#2d3748">Both at once (copy output into the fields)</p>
+<pre style="margin:0;background:#1a202c;color:#e2e8f0;padding:10px 12px;border-radius:4px;font-size:0.82em;overflow-x:auto"><code>function New-Secret([int]$len,[string]$prefix=''){ $b=[byte[]]::new([math]::Ceiling($len*3/4)+3); [System.Security.Cryptography.RandomNumberGenerator]::Fill($b); $prefix + ([Convert]::ToBase64String($b) -replace '[+/=]','').Substring(0,$len) }
+"LITELLM_MASTER_KEY = $(New-Secret 48 'sk-')"
+"POSTGRES_PASSWORD  = $(New-Secret 32)"</code></pre>
+      <p style="margin:10px 0 2px;font-size:0.82em;color:#718096"><strong>Tip:</strong> store these in a password manager before pasting below — they are sensitive and will not be shown again after deploy.</p>
+    </details>
+
     <div class="field">
       <label>Anthropic API Key <span class="required">*</span></label>
       <div class="hint">From <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a></div>
@@ -216,13 +230,13 @@
 
     <div class="field">
       <label>LiteLLM Master Key</label>
-      <div class="hint">Leave blank to auto-generate. Used for admin access and API authentication.</div>
+      <div class="hint">Leave blank to auto-generate, or paste a value from the PowerShell helper above. Used for admin access and API authentication.</div>
       <input type="text" id="litellmMasterKey" placeholder="Auto-generated if empty">
     </div>
 
     <div class="field" id="postgresField">
       <label>PostgreSQL Password</label>
-      <div class="hint">Leave blank to auto-generate.</div>
+      <div class="hint">Leave blank to auto-generate, or paste a value from the PowerShell helper above.</div>
       <input type="text" id="postgresPassword" placeholder="Auto-generated if empty">
     </div>
 

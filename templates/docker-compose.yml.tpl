@@ -119,7 +119,7 @@ services:
     # https://github.com/uniformedi/humility-guardrail
     entrypoint: ["/bin/sh", "-c"]
     command:
-      - "pip install --quiet humility-guardrail==0.1.0 && exec litellm --config /app/config.yaml --port 4000"
+      - "pip install --quiet 'humility-guardrail @ git+https://github.com/Uniformedi/humility-guardrail@v0.1.0' && exec litellm --config /app/config.yaml --port 4000"
     logging:
       driver: json-file
       options:
@@ -238,7 +238,8 @@ services:
     ports:
       - "5050:80"
     environment:
-      PGADMIN_DEFAULT_EMAIL: "admin@insidellm.local"
+      PGADMIN_DEFAULT_EMAIL: "admin@insidellm.io"
+      PGADMIN_CONFIG_CHECK_EMAIL_DELIVERABILITY: "False"
       PGADMIN_DEFAULT_PASSWORD: "${litellm_master_key}"
       PGADMIN_CONFIG_SERVER_MODE: "True"
     volumes:
@@ -460,7 +461,9 @@ services:
   # Watchtower — Automatic Container Image Updates
   # -------------------------------------------------------------------------
   watchtower:
-    image: containrrr/watchtower:latest
+    # containrrr/watchtower is unmaintained since 2022 and hardcodes Docker API 1.25,
+    # which is rejected by Docker Engine >=27 (minimum 1.40). Use the maintained fork.
+    image: nickfedor/watchtower:latest
     container_name: insidellm-watchtower
     restart: always
     volumes:
