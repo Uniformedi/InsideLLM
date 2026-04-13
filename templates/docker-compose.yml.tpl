@@ -119,7 +119,7 @@ services:
     # https://github.com/uniformedi/humility-guardrail
     entrypoint: ["/bin/sh", "-c"]
     command:
-      - "pip install --quiet 'humility-guardrail @ git+https://github.com/Uniformedi/humility-guardrail@v0.1.0' && exec litellm --config /app/config.yaml --port 4000"
+      - "pip install --quiet git+https://github.com/Uniformedi/humility-guardrail@v0.1.0 && exec litellm --config /app/config.yaml --port 4000"
     logging:
       driver: json-file
       options:
