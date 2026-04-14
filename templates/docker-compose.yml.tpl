@@ -498,12 +498,8 @@ services:
       - /opt/InsideLLM/loki/loki-config.yml:/etc/loki/local-config.yaml:ro
       - /opt/InsideLLM/data/loki:/loki
     command: -config.file=/etc/loki/local-config.yaml
-    healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:3100/ready || exit 1"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
+    # No healthcheck: grafana/loki image is distroless (no shell, wget, curl)
+    # so any exec-based probe fails. Dependents use service_started instead.
     logging:
       driver: json-file
       options:
@@ -526,7 +522,7 @@ services:
     command: -config.file=/etc/promtail/config.yml
     depends_on:
       loki:
-        condition: service_healthy
+        condition: service_started
     logging:
       driver: json-file
       options:
@@ -575,7 +571,7 @@ services:
       - /opt/InsideLLM/grafana/dashboards:/var/lib/grafana/dashboards:ro
     depends_on:
       loki:
-        condition: service_healthy
+        condition: service_started
       postgres:
         condition: service_healthy
     healthcheck:
