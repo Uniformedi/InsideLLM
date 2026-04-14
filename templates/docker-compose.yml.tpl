@@ -185,11 +185,12 @@ services:
       LDAP_ATTRIBUTE_FOR_MAIL: "mail"
       LDAP_ATTRIBUTE_FOR_USERNAME: "sAMAccountName"
       LDAP_SEARCH_BASE: "${ldap_user_search_base}"
-      # Accept sAMAccountName, mail, or UPN as the login identifier.
-      # AD users often have a mail domain different from their UPN
-      # (e.g. UPN uniformedi.local + mail organization.com), so a single-
-      # attribute filter forces users to guess which one Open WebUI wants.
-      LDAP_SEARCH_FILTERS: "(|(sAMAccountName=%(user)s)(mail=%(user)s)(userPrincipalName=%(user)s))"
+      # Additional filter ANDed with the hardcoded (sAMAccountName=<input>)
+      # search in auths.py. Must NOT contain %(user)s — Open WebUI doesn't
+      # substitute it, so the placeholder reaches LDAP literally and is
+      # rejected as 'malformed filter'. Keep it as a static constraint
+      # (e.g. objectClass=user). Users log in with their sAMAccountName.
+      LDAP_SEARCH_FILTERS: "(objectClass=user)"
       LDAP_APP_DN: "${ldap_bind_dn}"
       LDAP_APP_PASSWORD: "${ldap_bind_password}"
 %{ endif ~}
