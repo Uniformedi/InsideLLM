@@ -578,6 +578,10 @@ runcmd:
   - mkdir -p /opt/InsideLLM/data/redis
   - mkdir -p /opt/InsideLLM/data/open-webui
   - mkdir -p /opt/InsideLLM/data/pgadmin
+  # pgAdmin runs as UID 5050 inside its container; without this chown
+  # workers crash on /var/lib/pgadmin/sessions creation, gunicorn keeps
+  # respawning, container reports 'Up' but never serves HTTP.
+  - chown -R 5050:5050 /opt/InsideLLM/data/pgadmin
   - mkdir -p /opt/InsideLLM/data/netdata
   - mkdir -p /opt/InsideLLM/pipelines
 %{ if ops_grafana_enable ~}
