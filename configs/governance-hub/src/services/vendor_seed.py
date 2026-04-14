@@ -210,6 +210,84 @@ DEFAULT_VENDORS = [
             ("TRANSPARENCY_PUBLICATION", "https://github.com/Uniformedi/InsideLLM/tree/master/docs", "Publishes architecture and integrity-design documentation."),
         ],
     },
+
+    # ----- Standards bodies & protocol stewards ---------------------------
+    # These don't ship code we run directly, but every byte that crosses our
+    # wire conforms to specifications they steward. Acknowledged separately
+    # from "vendor that maintains an OSS project".
+    {
+        "slug": "ietf",
+        "name": "Internet Engineering Task Force (IETF)",
+        "category": "standards-body",
+        "website_url": "https://www.ietf.org",
+        "description": "Stewards the protocols that move every request through the platform: HTTP/1.1 (RFC 9112), HTTP/2 (9113), HTTP/3 (9114), TLS 1.3 (8446), OAuth 2.0 (6749), JWT (7519), JOSE.",
+        "contributions": [
+            ("STANDARDS_BODY", "https://www.ietf.org/about/", "Develops and stewards the open Internet protocol standards InsideLLM relies on end-to-end."),
+        ],
+    },
+    {
+        "slug": "iana",
+        "name": "Internet Assigned Numbers Authority (IANA)",
+        "category": "standards-body",
+        "website_url": "https://www.iana.org",
+        "description": "Manages global allocation of port numbers, MIME types, DNS root zone, and IP address blocks the platform's network stack depends on.",
+        "contributions": [
+            ("STANDARDS_BODY", "https://www.iana.org/about", "Allocates and registers the protocol parameters every network call resolves against."),
+        ],
+    },
+    {
+        "slug": "w3c",
+        "name": "World Wide Web Consortium (W3C)",
+        "category": "standards-body",
+        "website_url": "https://www.w3.org",
+        "description": "Stewards HTML, CSS, WCAG, and the web APIs every InsideLLM admin page renders against.",
+        "contributions": [
+            ("STANDARDS_BODY", "https://www.w3.org/standards/", "Develops the open web standards admin UIs are built on."),
+        ],
+    },
+    {
+        "slug": "linux-foundation",
+        "name": "The Linux Foundation",
+        "category": "foundation",
+        "website_url": "https://www.linuxfoundation.org",
+        "description": "Hosts the Linux kernel, CNCF (OPA, Kubernetes, Prometheus), OpenSSF (supply-chain security), Valkey (the Redis successor we'll migrate to), and many other projects InsideLLM depends on.",
+        "contributions": [
+            ("FOUNDATION_SPONSOR", "https://www.linuxfoundation.org/projects", "Neutral home and funding source for dozens of projects in the InsideLLM stack."),
+            ("STANDARDS_BODY", "https://openssf.org", "OpenSSF: Sigstore, Scorecard, S2C2F — software supply chain standards."),
+        ],
+    },
+    {
+        "slug": "cncf",
+        "name": "Cloud Native Computing Foundation (CNCF)",
+        "category": "foundation",
+        "website_url": "https://www.cncf.io",
+        "description": "Foundation home for OPA, Prometheus, Loki-adjacent projects, and the broader cloud-native ecosystem InsideLLM is built on.",
+        "contributions": [
+            ("FOUNDATION_SPONSOR", "https://www.cncf.io/projects/", "Hosts and funds the cloud-native projects InsideLLM ships."),
+        ],
+    },
+    {
+        "slug": "openssl",
+        "name": "OpenSSL Software Foundation",
+        "category": "foundation",
+        "website_url": "https://www.openssl.org",
+        "description": "Maintains OpenSSL, the cryptographic library every TLS handshake in the platform runs through.",
+        "contributions": [
+            ("OSS_PROJECT", "https://github.com/openssl/openssl", "OpenSSL under Apache 2.0."),
+            ("PERMISSIVE_LICENSE", "https://www.openssl.org/source/license.html", "Apache 2.0 (since OpenSSL 3.0)."),
+        ],
+    },
+    {
+        "slug": "python-software-foundation",
+        "name": "Python Software Foundation",
+        "category": "foundation",
+        "website_url": "https://www.python.org",
+        "description": "Stewards the Python language used by Governance Hub, the LiteLLM callbacks, and the Open WebUI / DLP / Humility code.",
+        "contributions": [
+            ("OSS_PROJECT", "https://github.com/python/cpython", "CPython reference implementation under PSF License."),
+            ("PERMISSIVE_LICENSE", "https://docs.python.org/3/license.html", "PSF-2.0 — OSI-approved, BSD-style."),
+        ],
+    },
 ]
 
 
