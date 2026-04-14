@@ -237,6 +237,17 @@ variable "ldap_bind_password" {
   sensitive   = true
 }
 
+variable "cockpit_enable" {
+  description = <<-EOT
+    Install Cockpit on each VM and expose it at /cockpit/ behind the
+    InsideLLM nginx. Cockpit is a Linux web management UI: web shell,
+    service control, log viewer, container management. Lightweight
+    equivalent of Windows Admin Center for the Linux side.
+  EOT
+  type        = bool
+  default     = true
+}
+
 variable "ldap_user_search_base" {
   description = <<-EOT
     Base DN for user lookups. If empty, defaults to the domain's DC= chain

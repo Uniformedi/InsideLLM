@@ -244,6 +244,13 @@ services:
     ports:
       - "80:80"
       - "443:443"
+%{ if cockpit_enable ~}
+    # Required so the /cockpit/ proxy can resolve host.docker.internal
+    # to the VM's host network (Cockpit listens on the host, not in a
+    # container).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+%{ endif ~}
     volumes:
       - /opt/InsideLLM/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - /opt/InsideLLM/nginx/ssl:/etc/nginx/ssl:ro

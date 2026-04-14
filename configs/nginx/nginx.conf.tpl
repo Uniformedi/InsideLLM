@@ -224,6 +224,25 @@ http {
         }
 
 %{ endif ~}
+%{ if cockpit_enable ~}
+        # --- Cockpit (per-VM Linux web management) ---
+        # Cockpit runs on the host (port 9090) not in a container, so we
+        # reach it via the docker host gateway. UrlRoot=/cockpit/ in
+        # cockpit.conf makes the app emit URLs that match this location.
+        location /cockpit/ {
+            proxy_pass http://host.docker.internal:9090/cockpit/;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto https;
+            proxy_buffering off;
+            proxy_read_timeout 3600s;  # web shell sessions stay open
+        }
+
+%{ endif ~}
 %{ if ops_uptime_kuma_enable ~}
         # --- Uptime Kuma Service Monitoring ---
         # Uptime Kuma serves assets/socket.io from absolute root paths, so we

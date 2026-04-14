@@ -417,6 +417,31 @@ runcmd:
   - sleep 2
 %{ endif ~}
 
+%{ if cockpit_enable ~}
+  # --- Install Cockpit (per-VM Linux web management) ---
+  # Lightweight Linux equivalent of Windows Admin Center: web shell,
+  # service control, log viewer, container management. Runs on host
+  # port 9090; nginx exposes it at /cockpit/ inside the same TLS cert.
+  - |
+    apt-get update
+    apt-get install -y --no-install-recommends cockpit cockpit-podman cockpit-storaged
+    # Tell Cockpit it is being reverse-proxied so absolute redirects work
+    # behind the InsideLLM nginx.
+    install -d -m 0755 /etc/cockpit
+    cat > /etc/cockpit/cockpit.conf <<COCKPITEOF
+    [WebService]
+    AllowUnencrypted = true
+    Origins = https://${fqdn} wss://${fqdn} http://localhost
+    UrlRoot = /cockpit/
+    ProtocolHeader = X-Forwarded-Proto
+    ForwardedForHeader = X-Forwarded-For
+    LoginTitle = InsideLLM ${vm_hostname}
+    COCKPITEOF
+    systemctl daemon-reload
+    systemctl enable cockpit.socket
+    systemctl restart cockpit.socket
+%{ endif ~}
+
   # --- Install Docker Engine ---
   - |
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg

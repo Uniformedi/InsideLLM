@@ -314,6 +314,7 @@ locals {
     hyperv_port        = var.hyperv_port
     hyperv_https       = var.hyperv_https
     hyperv_insecure    = var.hyperv_insecure
+    cockpit_enable     = var.cockpit_enable
     oidc_issuer_url    = var.sso_provider == "azure_ad" ? "https://login.microsoftonline.com/${var.azure_ad_tenant_id}/v2.0" : var.sso_provider == "okta" ? "https://${var.okta_domain}" : ""
     ollama_enable      = var.ollama_enable && !var.ollama_separate_vm
     ollama_models      = var.ollama_models
@@ -377,6 +378,7 @@ locals {
     admin_auth_mode        = var.sso_provider != "none" ? "oidc" : var.ad_domain_join ? "ldap" : "none"
     chat_enable             = var.chat_enable
     ldap_enable_services   = var.ldap_enable_services
+    cockpit_enable          = var.cockpit_enable
   })
 }
 
@@ -436,6 +438,7 @@ locals {
     ad_join_ou                   = var.ad_join_ou
     ad_dns_register              = var.ad_dns_register
     vm_domain                    = var.vm_domain
+    cockpit_enable               = var.cockpit_enable
     dc_dns_servers               = var.dc_dns_servers
     ad_domain                    = var.vm_domain
     ad_admin_groups              = var.ad_admin_groups
