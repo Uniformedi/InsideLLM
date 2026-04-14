@@ -44,6 +44,19 @@ wait_for_service "$LITELLM_URL/health/liveliness" "LiteLLM"
 wait_for_service "http://localhost:8080/health" "Open WebUI"
 
 # ---------------------------------------------------------------------------
+# Provision the Open WebUI service account used by Governance Hub's
+# skill-sync bridge. Idempotent — script exits 0 if the key is already
+# in /opt/InsideLLM/.env.
+# ---------------------------------------------------------------------------
+if [ -x /opt/InsideLLM/scripts/provision-owui-service-account.sh ]; then
+  log "Provisioning Open WebUI service account for governance-hub..."
+  bash /opt/InsideLLM/scripts/provision-owui-service-account.sh || \
+    log "WARNING: Open WebUI service-account provisioning failed (non-fatal)"
+else
+  log "Skipping Open WebUI service-account provisioning (script missing)"
+fi
+
+# ---------------------------------------------------------------------------
 # Register the legacy Open WebUI DLP pipeline as INACTIVE.
 #
 # As of platform 3.x, DLP runs at the LiteLLM gateway via

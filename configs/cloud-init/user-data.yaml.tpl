@@ -222,6 +222,13 @@ write_files:
       SystemKeepFree=1G
       MaxFileSec=1week
 
+  # --- Open WebUI service-account provisioner (invoked by post-deploy.sh) ---
+  - path: /opt/InsideLLM/scripts/provision-owui-service-account.sh
+    permissions: "0755"
+    owner: root:root
+    content: |
+      ${indent(6, provision_owui_svc_sh)}
+
   # --- Disk monitoring script ---
   - path: /usr/local/bin/disk-monitor.sh
     permissions: "0755"
