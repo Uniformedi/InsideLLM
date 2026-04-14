@@ -185,7 +185,11 @@ services:
       LDAP_ATTRIBUTE_FOR_MAIL: "mail"
       LDAP_ATTRIBUTE_FOR_USERNAME: "sAMAccountName"
       LDAP_SEARCH_BASE: "${ldap_user_search_base}"
-      LDAP_SEARCH_FILTERS: "(sAMAccountName=%(user)s)"
+      # Accept sAMAccountName, mail, or UPN as the login identifier.
+      # AD users often have a mail domain different from their UPN
+      # (e.g. UPN uniformedi.local + mail organization.com), so a single-
+      # attribute filter forces users to guess which one Open WebUI wants.
+      LDAP_SEARCH_FILTERS: "(|(sAMAccountName=%(user)s)(mail=%(user)s)(userPrincipalName=%(user)s))"
       LDAP_APP_DN: "${ldap_bind_dn}"
       LDAP_APP_PASSWORD: "${ldap_bind_password}"
 %{ endif ~}
