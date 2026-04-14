@@ -76,16 +76,20 @@ async def sync_skill_to_openwebui(skill: SharedSkill) -> None:
     model_id = payload["id"]
 
     async with httpx.AsyncClient(timeout=10) as client:
-        # Open WebUI's models API: POST to create, POST to /update for updates.
-        # We try update first (idempotent), fall back to create on 404.
+        # Open WebUI's models API:
+        #   POST /api/v1/models/create           create a new custom model
+        #   POST /api/v1/models/model/update?id= update an existing model
+        #   POST /api/v1/models/model/delete?id= delete one (note: POST, not DELETE)
+        # We try update first (idempotent, the common case), fall back to
+        # create on 401/404 (model doesn't exist yet).
         try:
             resp = await client.post(
-                f"{OWUI_BASE_URL}/api/v1/models/update",
+                f"{OWUI_BASE_URL}/api/v1/models/model/update",
                 params={"id": model_id},
                 headers=_headers(),
                 json=payload,
             )
-            if resp.status_code == 404:
+            if resp.status_code in (401, 404):
                 resp = await client.post(
                     f"{OWUI_BASE_URL}/api/v1/models/create",
                     headers=_headers(),
@@ -107,8 +111,9 @@ async def remove_skill_from_openwebui(skill: SharedSkill) -> None:
     model_id = _model_id(skill.slug)
     async with httpx.AsyncClient(timeout=10) as client:
         try:
-            resp = await client.delete(
-                f"{OWUI_BASE_URL}/api/v1/models/delete",
+            # Open WebUI uses POST (not HTTP DELETE) on /model/delete.
+            resp = await client.post(
+                f"{OWUI_BASE_URL}/api/v1/models/model/delete",
                 params={"id": model_id},
                 headers=_headers(),
             )

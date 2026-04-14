@@ -239,12 +239,12 @@ async def update_skill(
     return _to_out(skill)
 
 
-@router.delete("/{slug}", status_code=204)
+@router.delete("/{slug}")
 async def delete_skill(
     slug: str,
     request: Request,
     db: AsyncSession = Depends(get_local_db),
-) -> None:
+) -> dict:
     _require_admin(request)
 
     result = await db.execute(select(SharedSkill).where(SharedSkill.slug == slug))
@@ -262,6 +262,7 @@ async def delete_skill(
 
     await db.delete(skill)
     await db.commit()
+    return {"deleted": slug}
 
 
 @router.post("/{slug}/publish", response_model=SkillOut)
