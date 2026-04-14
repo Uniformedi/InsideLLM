@@ -150,6 +150,47 @@ write_files:
         }
       }
 
+%{ if ldap_enable_services ~}
+  # --- Grafana LDAP configuration ---
+  # Used by Grafana's native LDAP auth. Each [[servers.group_mappings]]
+  # entry maps an AD group to a Grafana role; the last catch-all "*" gives
+  # every authenticated user a Viewer seat.
+  - path: /opt/InsideLLM/grafana/ldap.toml
+    permissions: "0640"
+    owner: root:root
+    content: |
+      [[servers]]
+      host = "${ad_domain}"
+      port = 636
+      use_ssl = true
+      start_tls = false
+      ssl_skip_verify = true
+
+      bind_dn = "${ldap_bind_dn}"
+      bind_password = "${ldap_bind_password}"
+
+      search_filter = "(sAMAccountName=%s)"
+      search_base_dns = ["${ldap_user_search_base}"]
+
+      [servers.attributes]
+      name = "givenName"
+      surname = "sn"
+      username = "sAMAccountName"
+      member_of = "memberOf"
+      email = "mail"
+
+%{ for grp in split(",", ad_admin_groups) ~}
+      [[servers.group_mappings]]
+      group_dn = "CN=${trimspace(grp)},CN=Users,${ldap_user_search_base}"
+      org_role = "Admin"
+      grafana_admin = true
+
+%{ endfor ~}
+      [[servers.group_mappings]]
+      group_dn = "*"
+      org_role = "Viewer"
+%{ endif ~}
+
 %{ if length(dc_dns_servers) > 0 ~}
   # --- Domain controller DNS (required for LDAP admin auth) ---
   # Netplan drop-in: overrides DHCP-provided DNS with the AD DCs so

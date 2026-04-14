@@ -173,6 +173,22 @@ services:
 
       # Security
       WEBUI_AUTH: "true"
+%{ if ldap_enable_services ~}
+      # LDAP / Active Directory
+      ENABLE_LDAP: "true"
+      LDAP_SERVER_LABEL: "${ad_domain}"
+      LDAP_SERVER_HOST: "${ad_domain}"
+      LDAP_SERVER_PORT: "636"
+      LDAP_USE_TLS: "true"
+      LDAP_VALIDATE_CERT: "false"
+      LDAP_CIPHERS: "ALL"
+      LDAP_ATTRIBUTE_FOR_MAIL: "mail"
+      LDAP_ATTRIBUTE_FOR_USERNAME: "sAMAccountName"
+      LDAP_SEARCH_BASE: "${ldap_user_search_base}"
+      LDAP_SEARCH_FILTERS: "(sAMAccountName=%(user)s)"
+      LDAP_APP_DN: "${ldap_bind_dn}"
+      LDAP_APP_PASSWORD: "${ldap_bind_password}"
+%{ endif ~}
 %{ if sso_provider != "none" }
       # SSO / OIDC
       ENABLE_OAUTH_SIGNUP: "true"
@@ -242,6 +258,20 @@ services:
       PGADMIN_CONFIG_CHECK_EMAIL_DELIVERABILITY: "False"
       PGADMIN_DEFAULT_PASSWORD: "${litellm_master_key}"
       PGADMIN_CONFIG_SERVER_MODE: "True"
+%{ if ldap_enable_services ~}
+      # LDAP / Active Directory. pgAdmin requires values to be wrapped in
+      # extra quotes because config.py evaluates them with eval().
+      PGADMIN_CONFIG_AUTHENTICATION_SOURCES: "['ldap', 'internal']"
+      PGADMIN_CONFIG_LDAP_AUTO_CREATE_USER: "True"
+      PGADMIN_CONFIG_LDAP_SERVER_URI: "'ldaps://${ad_domain}:636'"
+      PGADMIN_CONFIG_LDAP_USERNAME_ATTRIBUTE: "'sAMAccountName'"
+      PGADMIN_CONFIG_LDAP_SEARCH_BASE_DN: "'${ldap_user_search_base}'"
+      PGADMIN_CONFIG_LDAP_SEARCH_FILTER: "'(objectClass=user)'"
+      PGADMIN_CONFIG_LDAP_SEARCH_SCOPE: "'SUBTREE'"
+      PGADMIN_CONFIG_LDAP_BIND_USER: "'${ldap_bind_dn}'"
+      PGADMIN_CONFIG_LDAP_BIND_PASSWORD: "'${ldap_bind_password}'"
+      PGADMIN_CONFIG_LDAP_USE_STARTTLS: "False"
+%{ endif ~}
     volumes:
       - /opt/InsideLLM/data/pgadmin:/var/lib/pgadmin
     depends_on:
@@ -546,6 +576,12 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: "${grafana_admin_password}"
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_AUTH_ANONYMOUS_ENABLED: "false"
+%{ if ldap_enable_services ~}
+      # LDAP / Active Directory (ldap.toml mounted at /etc/grafana/ldap.toml)
+      GF_AUTH_LDAP_ENABLED: "true"
+      GF_AUTH_LDAP_CONFIG_FILE: "/etc/grafana/ldap.toml"
+      GF_AUTH_LDAP_ALLOW_SIGN_UP: "true"
+%{ endif ~}
 %{ if sso_provider != "none" }
       # SSO / Generic OAuth
       GF_AUTH_GENERIC_OAUTH_ENABLED: "true"
@@ -569,6 +605,9 @@ services:
       - /opt/InsideLLM/data/grafana:/var/lib/grafana
       - /opt/InsideLLM/grafana/provisioning:/etc/grafana/provisioning:ro
       - /opt/InsideLLM/grafana/dashboards:/var/lib/grafana/dashboards:ro
+%{ if ldap_enable_services ~}
+      - /opt/InsideLLM/grafana/ldap.toml:/etc/grafana/ldap.toml:ro
+%{ endif ~}
     depends_on:
       loki:
         condition: service_started

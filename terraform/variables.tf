@@ -205,6 +205,49 @@ variable "dc_dns_servers" {
 }
 
 # =============================================================================
+# LDAP enablement for component services (Grafana, Open WebUI, pgAdmin, LiteLLM)
+# =============================================================================
+
+variable "ldap_enable_services" {
+  description = <<-EOT
+    When true, turn on LDAP auth in Grafana, Open WebUI, and pgAdmin, and
+    gate the LiteLLM admin UI behind the Governance Hub auth subrequest.
+    Requires ad_domain_join = true (so the VM resolves the DC) and a valid
+    ldap_bind_dn / ldap_bind_password service account.
+  EOT
+  type        = bool
+  default     = false
+}
+
+variable "ldap_bind_dn" {
+  description = <<-EOT
+    Distinguished Name of the read-only service account used by Grafana /
+    Open WebUI / pgAdmin to look up a user's DN before binding with the
+    user's own credentials. Example:
+      CN=svc-insidellm,OU=Service Accounts,DC=uniformedi,DC=local
+  EOT
+  type        = string
+  default     = ""
+}
+
+variable "ldap_bind_password" {
+  description = "Password for the LDAP bind service account. Treat as secret — do not commit."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "ldap_user_search_base" {
+  description = <<-EOT
+    Base DN for user lookups. If empty, defaults to the domain's DC= chain
+    (e.g. DC=uniformedi,DC=local for ad_domain = uniformedi.local). Narrow
+    to an OU if you want to restrict which users can authenticate.
+  EOT
+  type        = string
+  default     = ""
+}
+
+# =============================================================================
 # SSH ACCESS
 # =============================================================================
 

@@ -38,6 +38,14 @@ vm_domain            = "local"
 # Example:
 # dc_dns_servers       = ["10.0.0.10"]
 dc_dns_servers       = []
+
+# LDAP enablement for Grafana, Open WebUI, pgAdmin, and the LiteLLM admin UI.
+# Requires ad_domain_join = true (so the VM resolves your DC) and a
+# read-only service account. Leave disabled if you're using SSO/OIDC instead.
+# ldap_enable_services  = true
+# ldap_bind_dn          = "CN=svc-insidellm,OU=Service Accounts,DC=uniformedi,DC=local"
+# ldap_bind_password    = "..."  # treat as secret; use a .tfvars.secret file
+# ldap_user_search_base = ""     # empty = derive from vm_domain (DC=...,DC=...)
 ubuntu_vhdx_source   = "C:\\HyperV\\Images\\ubuntu-24.04-cloudimg-amd64.vhdx"
 
 # =============================================================================

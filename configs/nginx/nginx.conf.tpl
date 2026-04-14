@@ -124,9 +124,15 @@ http {
             proxy_connect_timeout 75s;
         }
 
-        # --- LiteLLM Proxy API ---
-        # Direct API access for Claude Code CLI and other API consumers
+        # --- LiteLLM admin UI / proxy ---
+        # Browser-facing admin dashboard. API consumers use /v1/ below with
+        # bearer tokens; that route stays unauthenticated at the nginx layer
+        # so LiteLLM's own key auth is the single source of truth there.
         location /litellm/ {
+%{ if ldap_enable_services && admin_auth_mode != "none" ~}
+            auth_request /auth/validate;
+            error_page 401 = /auth/login?redirect=$request_uri;
+%{ endif ~}
             proxy_pass http://litellm;
             proxy_http_version 1.1;
             proxy_set_header Host $host;
