@@ -30,6 +30,14 @@ vm_path              = "C:\\HyperV\\VMs"
 vm_vhd_path          = "C:\\HyperV\\VHDs"
 vm_hostname          = "InsideLLM"
 vm_domain            = "local"
+
+# Domain controller DNS — required for LDAP admin auth when the VM's
+# default DNS doesn't forward to your AD. List your DC IPs here and the
+# cloud-init netplan drop-in will set them on eth0. Leave empty to
+# inherit DHCP-provided DNS.
+# Example:
+# dc_dns_servers       = ["10.0.0.10"]
+dc_dns_servers       = []
 ubuntu_vhdx_source   = "C:\\HyperV\\Images\\ubuntu-24.04-cloudimg-amd64.vhdx"
 
 # =============================================================================

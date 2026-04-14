@@ -150,6 +150,27 @@ write_files:
         }
       }
 
+%{ if length(dc_dns_servers) > 0 ~}
+  # --- Domain controller DNS (required for LDAP admin auth) ---
+  # Netplan drop-in: overrides DHCP-provided DNS with the AD DCs so
+  # uniformedi.local (and other domain names) resolve. Without this the
+  # Governance Hub's ldap_authenticate() can't find the DC and admin
+  # login silently fails.
+  - path: /etc/netplan/99-insidellm-dns.yaml
+    permissions: "0600"
+    owner: root:root
+    content: |
+      network:
+        version: 2
+        ethernets:
+          eth0:
+            nameservers:
+              addresses: [${join(", ", dc_dns_servers)}]
+              search: [${ad_domain}]
+            dhcp4-overrides:
+              use-dns: false
+%{ endif ~}
+
   # --- Journald size limits ---
   - path: /etc/systemd/journald.conf.d/size-limit.conf
     permissions: "0644"
@@ -341,6 +362,13 @@ write_files:
 # Run commands (executed in order after packages are installed)
 # ---------------------------------------------------------------------------
 runcmd:
+%{ if length(dc_dns_servers) > 0 ~}
+  # --- Apply DC DNS override (must run before any domain lookup) ---
+  - chmod 0600 /etc/netplan/99-insidellm-dns.yaml
+  - netplan apply
+  - sleep 2
+%{ endif ~}
+
   # --- Install Docker Engine ---
   - |
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg

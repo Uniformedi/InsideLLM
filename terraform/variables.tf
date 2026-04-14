@@ -192,6 +192,18 @@ variable "ad_admin_groups" {
   default     = "Domain Admins"
 }
 
+variable "dc_dns_servers" {
+  description = <<-EOT
+    Domain controller IP(s) to use as the VM's DNS resolver. Required if
+    admin_auth_mode = "ldap" and the default network DNS doesn't forward
+    to your AD DNS (the common case — Ubuntu's systemd-resolved stub
+    can't resolve uniformedi.local without this). Leave empty to inherit
+    whatever DHCP provides.
+  EOT
+  type        = list(string)
+  default     = []
+}
+
 # =============================================================================
 # SSH ACCESS
 # =============================================================================
