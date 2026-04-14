@@ -1973,18 +1973,24 @@ function buildServiceCards() {
       return u.port ? `:${u.port}${path === '/' ? '' : path}` : path;
     } catch { return url; }
   };
-  document.getElementById('serviceCards').innerHTML = services.map(s => `
+  document.getElementById('serviceCards').innerHTML = services.map(s => {
+    // The card itself links to s.links[0]; additional links row shows only
+    // the secondary paths (health, docs, admin console, etc.) so we don't
+    // duplicate the primary URL.
+    const extras = s.links.slice(1);
+    return `
     <a class="service-btn" href="${s.links[0]}" target="_blank" rel="noopener">
       <div class="service-head">
         <span class="icon" style="background:${s.bg}">${s.icon}</span>
         <span class="service-name">${s.name}</span>
       </div>
       <div class="service-desc">${s.desc}</div>
-      <div class="service-links" onclick="event.stopPropagation()">
-        ${s.links.map(l => `<a href="${l}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${labelFor(l)}</a>`).join('')}
-      </div>
+      ${extras.length ? `<div class="service-links" onclick="event.stopPropagation()">
+        ${extras.map(l => `<a href="${l}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${labelFor(l)}</a>`).join('')}
+      </div>` : ''}
     </a>
-  `).join('');
+  `;
+  }).join('');
 }
 
 // ================================================================
