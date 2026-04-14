@@ -173,6 +173,12 @@ services:
 
       # Security
       WEBUI_AUTH: "true"
+      # Personal API keys required for the Governance Hub -> Open WebUI
+      # model-sync bridge, and useful for users wiring Claude Code / editor
+      # plugins at the OWUI /api/ surface. Endpoint restrictions off so
+      # the key can create/update models when skills are published.
+      ENABLE_API_KEY: "true"
+      ENABLE_API_KEY_ENDPOINT_RESTRICTIONS: "false"
 %{ if ldap_enable_services ~}
       # LDAP / Active Directory
       ENABLE_LDAP: "true"
