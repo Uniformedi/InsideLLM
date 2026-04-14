@@ -336,3 +336,29 @@ class ComplianceAttestation(Base):
     status = Column(String(50), default="active")  # active, expired, revoked
     attested_at = Column(DateTime(timezone=True), default=datetime.utcnow)
     expires_at = Column(DateTime(timezone=True))
+
+
+class SharedSkill(Base):
+    """Organizational AI skill — a named prompt/model configuration that
+    appears in employee-facing surfaces (Open WebUI, browser extension) as
+    a pre-configured persona or workflow. Managed centrally by governance
+    admins, gated by AD group membership."""
+
+    __tablename__ = "governance_shared_skills"
+
+    id = Column(Integer, primary_key=True)
+    slug = Column(String(100), nullable=False, unique=True)  # url-safe id
+    name = Column(String(200), nullable=False)
+    description = Column(Text, nullable=False)
+    system_prompt = Column(Text, nullable=False)
+    base_model = Column(String(100), nullable=False, default="claude-sonnet")
+    temperature = Column(Numeric(3, 2), nullable=False, default=0.7)
+    # Null/empty = visible to everyone. Otherwise: list of AD CN values —
+    # a user with any matching group (case-insensitive) can see this skill.
+    group_allowlist = Column(JSONB, nullable=False, default=list)
+    tags = Column(JSONB, nullable=False, default=list)  # for filtering in UI
+    tool_allowlist = Column(JSONB, nullable=False, default=list)  # OWUI tools
+    is_published = Column(Boolean, default=False)  # gate Open WebUI sync
+    created_by = Column(String(255), nullable=False, default="system")
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
