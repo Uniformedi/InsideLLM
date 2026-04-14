@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OPA Policies — InsideLLM Governance Hub</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Segoe UI',system-ui,sans-serif; background:#0a0e1a; color:#e2e8f0; min-height:100vh; padding:20px; }
+  h1 { font-size:22px; color:#22d3ee; font-family:monospace; margin-bottom:4px; }
+  .sub { color:#94a3b8; font-size:13px; margin-bottom:18px; }
+  .layout { display:grid; grid-template-columns:280px 1fr; gap:14px; height:calc(100vh - 80px); }
+  .panel { background:#111827; border:1px solid #2a3650; border-radius:8px; padding:14px; overflow:auto; }
+  .panel.editor { display:flex; flex-direction:column; padding:0; }
+  .toolbar { display:flex; gap:8px; padding:10px 14px; border-bottom:1px solid #2a3650; align-items:center; flex-wrap:wrap; }
+  button, .btn { background:#1a2234; border:1px solid #2a3650; color:#e2e8f0; padding:6px 12px; border-radius:5px; cursor:pointer; font-size:12px; font-family:inherit; }
+  button:hover { border-color:#22d3ee; }
+  button.primary { background:#2563eb; border-color:#2563eb; }
+  button.primary:hover { background:#1d4ed8; }
+  button.danger { background:#7f1d1d; border-color:#7f1d1d; }
+  button.danger:hover { background:#991b1b; }
+  textarea { background:#0f1629; border:none; color:#e2e8f0; padding:14px; font-family:'Menlo','Consolas',monospace; font-size:12px; line-height:1.5; resize:none; flex:1; outline:none; tab-size:2; }
+  .file-list { list-style:none; padding:0; }
+  .file-list li { padding:8px 10px; border-radius:5px; cursor:pointer; font-family:monospace; font-size:12px; color:#cbd5e1; display:flex; flex-direction:column; gap:2px; }
+  .file-list li:hover { background:#1a2234; }
+  .file-list li.active { background:#1e3a8a; color:#e2e8f0; }
+  .file-list li .pkg { font-size:10px; color:#64748b; }
+  .file-list li.active .pkg { color:#93c5fd; }
+  .file-list li .meta { font-size:10px; color:#475569; }
+  h2 { font-size:13px; color:#22d3ee; font-family:monospace; margin-bottom:10px; text-transform:uppercase; letter-spacing:0.05em; }
+  .new-row { display:flex; gap:6px; margin-bottom:14px; }
+  .new-row input { flex:1; background:#0f1629; border:1px solid #2a3650; color:#e2e8f0; padding:6px 10px; border-radius:5px; font-size:12px; font-family:monospace; }
+  .err { color:#fca5a5; background:#450a0a; border:1px solid #7f1d1d; padding:8px 12px; border-radius:5px; margin:0 14px 10px; font-size:12px; display:none; white-space:pre-wrap; font-family:monospace; max-height:120px; overflow:auto; }
+  .err.open { display:block; }
+  .ok { color:#6ee7b7; background:#064e3b; border:1px solid #059669; padding:8px 12px; border-radius:5px; margin:0 14px 10px; font-size:12px; display:none; }
+  .ok.open { display:block; }
+  .filename { font-family:monospace; font-size:13px; color:#94a3b8; padding:8px 14px; border-bottom:1px solid #2a3650; }
+  .eval-modal { position:fixed; inset:0; background:rgba(0,0,0,0.7); display:none; align-items:center; justify-content:center; z-index:10; }
+  .eval-modal.open { display:flex; }
+  .eval-card { background:#1a2234; border:1px solid #2a3650; border-radius:10px; padding:24px; width:80vw; max-width:780px; max-height:90vh; overflow:auto; }
+  .eval-card h2 { margin-bottom:12px; }
+  .eval-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .eval-grid label { display:block; font-size:11px; color:#94a3b8; text-transform:uppercase; margin-bottom:4px; }
+  .eval-grid textarea { background:#0f1629; border:1px solid #2a3650; min-height:200px; padding:10px; font-size:12px; }
+  .eval-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:12px; }
+  pre { background:#0f1629; border:1px solid #2a3650; border-radius:5px; padding:10px; font-family:monospace; font-size:12px; color:#cbd5e1; overflow:auto; max-height:240px; margin-top:10px; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<h1>OPA Policies</h1>
+<div class="sub">Edit Rego files under /opa-policies. Saves are validated by OPA before write; OPA --watch hot-reloads on save. Humility is canonical — edit with care.</div>
+
+<div class="layout">
+  <div class="panel">
+    <h2>Policies</h2>
+    <div class="new-row">
+      <input id="newpath" placeholder="custom/my-policy.rego">
+      <button onclick="newFile()">+ New</button>
+    </div>
+    <ul class="file-list" id="files"><li>Loading&hellip;</li></ul>
+  </div>
+
+  <div class="panel editor">
+    <div class="filename" id="fname">No file selected</div>
+    <div class="toolbar">
+      <button class="primary" onclick="save()">Save</button>
+      <button onclick="openEval()">Dry-run eval</button>
+      <button class="danger" onclick="del()">Delete</button>
+      <span id="dirty" style="margin-left:auto;color:#fbbf24;font-size:12px"></span>
+    </div>
+    <div class="err" id="err"></div>
+    <div class="ok" id="ok"></div>
+    <textarea id="editor" spellcheck="false" placeholder="# Select a policy or click + New to begin&#10;# package mypolicy&#10;# default allow = false"></textarea>
+  </div>
+</div>
+
+<div class="eval-modal" id="emodal"><div class="eval-card">
+  <h2>Dry-run evaluation</h2>
+  <div class="eval-grid">
+    <div>
+      <label>Query path</label>
+      <input id="e-query" value="insidellm/policy/decision" style="width:100%;background:#0f1629;border:1px solid #2a3650;color:#e2e8f0;padding:8px;border-radius:5px;font-family:monospace;font-size:12px">
+      <label style="margin-top:10px">Input JSON</label>
+      <textarea id="e-input">{
+  "messages": [{"role": "user", "content": "Sample prompt"}],
+  "user_id": "test",
+  "user_role": "engineer",
+  "data_classification": "internal"
+}</textarea>
+    </div>
+    <div>
+      <label>Result</label>
+      <pre id="e-result">(none yet)</pre>
+    </div>
+  </div>
+  <div class="eval-actions">
+    <button onclick="closeEval()">Close</button>
+    <button class="primary" onclick="runEval()">Evaluate</button>
+  </div>
+</div></div>
+
+<script>
+const api = "/governance/api/v1/policies";
+let current = null;
+let dirty = false;
+let original = "";
+
+function showErr(m){const e=document.getElementById('err');e.textContent=m;e.classList.add('open');document.getElementById('ok').classList.remove('open');setTimeout(()=>e.classList.remove('open'),8000);}
+function showOk(m){const e=document.getElementById('ok');e.textContent=m;e.classList.add('open');document.getElementById('err').classList.remove('open');setTimeout(()=>e.classList.remove('open'),3000);}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+async function loadList(){
+  try{
+    const r = await fetch(api,{credentials:'include'});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const d = await r.json();
+    const ul = document.getElementById('files');
+    if(!d.policies.length){ul.innerHTML='<li><em>No policies yet</em></li>';return;}
+    ul.innerHTML = d.policies.map(p =>
+      `<li onclick="open_('${esc(p.path)}')" data-p="${esc(p.path)}" class="${p.path===current?'active':''}">
+        <span>${esc(p.path)}</span>
+        <span class="pkg">${esc(p.package||'(no package)')}</span>
+        <span class="meta">${p.lines}L · ${p.size_bytes}B</span>
+      </li>`).join('');
+  }catch(e){showErr('List failed: '+e.message);}
+}
+
+async function open_(path){
+  if(dirty && !confirm('Discard unsaved changes?')) return;
+  try{
+    const r = await fetch(api+'/'+path,{credentials:'include'});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const d = await r.json();
+    current = path;
+    original = d.content;
+    document.getElementById('fname').textContent = path;
+    document.getElementById('editor').value = d.content;
+    setDirty(false);
+    document.querySelectorAll('.file-list li').forEach(li => li.classList.toggle('active', li.dataset.p===path));
+  }catch(e){showErr('Open failed: '+e.message);}
+}
+
+function newFile(){
+  const p = document.getElementById('newpath').value.trim();
+  if(!p) return;
+  if(!/\.rego$/.test(p)) { showErr('Path must end in .rego'); return; }
+  current = p;
+  original = '';
+  document.getElementById('fname').textContent = p+' (new)';
+  document.getElementById('editor').value = `package ${p.replace(/\.rego$/,'').replace(/\//g,'.')}\n\n# Your rules here\ndefault allow := false\n`;
+  setDirty(true);
+}
+
+async function save(){
+  if(!current) { showErr('No file selected'); return; }
+  const content = document.getElementById('editor').value;
+  try{
+    const r = await fetch(api+'/'+current, {method:'PUT', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify({content})});
+    const d = await r.json().catch(()=>({}));
+    if(!r.ok) { showErr(d.detail || ('HTTP '+r.status)); return; }
+    showOk('Saved. OPA reloaded.');
+    original = content;
+    setDirty(false);
+    loadList();
+  }catch(e){showErr('Save failed: '+e.message);}
+}
+
+async function del(){
+  if(!current) return;
+  if(!confirm('Delete '+current+'?')) return;
+  try{
+    const r = await fetch(api+'/'+current, {method:'DELETE', credentials:'include'});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    current = null; original = ''; setDirty(false);
+    document.getElementById('fname').textContent='No file selected';
+    document.getElementById('editor').value='';
+    loadList();
+    showOk('Deleted.');
+  }catch(e){showErr('Delete failed: '+e.message);}
+}
+
+function openEval(){document.getElementById('emodal').classList.add('open');}
+function closeEval(){document.getElementById('emodal').classList.remove('open');}
+
+async function runEval(){
+  let input;
+  try{input = JSON.parse(document.getElementById('e-input').value);}
+  catch(e){document.getElementById('e-result').textContent='Invalid JSON: '+e.message;return;}
+  const query_path = document.getElementById('e-query').value.trim();
+  try{
+    const r = await fetch(api+'/eval', {method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify({query_path, input})});
+    const d = await r.json();
+    document.getElementById('e-result').textContent = JSON.stringify(d.result || d, null, 2);
+  }catch(e){document.getElementById('e-result').textContent='Eval failed: '+e.message;}
+}
+
+function setDirty(d){dirty=d;document.getElementById('dirty').textContent = d ? '● modified' : '';}
+document.getElementById('editor').addEventListener('input', () => {
+  setDirty(document.getElementById('editor').value !== original);
+});
+window.addEventListener('beforeunload', e => { if(dirty){ e.preventDefault(); e.returnValue=''; } });
+
+loadList();
+</script>
+</body>
+</html>

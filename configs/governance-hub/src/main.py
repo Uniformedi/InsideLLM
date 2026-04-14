@@ -10,7 +10,7 @@ from sqlalchemy import text
 from .config import settings
 from .db.local_db import AsyncSessionLocal, SyncSessionLocal, engine
 from .db.models import Base
-from .routers import advisor, audit, auth, changes, chat, config_snapshots, connectors, fleet, framework, keyword_templates, obligations, prompts, restore, schema, skills, sync
+from .routers import advisor, audit, auth, changes, chat, config_snapshots, connectors, fleet, framework, keyword_templates, obligations, policies, prompts, restore, schema, skills, sync
 from .services.config_service import capture_snapshot
 from .services.sync_service import collect_telemetry, export_to_central
 
@@ -53,6 +53,7 @@ app.include_router(framework.router)
 app.include_router(keyword_templates.router)
 app.include_router(prompts.router)
 app.include_router(skills.router)
+app.include_router(policies.router)
 
 if settings.chat_enable:
     app.include_router(chat.router)
@@ -114,6 +115,10 @@ async def landing():
       <span class="icon" style="background:#0891b2">SK</span>
       <div><div class="label">Shared Skills</div><div class="desc">Org-wide AI skill catalog — create, edit, publish to Open WebUI, gate by AD group</div></div>
     </a>
+    <a href="/governance/policies">
+      <span class="icon" style="background:#dc2626">OP</span>
+      <div><div class="label">OPA Policies</div><div class="desc">Edit Rego policies — Humility, Integrity, industry overlays. OPA-validated saves with hot reload.</div></div>
+    </a>
     {chat_link}
     <a href="/governance/docs">
       <span class="icon" style="background:#059669">API</span>
@@ -150,6 +155,15 @@ async def skills_admin_page():
     Talks to /governance/api/v1/skills under the hood."""
     from pathlib import Path
     return (Path(__file__).parent / "pages" / "skills_admin.html").read_text(encoding="utf-8")
+
+
+@app.get("/policies", response_class=HTMLResponse)
+async def policies_admin_page():
+    """OPA policy editor — list/edit/save/delete .rego files with OPA-as-linter
+    on save and a dry-run evaluator. Admin-only. Talks to
+    /governance/api/v1/policies under the hood."""
+    from pathlib import Path
+    return (Path(__file__).parent / "pages" / "policies_admin.html").read_text(encoding="utf-8")
 
 
 @app.get("/health")

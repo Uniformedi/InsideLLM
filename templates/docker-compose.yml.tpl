@@ -406,7 +406,10 @@ services:
   # OPA — Open Policy Agent (Policy Enforcement)
   # -------------------------------------------------------------------------
   opa:
-    image: openpolicyagent/opa:latest
+    # Pinned: post-Apple maintainer transition (Styra team -> Apple), monthly
+    # release cadence continues but new ownership = bump deliberately, not on
+    # every container restart. See docs/architecture/guardrails.md.
+    image: openpolicyagent/opa:1.10.0
     container_name: insidellm-opa
     restart: always
     command:
@@ -414,9 +417,12 @@ services:
       - "--server"
       - "--addr=:8181"
       - "--log-level=info"
+      - "--watch"
       - "/policies"
     volumes:
-      - /opt/InsideLLM/opa/policies:/policies:ro
+      # rw so the Governance Hub policy editor can write .rego files here.
+      # Writes are admin-gated and audited via governance-hub's hash chain.
+      - /opt/InsideLLM/opa/policies:/policies:rw
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:8181/health || exit 1"]
       interval: 15s
@@ -477,6 +483,8 @@ services:
     volumes:
       - /opt/InsideLLM/data/governance-hub:/app/data
       - /opt/InsideLLM/governance-hub/framework:/app/framework:ro
+      # Policy editor writes .rego files here; OPA --watch picks up changes.
+      - /opt/InsideLLM/opa/policies:/opa-policies:rw
     depends_on:
       postgres:
         condition: service_healthy
