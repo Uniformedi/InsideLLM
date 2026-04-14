@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Shared Skills — InsideLLM Governance Hub</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Segoe UI',system-ui,sans-serif; background:#0a0e1a; color:#e2e8f0; min-height:100vh; padding:24px; }
+  h1 { font-size:22px; color:#22d3ee; font-family:monospace; margin-bottom:4px; }
+  .sub { color:#94a3b8; font-size:13px; margin-bottom:24px; }
+  .toolbar { display:flex; gap:10px; margin-bottom:16px; align-items:center; }
+  button, .btn { background:#1a2234; border:1px solid #2a3650; color:#e2e8f0; padding:8px 14px; border-radius:6px; cursor:pointer; font-size:13px; font-family:inherit; }
+  button:hover, .btn:hover { border-color:#22d3ee; }
+  button.primary { background:#2563eb; border-color:#2563eb; }
+  button.primary:hover { background:#1d4ed8; }
+  button.danger { background:#7f1d1d; border-color:#7f1d1d; }
+  button.danger:hover { background:#991b1b; }
+  input, textarea, select { background:#0f1629; border:1px solid #2a3650; color:#e2e8f0; padding:8px 10px; border-radius:6px; font-size:13px; font-family:inherit; width:100%; }
+  textarea { min-height:80px; font-family:monospace; font-size:12px; }
+  table { width:100%; border-collapse:collapse; background:#111827; border:1px solid #2a3650; border-radius:8px; overflow:hidden; }
+  th, td { padding:10px 12px; text-align:left; border-bottom:1px solid #1e293b; font-size:13px; vertical-align:top; }
+  th { background:#0f1629; color:#22d3ee; font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:0.05em; }
+  tr:last-child td { border-bottom:none; }
+  .badge { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-family:monospace; }
+  .b-pub { background:#064e3b; color:#6ee7b7; }
+  .b-draft { background:#1e293b; color:#94a3b8; }
+  .b-tag { background:#1e3a8a; color:#93c5fd; margin-right:4px; }
+  .mono { font-family:monospace; font-size:12px; color:#94a3b8; }
+  .row-actions { display:flex; gap:6px; flex-wrap:wrap; }
+  .row-actions button { padding:4px 10px; font-size:11px; }
+  .modal-bg { position:fixed; inset:0; background:rgba(0,0,0,0.7); display:none; align-items:center; justify-content:center; z-index:10; }
+  .modal-bg.open { display:flex; }
+  .modal { background:#1a2234; border:1px solid #2a3650; border-radius:12px; padding:28px; max-width:680px; width:90vw; max-height:90vh; overflow-y:auto; }
+  .modal h2 { font-size:16px; color:#22d3ee; font-family:monospace; margin-bottom:16px; }
+  .field { margin-bottom:12px; }
+  .field label { display:block; font-size:11px; color:#94a3b8; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px; }
+  .field .hint { font-size:11px; color:#64748b; margin-top:2px; }
+  .modal-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:20px; }
+  .empty { color:#64748b; font-style:italic; text-align:center; padding:40px; }
+  .err { color:#fca5a5; background:#450a0a; border:1px solid #7f1d1d; padding:10px 14px; border-radius:6px; margin-bottom:12px; display:none; }
+  .err.open { display:block; }
+</style>
+</head>
+<body>
+<h1>Shared Skills</h1>
+<div class="sub">Curated AI skills pushed to Open WebUI. Each skill is a named system-prompt + model + temperature, optionally gated to specific AD groups.</div>
+<div class="err" id="errbox"></div>
+<div class="toolbar">
+  <button class="primary" onclick="openNew()">+ New skill</button>
+  <button onclick="load()">Refresh</button>
+</div>
+<table id="tbl"><thead><tr>
+  <th>Slug</th><th>Name</th><th>Model</th><th>Temp</th><th>Groups</th><th>Tags</th><th>Status</th><th></th>
+</tr></thead><tbody id="tbody"><tr><td colspan="8" class="empty">Loading&hellip;</td></tr></tbody></table>
+
+<div class="modal-bg" id="modal"><div class="modal">
+  <h2 id="mtitle">New skill</h2>
+  <div class="field"><label>Slug <span class="hint">(url-safe, lowercase, hyphenated)</span></label><input id="f-slug" placeholder="contract-reviewer"></div>
+  <div class="field"><label>Name</label><input id="f-name" placeholder="Contract Reviewer"></div>
+  <div class="field"><label>Description</label><input id="f-desc" placeholder="Reviews contracts for unusual clauses and risk language."></div>
+  <div class="field"><label>System prompt</label><textarea id="f-prompt" placeholder="You are a contract analyst..."></textarea></div>
+  <div class="field"><label>Base model</label><input id="f-model" value="claude-sonnet"></div>
+  <div class="field"><label>Temperature <span class="hint">(0.0 - 2.0)</span></label><input id="f-temp" type="number" step="0.05" min="0" max="2" value="0.7"></div>
+  <div class="field"><label>Group allowlist <span class="hint">(comma-separated AD group CNs; empty = everyone)</span></label><input id="f-groups" placeholder="Legal, Contracts Team"></div>
+  <div class="field"><label>Tags <span class="hint">(comma-separated)</span></label><input id="f-tags" placeholder="legal, review"></div>
+  <div class="modal-actions">
+    <button onclick="closeModal()">Cancel</button>
+    <button class="primary" onclick="save()">Save</button>
+  </div>
+</div></div>
+
+<script>
+const api = "/governance/api/v1/skills";
+let editingSlug = null;
+
+function showErr(msg) {
+  const e = document.getElementById('errbox');
+  e.textContent = msg;
+  e.classList.add('open');
+  setTimeout(() => e.classList.remove('open'), 5000);
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+async function load() {
+  try {
+    const r = await fetch(api, { credentials: 'include' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    const tb = document.getElementById('tbody');
+    if (!d.skills.length) {
+      tb.innerHTML = '<tr><td colspan="8" class="empty">No skills yet. Click "+ New skill" to create one.</td></tr>';
+      return;
+    }
+    tb.innerHTML = d.skills.map(s => {
+      const groups = (s.group_allowlist || []).map(g => '<span class="badge b-tag">' + esc(g) + '</span>').join('') || '<span class="mono">all</span>';
+      const tags = (s.tags || []).map(t => '<span class="badge b-tag">' + esc(t) + '</span>').join('');
+      const statusClass = s.is_published ? 'b-pub' : 'b-draft';
+      const statusText = s.is_published ? 'Published' : 'Draft';
+      const pubLabel = s.is_published ? 'Unpublish' : 'Publish';
+      return '<tr>' +
+        '<td class="mono">' + esc(s.slug) + '</td>' +
+        '<td>' + esc(s.name) + '</td>' +
+        '<td class="mono">' + esc(s.base_model) + '</td>' +
+        '<td class="mono">' + s.temperature + '</td>' +
+        '<td>' + groups + '</td>' +
+        '<td>' + tags + '</td>' +
+        '<td><span class="badge ' + statusClass + '">' + statusText + '</span></td>' +
+        '<td><div class="row-actions">' +
+          '<button onclick="edit(\'' + esc(s.slug) + '\')">Edit</button>' +
+          '<button onclick="togglePublish(\'' + esc(s.slug) + '\', ' + s.is_published + ')">' + pubLabel + '</button>' +
+          '<button class="danger" onclick="del(\'' + esc(s.slug) + '\')">Delete</button>' +
+        '</div></td>' +
+      '</tr>';
+    }).join('');
+  } catch (e) {
+    showErr('Load failed: ' + e.message);
+  }
+}
+
+function openNew() {
+  editingSlug = null;
+  document.getElementById('mtitle').textContent = 'New skill';
+  ['f-slug','f-name','f-desc','f-prompt','f-groups','f-tags'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('f-slug').disabled = false;
+  document.getElementById('f-model').value = 'claude-sonnet';
+  document.getElementById('f-temp').value = '0.7';
+  document.getElementById('modal').classList.add('open');
+}
+
+async function edit(slug) {
+  try {
+    const r = await fetch(api + '/' + slug, { credentials: 'include' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const s = await r.json();
+    editingSlug = slug;
+    document.getElementById('mtitle').textContent = 'Edit: ' + slug;
+    document.getElementById('f-slug').value = s.slug;
+    document.getElementById('f-slug').disabled = true;
+    document.getElementById('f-name').value = s.name;
+    document.getElementById('f-desc').value = s.description;
+    document.getElementById('f-prompt').value = s.system_prompt;
+    document.getElementById('f-model').value = s.base_model;
+    document.getElementById('f-temp').value = s.temperature;
+    document.getElementById('f-groups').value = (s.group_allowlist || []).join(', ');
+    document.getElementById('f-tags').value = (s.tags || []).join(', ');
+    document.getElementById('modal').classList.add('open');
+  } catch (e) {
+    showErr('Load failed: ' + e.message);
+  }
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.remove('open');
+}
+
+function splitList(id) {
+  return document.getElementById(id).value.split(',').map(s => s.trim()).filter(Boolean);
+}
+
+async function save() {
+  const body = {
+    name: document.getElementById('f-name').value.trim(),
+    description: document.getElementById('f-desc').value.trim(),
+    system_prompt: document.getElementById('f-prompt').value,
+    base_model: document.getElementById('f-model').value.trim() || 'claude-sonnet',
+    temperature: parseFloat(document.getElementById('f-temp').value) || 0.7,
+    group_allowlist: splitList('f-groups'),
+    tags: splitList('f-tags'),
+    tool_allowlist: []
+  };
+  try {
+    let r;
+    if (editingSlug) {
+      r = await fetch(api + '/' + editingSlug, {
+        method: 'PATCH',
+        headers: {'Content-Type':'application/json'},
+        credentials: 'include',
+        body: JSON.stringify(body)
+      });
+    } else {
+      body.slug = document.getElementById('f-slug').value.trim();
+      r = await fetch(api, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        credentials: 'include',
+        body: JSON.stringify(body)
+      });
+    }
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({detail: r.statusText}));
+      throw new Error(e.detail || 'HTTP ' + r.status);
+    }
+    closeModal();
+    load();
+  } catch (e) {
+    showErr('Save failed: ' + e.message);
+  }
+}
+
+async function del(slug) {
+  if (!confirm('Delete skill "' + slug + '"? If published, it will be removed from Open WebUI first.')) return;
+  try {
+    const r = await fetch(api + '/' + slug, { method: 'DELETE', credentials: 'include' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    load();
+  } catch (e) {
+    showErr('Delete failed: ' + e.message);
+  }
+}
+
+async function togglePublish(slug, isPub) {
+  const action = isPub ? 'unpublish' : 'publish';
+  try {
+    const r = await fetch(api + '/' + slug + '/' + action, { method: 'POST', credentials: 'include' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    load();
+  } catch (e) {
+    showErr(action + ' failed: ' + e.message);
+  }
+}
+
+load();
+</script>
+</body>
+</html>

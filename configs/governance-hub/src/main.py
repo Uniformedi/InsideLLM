@@ -110,6 +110,10 @@ async def landing():
       <span class="icon" style="background:#2563eb">CC</span>
       <div><div class="label">Command Center</div><div class="desc">Governance dashboard, change management, fleet overview, monitoring</div></div>
     </a>
+    <a href="/governance/skills">
+      <span class="icon" style="background:#0891b2">SK</span>
+      <div><div class="label">Shared Skills</div><div class="desc">Org-wide AI skill catalog — create, edit, publish to Open WebUI, gate by AD group</div></div>
+    </a>
     {chat_link}
     <a href="/governance/docs">
       <span class="icon" style="background:#059669">API</span>
@@ -138,6 +142,14 @@ async def landing():
   </div>
 </div>
 </body></html>"""
+
+
+@app.get("/skills", response_class=HTMLResponse)
+async def skills_admin_page():
+    """Admin page for organizational shared skills (CRUD + publish/unpublish).
+    Talks to /governance/api/v1/skills under the hood."""
+    from pathlib import Path
+    return (Path(__file__).parent / "pages" / "skills_admin.html").read_text(encoding="utf-8")
 
 
 @app.get("/health")
