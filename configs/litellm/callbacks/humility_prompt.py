@@ -66,3 +66,7 @@ class HumilityPromptCallback(_BaseHumilityPrompt):
             return self._cache[self.tier]
 
         return _fallback_prompt(self.tier)
+
+
+# Module-level instance for LiteLLM's custom_callback_path loader.
+proxy_handler_instance = HumilityPromptCallback()

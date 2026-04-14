@@ -314,8 +314,7 @@ class DLPGuardrailCallback(CustomLogger):
         if metadata.get("dlp_guardrail_evaluated"):
             return data
 
-        user_info = user_api_key_dict or {}
-        user_id = user_info.get("user", "unknown")
+        user_id = getattr(user_api_key_dict, "user_id", None) or "unknown"
 
         # Collect detections across all user messages
         detections: list[tuple[str, str, str]] = []
@@ -424,3 +423,9 @@ class DLPGuardrailCallback(CustomLogger):
                 )
 
         return response
+
+
+# Module-level instance for LiteLLM's custom_callback_path loader.
+# LiteLLM's config references this name (not the class) so the proxy
+# receives a pre-instantiated handler rather than a class reference.
+proxy_handler_instance = DLPGuardrailCallback()

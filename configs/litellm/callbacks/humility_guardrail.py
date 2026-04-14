@@ -142,3 +142,7 @@ class HumilityGuardrailCallback(_BaseGuardrail):
             )
         except Exception:
             pass
+
+
+# Module-level instance for LiteLLM's custom_callback_path loader.
+proxy_handler_instance = HumilityGuardrailCallback()

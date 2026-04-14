@@ -102,7 +102,7 @@ litellm_settings:
   drop_params: true
 
   # Enable dynamic rate limiting + Humility (prompt + guardrail) + DLP guardrail
-  callbacks: ["dynamic_rate_limiter_v3", "callbacks.humility_prompt.HumilityPromptCallback", "callbacks.humility_guardrail.HumilityGuardrailCallback", "callbacks.dlp_guardrail.DLPGuardrailCallback"]
+  callbacks: ["dynamic_rate_limiter_v3", "callbacks.humility_prompt.proxy_handler_instance", "callbacks.humility_guardrail.proxy_handler_instance", "callbacks.dlp_guardrail.proxy_handler_instance"]
   custom_callback_path: "/app/callbacks"
 
   # Count total tokens for rate limit enforcement
