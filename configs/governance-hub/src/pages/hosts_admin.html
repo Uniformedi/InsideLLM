@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hyper-V Hosts — InsideLLM Governance Hub</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Segoe UI',system-ui,sans-serif; background:#0a0e1a; color:#e2e8f0; min-height:100vh; padding:20px; }
+  h1 { font-size:22px; color:#22d3ee; font-family:monospace; margin-bottom:4px; }
+  .sub { color:#94a3b8; font-size:13px; margin-bottom:18px; max-width:780px; }
+  .grid { display:grid; grid-template-columns:1fr; gap:14px; }
+  .panel { background:#111827; border:1px solid #2a3650; border-radius:8px; padding:16px; }
+  h2 { font-size:13px; color:#22d3ee; font-family:monospace; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:10px; }
+  .stats { display:grid; grid-template-columns:repeat(auto-fill, minmax(160px,1fr)); gap:10px; font-size:12px; }
+  .stat { background:#0f1629; border:1px solid #2a3650; border-radius:5px; padding:10px; }
+  .stat .lbl { font-size:10px; color:#64748b; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:3px; }
+  .stat .val { font-family:monospace; color:#e2e8f0; font-size:14px; word-break:break-all; }
+  table { width:100%; border-collapse:collapse; font-size:12px; }
+  th, td { padding:8px 10px; text-align:left; border-bottom:1px solid #1e293b; }
+  th { background:#0f1629; color:#22d3ee; font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.05em; }
+  tr:last-child td { border-bottom:none; }
+  .state { display:inline-block; padding:2px 8px; border-radius:3px; font-size:10px; font-family:monospace; text-transform:uppercase; letter-spacing:0.05em; }
+  .s-running { background:#064e3b; color:#6ee7b7; }
+  .s-off { background:#1e293b; color:#94a3b8; }
+  .s-saved { background:#1e3a8a; color:#93c5fd; }
+  .s-paused { background:#78350f; color:#fcd34d; }
+  .actions { display:flex; gap:5px; }
+  button { background:#1a2234; border:1px solid #2a3650; color:#e2e8f0; padding:4px 8px; border-radius:4px; cursor:pointer; font-size:11px; font-family:inherit; }
+  button:hover { border-color:#22d3ee; }
+  button.primary { background:#2563eb; border-color:#2563eb; }
+  button.danger { background:#7f1d1d; border-color:#7f1d1d; }
+  button.warn { background:#78350f; border-color:#78350f; }
+  .err { color:#fca5a5; background:#450a0a; border:1px solid #7f1d1d; padding:10px 14px; border-radius:5px; margin-bottom:14px; font-size:12px; display:none; white-space:pre-wrap; }
+  .err.open { display:block; }
+  .ok { color:#6ee7b7; background:#064e3b; border:1px solid #059669; padding:10px 14px; border-radius:5px; margin-bottom:14px; font-size:12px; display:none; }
+  .ok.open { display:block; }
+  .toolbar { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
+  .empty { color:#64748b; font-style:italic; padding:30px; text-align:center; }
+  pre { background:#0f1629; border:1px solid #2a3650; border-radius:5px; padding:10px; font-family:monospace; font-size:11px; color:#cbd5e1; overflow:auto; max-height:300px; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<h1>Hyper-V Hosts</h1>
+<div class="sub">Thin functional equivalent of Windows Admin Center scoped to InsideLLM's needs. Reads the same WinRM credentials Terraform's hyperv provider uses. Read-only inventory + start/stop/snapshot. For full Windows server administration, use Microsoft's Windows Admin Center.</div>
+<div class="err" id="err"></div>
+<div class="ok" id="ok"></div>
+
+<div class="grid">
+  <div class="panel">
+    <div class="toolbar">
+      <h2 style="margin-bottom:0">Host</h2>
+      <span style="flex:1"></span>
+      <button onclick="refresh()">Refresh</button>
+    </div>
+    <div class="stats" id="hoststats"><div class="empty">Loading host info…</div></div>
+  </div>
+
+  <div class="panel">
+    <h2>Virtual Machines</h2>
+    <table id="vmtbl">
+      <thead><tr><th>Name</th><th>State</th><th>CPU %</th><th>Memory</th><th>Uptime</th><th>Actions</th></tr></thead>
+      <tbody id="vmbody"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="panel" id="detail" style="display:none">
+    <div class="toolbar"><h2 style="margin-bottom:0" id="dtitle"></h2><span style="flex:1"></span><button onclick="document.getElementById('detail').style.display='none'">Close</button></div>
+    <pre id="ddata"></pre>
+  </div>
+</div>
+
+<script>
+const api = "/governance/api/v1/hyperv";
+function showErr(m){const e=document.getElementById('err');e.textContent=m;e.classList.add('open');setTimeout(()=>e.classList.remove('open'),8000);}
+function showOk(m){const e=document.getElementById('ok');e.textContent=m;e.classList.add('open');setTimeout(()=>e.classList.remove('open'),3000);}
+function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function fmtMem(b){if(b==null) return '—';return (b/1024/1024/1024).toFixed(1)+' GB';}
+function fmtUptime(t){if(!t || !t.TotalSeconds) return '—'; const s=t.TotalSeconds|0; if(s<60) return s+'s'; if(s<3600) return Math.floor(s/60)+'m'; if(s<86400) return Math.floor(s/3600)+'h'; return Math.floor(s/86400)+'d';}
+function stateClass(s){return 's-' + String(s||'').toLowerCase().replace(/[^a-z]/g,'') || 's-off';}
+
+async function loadHost(){
+  try{
+    const r = await fetch(api+'/host', {credentials:'include'});
+    if(!r.ok){const d=await r.json().catch(()=>({})); throw new Error(d.detail || r.status);}
+    const j = await r.json();
+    const h = j.data;
+    if(!h){document.getElementById('hoststats').innerHTML = '<div class="empty">No host data returned.</div>'; return;}
+    document.getElementById('hoststats').innerHTML = `
+      <div class="stat"><div class="lbl">Hostname</div><div class="val">${esc(h.Hostname)}.${esc(h.Domain||'')}</div></div>
+      <div class="stat"><div class="lbl">OS</div><div class="val">${esc(h.OS)}</div></div>
+      <div class="stat"><div class="lbl">CPUs</div><div class="val">${h.LogicalCPUs}</div></div>
+      <div class="stat"><div class="lbl">Memory</div><div class="val">${h.TotalMemoryGB} GB total · ${(h.FreeMemoryGB/1024).toFixed(1)} GB free</div></div>
+      <div class="stat"><div class="lbl">Last boot</div><div class="val">${esc((h.LastBootUpTime||'').slice(0,19).replace('T',' '))}</div></div>
+      ${(h.Disks||[]).map(d => `<div class="stat"><div class="lbl">Disk ${esc(d.DeviceID)}</div><div class="val">${d.SizeGB} GB · ${d.FreeGB} GB free</div></div>`).join('')}
+    `;
+  }catch(e){showErr('Host fetch failed: '+e.message); document.getElementById('hoststats').innerHTML = '<div class="empty">Could not reach Hyper-V host.</div>';}
+}
+
+async function loadVMs(){
+  try{
+    const r = await fetch(api+'/vms', {credentials:'include'});
+    if(!r.ok){const d=await r.json().catch(()=>({})); throw new Error(d.detail || r.status);}
+    const j = await r.json();
+    const vms = Array.isArray(j.data) ? j.data : (j.data ? [j.data] : []);
+    if(!vms.length){document.getElementById('vmbody').innerHTML='<tr><td colspan="6" class="empty">No VMs.</td></tr>';return;}
+    document.getElementById('vmbody').innerHTML = vms.map(v => `
+      <tr>
+        <td><a href="#" onclick="showDetail('${esc(v.Name)}');return false" style="color:#60a5fa">${esc(v.Name)}</a></td>
+        <td><span class="state ${stateClass(v.State)}">${esc(v.State)}</span></td>
+        <td>${v.CPUUsage != null ? v.CPUUsage + '%' : '—'}</td>
+        <td>${fmtMem(v.MemoryAssigned)}</td>
+        <td>${fmtUptime(v.Uptime)}</td>
+        <td class="actions">
+          <button onclick="act('${esc(v.Name)}','start')">Start</button>
+          <button class="warn" onclick="act('${esc(v.Name)}','stop')">Shutdown</button>
+          <button class="danger" onclick="actForce('${esc(v.Name)}')">Force off</button>
+          <button onclick="snap('${esc(v.Name)}')">Snapshot</button>
+        </td>
+      </tr>`).join('');
+  }catch(e){showErr('VM list failed: '+e.message); document.getElementById('vmbody').innerHTML='<tr><td colspan="6" class="empty">Could not list VMs.</td></tr>';}
+}
+
+async function act(name, op){
+  if(op==='stop' && !confirm(`Shutdown ${name}? Sends ACPI shutdown signal.`)) return;
+  if(op==='start' && !confirm(`Start ${name}?`)) return;
+  try{
+    const r = await fetch(`${api}/vms/${encodeURIComponent(name)}/${op}`, {method:'POST', credentials:'include'});
+    if(!r.ok){const d=await r.json().catch(()=>({})); throw new Error(d.detail || r.status);}
+    showOk(`${op} sent.`); setTimeout(loadVMs, 1500);
+  }catch(e){showErr(`${op} failed: ${e.message}`);}
+}
+
+async function actForce(name){
+  if(!confirm(`Force-OFF ${name}? Equivalent to pulling the power. Use only if shutdown is hung.`)) return;
+  try{
+    const r = await fetch(`${api}/vms/${encodeURIComponent(name)}/stop`, {method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify({force:true})});
+    if(!r.ok){const d=await r.json().catch(()=>({})); throw new Error(d.detail || r.status);}
+    showOk('Force-off sent.'); setTimeout(loadVMs, 1500);
+  }catch(e){showErr('Force-off failed: '+e.message);}
+}
+
+async function snap(name){
+  const snapName = prompt('Snapshot name (blank for auto):', '');
+  if(snapName === null) return;
+  try{
+    const r = await fetch(`${api}/vms/${encodeURIComponent(name)}/snapshot`, {method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify({name: snapName})});
+    if(!r.ok){const d=await r.json().catch(()=>({})); throw new Error(d.detail || r.status);}
+    const j = await r.json();
+    showOk(`Snapshot taken: ${j.data?.Latest || 'created'}`);
+  }catch(e){showErr('Snapshot failed: '+e.message);}
+}
+
+async function showDetail(name){
+  document.getElementById('detail').style.display='';
+  document.getElementById('dtitle').textContent = name;
+  document.getElementById('ddata').textContent = 'Loading…';
+  try{
+    const [vr, sr] = await Promise.all([
+      fetch(`${api}/vms/${encodeURIComponent(name)}`, {credentials:'include'}),
+      fetch(`${api}/vms/${encodeURIComponent(name)}/snapshots`, {credentials:'include'}),
+    ]);
+    const v = (await vr.json()).data;
+    const s = (await sr.json()).data;
+    document.getElementById('ddata').textContent = JSON.stringify({vm: v, snapshots: s}, null, 2);
+  }catch(e){document.getElementById('ddata').textContent = 'Detail load failed: '+e.message;}
+}
+
+function refresh(){loadHost(); loadVMs();}
+refresh();
+setInterval(loadVMs, 30000);  // light auto-refresh; CPU/uptime drift over time
+</script>
+</body>
+</html>

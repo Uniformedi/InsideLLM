@@ -308,6 +308,12 @@ locals {
     ldap_bind_dn          = var.ldap_bind_dn
     ldap_bind_password    = var.ldap_bind_password
     ldap_user_search_base = var.ldap_user_search_base != "" ? var.ldap_user_search_base : join(",", [for p in split(".", var.vm_domain) : "DC=${p}"])
+    hyperv_host        = var.hyperv_host
+    hyperv_user        = var.hyperv_user
+    hyperv_password    = var.hyperv_password
+    hyperv_port        = var.hyperv_port
+    hyperv_https       = var.hyperv_https
+    hyperv_insecure    = var.hyperv_insecure
     oidc_issuer_url    = var.sso_provider == "azure_ad" ? "https://login.microsoftonline.com/${var.azure_ad_tenant_id}/v2.0" : var.sso_provider == "okta" ? "https://${var.okta_domain}" : ""
     ollama_enable      = var.ollama_enable && !var.ollama_separate_vm
     ollama_models      = var.ollama_models

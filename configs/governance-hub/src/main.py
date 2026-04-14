@@ -10,7 +10,7 @@ from sqlalchemy import text
 from .config import settings
 from .db.local_db import AsyncSessionLocal, SyncSessionLocal, engine
 from .db.models import Base
-from .routers import advisor, audit, auth, changes, chat, config_snapshots, connectors, fleet, framework, keyword_templates, obligations, policies, prompts, restore, schema, skills, sync, vendors
+from .routers import advisor, audit, auth, changes, chat, config_snapshots, connectors, fleet, framework, hyperv, keyword_templates, obligations, policies, prompts, restore, schema, skills, sync, vendors
 from .services.config_service import capture_snapshot
 from .services.sync_service import collect_telemetry, export_to_central
 
@@ -55,6 +55,7 @@ app.include_router(prompts.router)
 app.include_router(skills.router)
 app.include_router(policies.router)
 app.include_router(vendors.router)
+app.include_router(hyperv.router)
 
 if settings.chat_enable:
     app.include_router(chat.router)
@@ -124,6 +125,10 @@ async def landing():
       <span class="icon" style="background:#fbbf24">VD</span>
       <div><div class="label">Vendor Directory</div><div class="desc">Curated vendor catalog. Stars for FOSS / standards contributions. Tag favorites.</div></div>
     </a>
+    <a href="/governance/hosts">
+      <span class="icon" style="background:#0d9488">HV</span>
+      <div><div class="label">Hyper-V Hosts</div><div class="desc">Thin Windows-Admin-Center equivalent. Inventory + start/stop/snapshot via WinRM.</div></div>
+    </a>
     {chat_link}
     <a href="/governance/docs">
       <span class="icon" style="background:#059669">API</span>
@@ -178,6 +183,14 @@ async def vendors_admin_page():
     favorites. Talks to /governance/api/v1/vendors."""
     from pathlib import Path
     return (Path(__file__).parent / "pages" / "vendors_admin.html").read_text(encoding="utf-8")
+
+
+@app.get("/hosts", response_class=HTMLResponse)
+async def hosts_admin_page():
+    """Hyper-V hosts management — thin functional equivalent of Windows Admin
+    Center scoped to the bits InsideLLM operators need."""
+    from pathlib import Path
+    return (Path(__file__).parent / "pages" / "hosts_admin.html").read_text(encoding="utf-8")
 
 
 @app.get("/health")

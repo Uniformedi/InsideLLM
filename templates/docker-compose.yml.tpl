@@ -459,6 +459,14 @@ services:
       GOVERNANCE_HUB_HUB_SECRET: "${governance_hub_secret}"
       GOVERNANCE_HUB_LITELLM_URL: "http://litellm:4000"
       GOVERNANCE_HUB_LITELLM_API_KEY: "${litellm_master_key}"
+      # Hyper-V WinRM (reuses Terraform's hyperv provider creds) — used by
+      # the /governance/hosts page for inventory + start/stop/snapshot.
+      HYPERV_HOST: "${hyperv_host}"
+      HYPERV_USER: "${hyperv_user}"
+      HYPERV_PASSWORD: "${hyperv_password}"
+      HYPERV_PORT: "${hyperv_port}"
+      HYPERV_HTTPS: "${hyperv_https}"
+      HYPERV_INSECURE: "${hyperv_insecure}"
       GOVERNANCE_HUB_ADVISOR_MODEL: "${governance_hub_advisor_model}"
 %{ if governance_hub_registration_token != "" }
       GOVERNANCE_HUB_REGISTRATION_TOKEN: "${governance_hub_registration_token}"
