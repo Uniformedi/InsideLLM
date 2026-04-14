@@ -30,7 +30,7 @@ INSTANCE_ID="${INSTANCE_ID:-$(hostname)}"
 # Slugify: lowercase, replace anything not [a-z0-9-] with '-', strip leading/
 # trailing hyphens. AD/email-safe while preserving readability.
 INSTANCE_SLUG="$(printf '%s' "$INSTANCE_ID" | tr '[:upper:]' '[:lower:]' \
-  | sed -E 's/[^a-z0-9-]+/-/g; s/^-+//; s/-+$//')"
+  | sed -E 's/[^a-z0-9-]+/-/g; s/^-+//; s/-+$//; s/^insidellm-//')"
 [ -z "$INSTANCE_SLUG" ] && INSTANCE_SLUG="local"
 SVC_EMAIL="${SVC_EMAIL:-governance-hub@svc.insidellm-${INSTANCE_SLUG}.local}"
 SVC_NAME="${SVC_NAME:-Governance Hub (service account — ${INSTANCE_SLUG})}"
