@@ -25,6 +25,19 @@ from humility.rules import Decision, evaluate
 logger = logging.getLogger("insidellm.humility_guardrail")
 
 
+def _coerce_user_info(user_info) -> dict:
+    """LiteLLM hands us UserAPIKeyAuth (a pydantic model); _query_opa_sync and
+    _log_to_hub_sync expect a plain dict. Normalize at the adapter boundary
+    so downstream code can rely on .get() without attribute surprises."""
+    if isinstance(user_info, dict) or user_info is None:
+        return user_info or {}
+    return {
+        "user_id": getattr(user_info, "user_id", "") or "",
+        "user": getattr(user_info, "user_id", "") or "",
+        "user_role": getattr(user_info, "user_role", "") or "",
+    }
+
+
 def _last_user_message(messages: list[dict]) -> str:
     for msg in reversed(messages):
         if msg.get("role") == "user":
@@ -105,7 +118,8 @@ class HumilityGuardrailCallback(_BaseGuardrail):
             f"fail_mode={self.fail_mode})"
         )
 
-    def evaluate_decision(self, messages: list[dict], user_info: dict) -> Decision:
+    def evaluate_decision(self, messages: list[dict], user_info) -> Decision:
+        user_info = _coerce_user_info(user_info)
         if self.opa_enabled:
             try:
                 loop = asyncio.get_event_loop()
@@ -127,9 +141,10 @@ class HumilityGuardrailCallback(_BaseGuardrail):
 
         return evaluate(messages)
 
-    def on_decision(self, decision: Decision, user_info: dict) -> None:
+    def on_decision(self, decision: Decision, user_info) -> None:
         if decision.allow:
             return
+        user_info = _coerce_user_info(user_info)
         try:
             loop = asyncio.get_event_loop()
             loop.run_in_executor(

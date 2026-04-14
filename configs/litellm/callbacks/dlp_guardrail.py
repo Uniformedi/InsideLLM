@@ -22,6 +22,7 @@ import os
 import re
 from typing import Any
 
+from fastapi import HTTPException
 from litellm.integrations.custom_logger import CustomLogger
 
 logger = logging.getLogger("litellm.dlp_guardrail")
@@ -348,15 +349,18 @@ class DLPGuardrailCallback(CustomLogger):
             },
         )
 
-        # --- BLOCK mode: reject the request ---
+        # --- BLOCK mode: reject the request with 400 (client-fixable) ---
         if self.mode == "block":
             types_found = ", ".join(sorted({d[1] for d in detections}))
-            raise Exception(
-                "**DLP Filter Blocked This Message**\n\n"
-                f"Your message contains sensitive information ({types_found}).\n\n"
-                "For security and compliance, this request was blocked before "
-                "reaching the AI service. Please remove the sensitive data and "
-                "try again."
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "**DLP Filter Blocked This Message**\n\n"
+                    f"Your message contains sensitive information ({types_found}).\n\n"
+                    "For security and compliance, this request was blocked before "
+                    "reaching the AI service. Please remove the sensitive data and "
+                    "try again."
+                ),
             )
 
         # --- REDACT mode: rewrite messages and proceed ---
