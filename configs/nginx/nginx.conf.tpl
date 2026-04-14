@@ -266,7 +266,7 @@ http {
         # --- Auth subrequest target ---
         location = /auth/validate {
             internal;
-            proxy_pass http://governance-hub:8090/auth/validate;
+            proxy_pass http://governance-hub/auth/validate;
             proxy_pass_request_body off;
             proxy_set_header Content-Length "";
             proxy_set_header X-Original-URI $request_uri;
@@ -275,7 +275,7 @@ http {
 
         # --- Auth endpoints (login, callback, logout, whoami) ---
         location /auth/ {
-            proxy_pass http://governance-hub:8090/auth/;
+            proxy_pass http://governance-hub/auth/;
             proxy_http_version 1.1;
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
