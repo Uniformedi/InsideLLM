@@ -84,9 +84,10 @@ you can prove the log hasn't been tampered with.
 - **Open governance overlays.** HIPAA, SOX, FERPA, GLBA, FDCPA policies
   ship as Rego and are yours to extend. No consulting engagement to change a
   rule.
-- **First reference customer underway.** Organization is deploying
-  InsideLLM as their enterprise AI gateway. Design partner engagements are
-  available for organizations willing to shape the roadmap.
+- **Design-partner program active.** A small number of enterprises are
+  currently shaping the roadmap. Engagements are available for
+  organizations willing to inform v1.x priorities in exchange for
+  preferential terms and direct access to the framework author.
 
 ## The economic case
 
