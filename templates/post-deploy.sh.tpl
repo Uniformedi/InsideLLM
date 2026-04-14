@@ -50,7 +50,12 @@ wait_for_service "http://localhost:8080/health" "Open WebUI"
 # ---------------------------------------------------------------------------
 if [ -x /opt/InsideLLM/scripts/provision-owui-service-account.sh ]; then
   log "Provisioning Open WebUI service account for governance-hub..."
-  bash /opt/InsideLLM/scripts/provision-owui-service-account.sh || \
+  # INSTANCE_ID is interpolated from Terraform so the service account's
+  # email carries the VM identity — critical for cross-fleet audit.
+  # Each instance's governance-hub now attributes as a distinct
+  # governance-hub@svc.insidellm-<vm_name>.local in OWUI's logs.
+  INSTANCE_ID="${instance_id}" \
+    bash /opt/InsideLLM/scripts/provision-owui-service-account.sh || \
     log "WARNING: Open WebUI service-account provisioning failed (non-fatal)"
 else
   log "Skipping Open WebUI service-account provisioning (script missing)"

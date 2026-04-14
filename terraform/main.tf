@@ -441,6 +441,7 @@ locals {
       litellm_master_key  = local.litellm_master_key
       default_user_budget = var.litellm_default_user_budget
       vm_fqdn             = local.vm_fqdn
+      instance_id         = var.vm_name
       ollama_enable       = var.ollama_enable && !var.ollama_separate_vm
       ollama_models       = var.ollama_models
       docforge_enable        = var.docforge_enable

@@ -23,8 +23,17 @@
 set -euo pipefail
 
 ENV_FILE="${ENV_FILE:-/opt/InsideLLM/.env}"
-SVC_EMAIL="${SVC_EMAIL:-governance-hub@svc.insidellm.local}"
-SVC_NAME="${SVC_NAME:-Governance Hub (service account)}"
+# INSTANCE_ID should come from the caller (post-deploy.sh renders it from
+# Terraform's var.vm_name). Fall back to the machine's hostname so an ad-hoc
+# run of the script still produces a disambiguated email.
+INSTANCE_ID="${INSTANCE_ID:-$(hostname)}"
+# Slugify: lowercase, replace anything not [a-z0-9-] with '-', strip leading/
+# trailing hyphens. AD/email-safe while preserving readability.
+INSTANCE_SLUG="$(printf '%s' "$INSTANCE_ID" | tr '[:upper:]' '[:lower:]' \
+  | sed -E 's/[^a-z0-9-]+/-/g; s/^-+//; s/-+$//')"
+[ -z "$INSTANCE_SLUG" ] && INSTANCE_SLUG="local"
+SVC_EMAIL="${SVC_EMAIL:-governance-hub@svc.insidellm-${INSTANCE_SLUG}.local}"
+SVC_NAME="${SVC_NAME:-Governance Hub (service account — ${INSTANCE_SLUG})}"
 OWUI_URL="${OWUI_URL:-http://localhost:8080}"
 OWUI_CONTAINER="${OWUI_CONTAINER:-insidellm-open-webui}"
 
