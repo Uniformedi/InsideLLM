@@ -10,7 +10,7 @@ from sqlalchemy import text
 from .config import settings
 from .db.local_db import AsyncSessionLocal, SyncSessionLocal, engine
 from .db.models import Base
-from .routers import advisor, audit, auth, changes, chat, config_snapshots, connectors, fleet, framework, keyword_templates, obligations, policies, prompts, restore, schema, skills, sync
+from .routers import advisor, audit, auth, changes, chat, config_snapshots, connectors, fleet, framework, keyword_templates, obligations, policies, prompts, restore, schema, skills, sync, vendors
 from .services.config_service import capture_snapshot
 from .services.sync_service import collect_telemetry, export_to_central
 
@@ -54,6 +54,7 @@ app.include_router(keyword_templates.router)
 app.include_router(prompts.router)
 app.include_router(skills.router)
 app.include_router(policies.router)
+app.include_router(vendors.router)
 
 if settings.chat_enable:
     app.include_router(chat.router)
@@ -119,6 +120,10 @@ async def landing():
       <span class="icon" style="background:#dc2626">OP</span>
       <div><div class="label">OPA Policies</div><div class="desc">Edit Rego policies — Humility, Integrity, industry overlays. OPA-validated saves with hot reload.</div></div>
     </a>
+    <a href="/governance/vendors">
+      <span class="icon" style="background:#fbbf24">VD</span>
+      <div><div class="label">Vendor Directory</div><div class="desc">Curated vendor catalog. Stars for FOSS / standards contributions. Tag favorites.</div></div>
+    </a>
     {chat_link}
     <a href="/governance/docs">
       <span class="icon" style="background:#059669">API</span>
@@ -166,6 +171,15 @@ async def policies_admin_page():
     return (Path(__file__).parent / "pages" / "policies_admin.html").read_text(encoding="utf-8")
 
 
+@app.get("/vendors", response_class=HTMLResponse)
+async def vendors_admin_page():
+    """Vendor directory — values-aligned vendor catalog with FOSS/standards
+    contribution stars, admin-managed contribution types, and per-user
+    favorites. Talks to /governance/api/v1/vendors."""
+    from pathlib import Path
+    return (Path(__file__).parent / "pages" / "vendors_admin.html").read_text(encoding="utf-8")
+
+
 @app.get("/health")
 async def health():
     return {
@@ -198,6 +212,15 @@ async def startup():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     logger.info("Governance tables created/verified")
+
+    # Seed default vendor catalog + contribution types (idempotent)
+    try:
+        from .db.local_db import AsyncSessionLocal
+        from .services.vendor_seed import seed_vendors
+        async with AsyncSessionLocal() as db:
+            await seed_vendors(db)
+    except Exception as e:
+        logger.warning(f"Vendor seed failed (non-fatal): {e}")
 
     # Load settings overrides from DB (replaces .env file approach)
     try:

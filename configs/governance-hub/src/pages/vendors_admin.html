@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Vendor Directory — InsideLLM Governance Hub</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Segoe UI',system-ui,sans-serif; background:#0a0e1a; color:#e2e8f0; min-height:100vh; padding:20px; }
+  h1 { font-size:22px; color:#22d3ee; font-family:monospace; margin-bottom:4px; }
+  .sub { color:#94a3b8; font-size:13px; margin-bottom:16px; max-width:780px; }
+  .toolbar { display:flex; gap:8px; margin-bottom:14px; align-items:center; flex-wrap:wrap; }
+  button, .btn { background:#1a2234; border:1px solid #2a3650; color:#e2e8f0; padding:7px 13px; border-radius:5px; cursor:pointer; font-size:12px; font-family:inherit; }
+  button:hover { border-color:#22d3ee; }
+  button.primary { background:#2563eb; border-color:#2563eb; }
+  button.primary:hover { background:#1d4ed8; }
+  button.danger { background:#7f1d1d; border-color:#7f1d1d; }
+  button.danger:hover { background:#991b1b; }
+  input, textarea, select { background:#0f1629; border:1px solid #2a3650; color:#e2e8f0; padding:7px 10px; border-radius:5px; font-size:12px; font-family:inherit; width:100%; }
+  textarea { min-height:70px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:14px; }
+  .card { background:#111827; border:1px solid #2a3650; border-radius:8px; padding:16px; cursor:pointer; transition:border-color 0.15s; display:flex; flex-direction:column; gap:8px; }
+  .card:hover { border-color:#22d3ee; }
+  .card .top { display:flex; justify-content:space-between; align-items:start; gap:8px; }
+  .card .name { font-size:15px; font-weight:600; color:#e2e8f0; }
+  .card .cat { font-family:monospace; font-size:10px; color:#64748b; text-transform:uppercase; letter-spacing:0.05em; }
+  .stars { font-family:monospace; font-size:14px; color:#fbbf24; white-space:nowrap; }
+  .desc { color:#94a3b8; font-size:12px; line-height:1.4; min-height:36px; }
+  .card .actions { display:flex; gap:6px; align-items:center; margin-top:auto; padding-top:8px; border-top:1px solid #1e293b; }
+  .fav { background:none; border:none; padding:0; font-size:18px; cursor:pointer; color:#475569; }
+  .fav.on { color:#fbbf24; }
+  .modal-bg { position:fixed; inset:0; background:rgba(0,0,0,0.7); display:none; align-items:center; justify-content:center; z-index:10; padding:20px; }
+  .modal-bg.open { display:flex; }
+  .modal { background:#1a2234; border:1px solid #2a3650; border-radius:10px; padding:24px; width:780px; max-width:100%; max-height:88vh; overflow:auto; }
+  .modal h2 { font-size:16px; color:#22d3ee; font-family:monospace; margin-bottom:14px; }
+  .field { margin-bottom:10px; }
+  .field label { display:block; font-size:11px; color:#94a3b8; text-transform:uppercase; margin-bottom:3px; }
+  .field .hint { font-size:10px; color:#64748b; margin-top:2px; }
+  .modal-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:14px; padding-top:12px; border-top:1px solid #2a3650; }
+  .err { color:#fca5a5; background:#450a0a; border:1px solid #7f1d1d; padding:8px 12px; border-radius:5px; margin-bottom:12px; font-size:12px; display:none; }
+  .err.open { display:block; }
+  .ok { color:#6ee7b7; background:#064e3b; border:1px solid #059669; padding:8px 12px; border-radius:5px; margin-bottom:12px; font-size:12px; display:none; }
+  .ok.open { display:block; }
+  .contrib-row { display:grid; grid-template-columns:auto 1fr auto; gap:8px; padding:8px 10px; background:#0f1629; border:1px solid #2a3650; border-radius:5px; margin-bottom:6px; align-items:center; font-size:12px; }
+  .contrib-row .type { font-family:monospace; color:#22d3ee; }
+  .contrib-row .ev { color:#cbd5e1; }
+  .contrib-row .ev a { color:#60a5fa; word-break:break-all; }
+  .contrib-row button { padding:3px 8px; font-size:11px; }
+  .badge { display:inline-block; padding:1px 7px; border-radius:3px; font-size:10px; font-family:monospace; background:#1e293b; color:#94a3b8; margin-right:4px; }
+  .toolbar input[type=search] { max-width:280px; }
+  .filter-pill { background:#1a2234; border:1px solid #2a3650; padding:5px 10px; border-radius:14px; font-size:11px; cursor:pointer; }
+  .filter-pill.active { background:#1e3a8a; border-color:#3b82f6; color:#fff; }
+  hr { border:none; border-top:1px solid #2a3650; margin:14px 0; }
+</style>
+</head>
+<body>
+<h1>Vendor Directory</h1>
+<div class="sub">Curated, values-aligned. Every vendor in the catalog earns at least one star for contributing to FOSS or recognized standards. Stars cannot be added without recorded evidence. Tag your favorites to filter quickly.</div>
+<div class="err" id="err"></div>
+<div class="ok" id="ok"></div>
+
+<div class="toolbar">
+  <input type="search" id="q" placeholder="Search by name..." oninput="render()">
+  <span class="filter-pill" id="pill-all" onclick="setFilter('all')">All</span>
+  <span class="filter-pill" id="pill-fav" onclick="setFilter('favorites')">My favorites</span>
+  <span style="flex:1"></span>
+  <button onclick="openTypes()">Manage contribution types</button>
+  <button class="primary" onclick="openNew()">+ Add vendor</button>
+</div>
+
+<div class="grid" id="cards"></div>
+
+<!-- Vendor add/edit modal -->
+<div class="modal-bg" id="vmodal"><div class="modal">
+  <h2 id="vmtitle">New vendor</h2>
+  <div class="field"><label>Slug <span class="hint">(lowercase, hyphenated)</span></label><input id="v-slug" placeholder="my-vendor"></div>
+  <div class="field"><label>Name</label><input id="v-name"></div>
+  <div class="field"><label>Category <span class="hint">(database, model, monitoring, etc.)</span></label><input id="v-cat"></div>
+  <div class="field"><label>Website URL</label><input id="v-url"></div>
+  <div class="field"><label>Description</label><textarea id="v-desc"></textarea></div>
+  <div class="modal-actions">
+    <button onclick="closeV()">Cancel</button>
+    <button class="primary" onclick="saveV()">Save</button>
+  </div>
+</div></div>
+
+<!-- Vendor detail modal -->
+<div class="modal-bg" id="dmodal"><div class="modal">
+  <h2 id="dtitle"></h2>
+  <div id="ddesc" style="color:#94a3b8;font-size:13px;margin-bottom:12px"></div>
+  <div id="dmeta" style="font-size:12px;color:#64748b;margin-bottom:14px"></div>
+  <h3 style="font-size:12px;color:#22d3ee;font-family:monospace;text-transform:uppercase;margin-bottom:8px">Contributions earned</h3>
+  <div id="dcontribs"></div>
+  <div id="dadd" style="display:none;margin-top:12px;padding-top:12px;border-top:1px dashed #2a3650">
+    <div class="field"><label>Award contribution</label>
+      <select id="d-type"></select>
+    </div>
+    <div class="field"><label>Evidence URL</label><input id="d-evurl"></div>
+    <div class="field"><label>Evidence description</label><textarea id="d-evdesc"></textarea></div>
+    <button class="primary" onclick="addContrib()">Award star</button>
+  </div>
+  <div class="modal-actions">
+    <button onclick="closeD()">Close</button>
+    <button id="d-edit" onclick="editFromD()" style="display:none">Edit</button>
+    <button id="d-del" class="danger" onclick="delFromD()" style="display:none">Delete vendor</button>
+  </div>
+</div></div>
+
+<!-- Contribution Types modal -->
+<div class="modal-bg" id="tmodal"><div class="modal">
+  <h2>Contribution Types</h2>
+  <div style="font-size:12px;color:#64748b;margin-bottom:12px">These define what counts as a star. Editing is company-wide; user favorites are unaffected.</div>
+  <div id="tlist"></div>
+  <hr>
+  <div id="tadd">
+    <div class="field"><label>Code <span class="hint">(SHOUT_CASE, no spaces)</span></label><input id="t-code"></div>
+    <div class="field"><label>Name</label><input id="t-name"></div>
+    <div class="field"><label>Description</label><textarea id="t-desc"></textarea></div>
+    <div class="field"><label>Points</label><input id="t-pts" type="number" value="1" min="1" max="10"></div>
+    <button class="primary" onclick="addType()">+ Add type</button>
+  </div>
+  <div class="modal-actions">
+    <button onclick="closeT()">Close</button>
+  </div>
+</div></div>
+
+<script>
+const api = "/governance/api/v1";
+let allVendors = [];
+let types = [];
+let filter = "all";
+let isAdmin = false;
+let currentSlug = null;
+
+function showErr(m){const e=document.getElementById('err');e.textContent=m;e.classList.add('open');setTimeout(()=>e.classList.remove('open'),6000);}
+function showOk(m){const e=document.getElementById('ok');e.textContent=m;e.classList.add('open');setTimeout(()=>e.classList.remove('open'),3000);}
+function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function stars(n){return '★'.repeat(n) + (n>0 ? ' ' : '') + n;}
+
+async function loadAll(){
+  try{
+    const [vr, tr] = await Promise.all([
+      fetch(api+'/vendors', {credentials:'include'}),
+      fetch(api+'/contribution-types', {credentials:'include'}),
+    ]);
+    const vd = await vr.json();
+    const td = await tr.json();
+    allVendors = vd.vendors;
+    types = td.types;
+    // Detect admin via 403/200 on a benign mutation probe? Simpler: try to create-types modal
+    // For v1, derive from a test fetch to /api/v1/contribution-types with admin-only side check.
+    // We'll just always show admin controls if any of them work; cleaner UX could come later.
+    render();
+  }catch(e){showErr('Load failed: '+e.message);}
+}
+
+function setFilter(f){filter=f;document.getElementById('pill-all').classList.toggle('active', f==='all');document.getElementById('pill-fav').classList.toggle('active', f==='favorites');render();}
+
+function render(){
+  const q = document.getElementById('q').value.trim().toLowerCase();
+  let list = allVendors;
+  if (filter==='favorites') list = list.filter(v => v.is_favorite);
+  if (q) list = list.filter(v => v.name.toLowerCase().includes(q) || (v.category||'').toLowerCase().includes(q));
+  const c = document.getElementById('cards');
+  if (!list.length) { c.innerHTML = '<div style="color:#64748b;padding:24px;text-align:center;grid-column:1/-1">No vendors match.</div>'; return; }
+  c.innerHTML = list.map(v => `
+    <div class="card" onclick="openDetail('${esc(v.slug)}')">
+      <div class="top">
+        <div>
+          <div class="name">${esc(v.name)}</div>
+          <div class="cat">${esc(v.category||'(uncategorized)')}</div>
+        </div>
+        <div class="stars" title="${v.total_stars} contribution star(s)">${stars(v.total_stars)}</div>
+      </div>
+      <div class="desc">${esc(v.description||'').slice(0,180)}${v.description.length>180?'…':''}</div>
+      <div class="actions">
+        <button class="fav ${v.is_favorite?'on':''}" onclick="event.stopPropagation();toggleFav('${esc(v.slug)}')" title="${v.is_favorite?'Remove from favorites':'Add to favorites'}">${v.is_favorite?'★':'☆'}</button>
+        ${v.website_url ? `<a href="${esc(v.website_url)}" target="_blank" onclick="event.stopPropagation()" style="color:#60a5fa;font-size:11px;text-decoration:none">website ↗</a>` : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+async function toggleFav(slug){
+  try{
+    const r = await fetch(api+'/vendors/'+slug+'/favorite', {method:'POST', credentials:'include', headers:{'Content-Type':'application/json'}, body:'{}'});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const d = await r.json();
+    const v = allVendors.find(x => x.slug===slug);
+    if(v) v.is_favorite = d.is_favorite;
+    render();
+  }catch(e){showErr('Favorite toggle failed: '+e.message);}
+}
+
+async function openDetail(slug){
+  currentSlug = slug;
+  try{
+    const r = await fetch(api+'/vendors/'+slug, {credentials:'include'});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const v = await r.json();
+    document.getElementById('dtitle').textContent = v.name + ' ' + stars(v.total_stars);
+    document.getElementById('ddesc').textContent = v.description;
+    document.getElementById('dmeta').innerHTML = `<span class="badge">${esc(v.category)}</span> ${v.website_url ? `<a href="${esc(v.website_url)}" target="_blank" style="color:#60a5fa">${esc(v.website_url)}</a>` : ''}`;
+    document.getElementById('dcontribs').innerHTML = v.contributions.length
+      ? v.contributions.map(c => `
+          <div class="contrib-row">
+            <div class="type">★ ${esc(c.type_name)}</div>
+            <div class="ev">${esc(c.evidence_description)}<br>${c.evidence_url ? `<a href="${esc(c.evidence_url)}" target="_blank">${esc(c.evidence_url)}</a>` : ''}</div>
+            <button class="danger" onclick="revokeContrib(${c.id})">Revoke</button>
+          </div>`).join('')
+      : '<div style="color:#64748b;font-style:italic">No contributions recorded yet.</div>';
+
+    // populate type select
+    const sel = document.getElementById('d-type');
+    sel.innerHTML = types.filter(t => t.is_active).map(t => `<option value="${t.id}">${esc(t.name)} (+${t.points})</option>`).join('');
+    document.getElementById('dadd').style.display = '';  // optimistic; admin-gate is enforced server-side
+    document.getElementById('d-edit').style.display = '';
+    document.getElementById('d-del').style.display = '';
+    document.getElementById('dmodal').classList.add('open');
+  }catch(e){showErr('Detail load failed: '+e.message);}
+}
+
+function closeD(){document.getElementById('dmodal').classList.remove('open');currentSlug=null;}
+
+async function addContrib(){
+  if(!currentSlug) return;
+  const body = {
+    contribution_type_id: parseInt(document.getElementById('d-type').value, 10),
+    evidence_url: document.getElementById('d-evurl').value.trim(),
+    evidence_description: document.getElementById('d-evdesc').value.trim(),
+  };
+  try{
+    const r = await fetch(api+'/vendors/'+currentSlug+'/contributions', {method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify(body)});
+    if(!r.ok) {const e = await r.json().catch(()=>({})); throw new Error(e.detail || ('HTTP '+r.status));}
+    showOk('Star awarded.');
+    document.getElementById('d-evurl').value=''; document.getElementById('d-evdesc').value='';
+    await openDetail(currentSlug); await loadAll();
+  }catch(e){showErr('Award failed: '+e.message);}
+}
+
+async function revokeContrib(id){
+  if(!confirm('Revoke this star?')) return;
+  try{
+    const r = await fetch(api+'/vendors/'+currentSlug+'/contributions/'+id, {method:'DELETE', credentials:'include'});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    showOk('Star revoked.');
+    await openDetail(currentSlug); await loadAll();
+  }catch(e){showErr('Revoke failed: '+e.message);}
+}
+
+function openNew(){
+  document.getElementById('vmtitle').textContent='New vendor';
+  ['v-slug','v-name','v-cat','v-url','v-desc'].forEach(id => document.getElementById(id).value='');
+  document.getElementById('v-slug').disabled = false;
+  document.getElementById('vmodal').classList.add('open');
+}
+function editFromD(){
+  const v = allVendors.find(x => x.slug===currentSlug);
+  if(!v) return;
+  document.getElementById('vmtitle').textContent='Edit: '+v.slug;
+  document.getElementById('v-slug').value = v.slug; document.getElementById('v-slug').disabled = true;
+  document.getElementById('v-name').value = v.name;
+  document.getElementById('v-cat').value = v.category||'';
+  document.getElementById('v-url').value = v.website_url||'';
+  document.getElementById('v-desc').value = v.description||'';
+  closeD();
+  document.getElementById('vmodal').classList.add('open');
+}
+function closeV(){document.getElementById('vmodal').classList.remove('open');}
+
+async function saveV(){
+  const slug = document.getElementById('v-slug').value.trim();
+  const body = {
+    name: document.getElementById('v-name').value.trim(),
+    category: document.getElementById('v-cat').value.trim(),
+    website_url: document.getElementById('v-url').value.trim(),
+    description: document.getElementById('v-desc').value.trim(),
+  };
+  try{
+    let r;
+    if (document.getElementById('v-slug').disabled) {
+      r = await fetch(api+'/vendors/'+slug, {method:'PATCH', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify(body)});
+    } else {
+      body.slug = slug;
+      r = await fetch(api+'/vendors', {method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify(body)});
+    }
+    if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.detail || ('HTTP '+r.status));}
+    showOk('Saved.');
+    closeV();
+    await loadAll();
+  }catch(e){showErr('Save failed: '+e.message);}
+}
+
+async function delFromD(){
+  if(!currentSlug) return;
+  if(!confirm('Delete vendor "'+currentSlug+'"? Removes all contributions and favorites.')) return;
+  try{
+    const r = await fetch(api+'/vendors/'+currentSlug, {method:'DELETE', credentials:'include'});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    showOk('Deleted.');
+    closeD();
+    await loadAll();
+  }catch(e){showErr('Delete failed: '+e.message);}
+}
+
+function openTypes(){
+  renderTypes();
+  document.getElementById('tmodal').classList.add('open');
+}
+function closeT(){document.getElementById('tmodal').classList.remove('open');}
+
+function renderTypes(){
+  document.getElementById('tlist').innerHTML = types.map(t => `
+    <div class="contrib-row">
+      <div class="type">${esc(t.code)} (+${t.points})</div>
+      <div class="ev"><strong>${esc(t.name)}</strong><br>${esc(t.description)}</div>
+      <button class="danger" onclick="delType(${t.id})">Delete</button>
+    </div>
+  `).join('');
+}
+
+async function addType(){
+  const body = {
+    code: document.getElementById('t-code').value.trim().toUpperCase(),
+    name: document.getElementById('t-name').value.trim(),
+    description: document.getElementById('t-desc').value.trim(),
+    points: parseInt(document.getElementById('t-pts').value,10) || 1,
+  };
+  try{
+    const r = await fetch(api+'/contribution-types', {method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify(body)});
+    if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.detail || ('HTTP '+r.status));}
+    showOk('Type added.');
+    ['t-code','t-name','t-desc'].forEach(id => document.getElementById(id).value='');
+    await loadAll(); renderTypes();
+  }catch(e){showErr('Add type failed: '+e.message);}
+}
+
+async function delType(id){
+  if(!confirm('Delete this contribution type? Will fail if any vendor still references it.')) return;
+  try{
+    const r = await fetch(api+'/contribution-types/'+id, {method:'DELETE', credentials:'include'});
+    if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.detail || ('HTTP '+r.status));}
+    showOk('Type deleted.');
+    await loadAll(); renderTypes();
+  }catch(e){showErr('Delete failed: '+e.message);}
+}
+
+setFilter('all');
+loadAll();
+</script>
+</body>
+</html>

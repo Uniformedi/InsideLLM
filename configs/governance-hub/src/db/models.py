@@ -362,3 +362,65 @@ class SharedSkill(Base):
     created_by = Column(String(255), nullable=False, default="system")
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
     updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+# ----- Vendor Management -------------------------------------------------------
+# A curated, values-aligned vendor directory. Default policy: every vendor in
+# the catalog must contribute to FOSS and/or recognized standards. Each
+# qualifying contribution becomes a ContributionType-tied star on the vendor.
+# Users can tag personal favorites, separate from the company-managed list.
+
+class Vendor(Base):
+    __tablename__ = "governance_vendors"
+    id = Column(Integer, primary_key=True)
+    slug = Column(String(100), nullable=False, unique=True)
+    name = Column(String(200), nullable=False)
+    description = Column(Text, nullable=False, default="")
+    website_url = Column(String(500), nullable=False, default="")
+    category = Column(String(100), nullable=False, default="")  # database, model, monitoring, etc.
+    is_active = Column(Boolean, default=True)
+    # Cached for sort/index performance. Kept in sync via VendorContribution
+    # insert/delete; refresh helper in the service layer.
+    total_stars = Column(Integer, default=0, nullable=False)
+    created_by = Column(String(255), nullable=False, default="system")
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class ContributionType(Base):
+    """A class of qualifying contribution. Editable by admins so the
+    organization can extend or refine the criteria over time without
+    code changes."""
+    __tablename__ = "governance_contribution_types"
+    id = Column(Integer, primary_key=True)
+    code = Column(String(50), nullable=False, unique=True)  # OSS_PROJECT, STANDARDS_BODY, ...
+    name = Column(String(200), nullable=False)
+    description = Column(Text, nullable=False)
+    points = Column(Integer, default=1, nullable=False)  # most contributions = 1 star
+    is_active = Column(Boolean, default=True)
+    sort_order = Column(Integer, default=100)
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+
+
+class VendorContribution(Base):
+    """One award of a ContributionType to a Vendor. Includes evidence so the
+    star isn't a bare assertion — anyone can audit the basis."""
+    __tablename__ = "governance_vendor_contributions"
+    id = Column(Integer, primary_key=True)
+    vendor_id = Column(Integer, nullable=False, index=True)
+    contribution_type_id = Column(Integer, nullable=False)
+    evidence_url = Column(String(500), nullable=False, default="")
+    evidence_description = Column(Text, nullable=False, default="")
+    awarded_by = Column(String(255), nullable=False, default="system")
+    awarded_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+
+
+class VendorFavorite(Base):
+    """Per-user favorite. Personal, never affects total_stars or the
+    company-curated list."""
+    __tablename__ = "governance_vendor_favorites"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(String(255), nullable=False, index=True)
+    vendor_id = Column(Integer, nullable=False, index=True)
+    tag = Column(String(100), default="")  # optional user-applied tag
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
