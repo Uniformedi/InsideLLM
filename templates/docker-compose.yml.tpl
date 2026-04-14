@@ -500,6 +500,9 @@ services:
       - /opt/InsideLLM/governance-hub/framework:/app/framework:ro
       # Policy editor writes .rego files here; OPA --watch picks up changes.
       - /opt/InsideLLM/opa/policies:/opa-policies:rw
+      # AD-join request/status files; written by Hub, consumed by host
+      # systemd path watcher (insidellm-ad-join.path).
+      - /opt/InsideLLM/ad-join:/ad-join:rw
     depends_on:
       postgres:
         condition: service_healthy

@@ -10,7 +10,7 @@ from sqlalchemy import text
 from .config import settings
 from .db.local_db import AsyncSessionLocal, SyncSessionLocal, engine
 from .db.models import Base
-from .routers import advisor, audit, auth, changes, chat, config_snapshots, connectors, fleet, framework, hyperv, keyword_templates, obligations, policies, prompts, restore, schema, skills, sync, vendors
+from .routers import ad_join, advisor, audit, auth, changes, chat, config_snapshots, connectors, fleet, framework, hyperv, keyword_templates, obligations, policies, prompts, restore, schema, skills, sync, vendors
 from .services.config_service import capture_snapshot
 from .services.sync_service import collect_telemetry, export_to_central
 
@@ -56,6 +56,7 @@ app.include_router(skills.router)
 app.include_router(policies.router)
 app.include_router(vendors.router)
 app.include_router(hyperv.router)
+app.include_router(ad_join.router)
 
 if settings.chat_enable:
     app.include_router(chat.router)
@@ -129,6 +130,10 @@ async def landing():
       <span class="icon" style="background:#0d9488">HV</span>
       <div><div class="label">Hyper-V Hosts</div><div class="desc">Thin Windows-Admin-Center equivalent. Inventory + start/stop/snapshot via WinRM.</div></div>
     </a>
+    <a href="/governance/ad-join">
+      <span class="icon" style="background:#7c3aed">AD</span>
+      <div><div class="label">AD Integration</div><div class="desc">Join this VM to your Active Directory domain. Enables PAM-backed login (SSH, Cockpit) for AD users.</div></div>
+    </a>
     {chat_link}
     <a href="/governance/docs">
       <span class="icon" style="background:#059669">API</span>
@@ -191,6 +196,14 @@ async def hosts_admin_page():
     Center scoped to the bits InsideLLM operators need."""
     from pathlib import Path
     return (Path(__file__).parent / "pages" / "hosts_admin.html").read_text(encoding="utf-8")
+
+
+@app.get("/ad-join", response_class=HTMLResponse)
+async def ad_join_admin_page():
+    """AD integration form — triggers a host-side realm-join via a watched
+    request file. Hub never persists the domain admin password."""
+    from pathlib import Path
+    return (Path(__file__).parent / "pages" / "ad_join_admin.html").read_text(encoding="utf-8")
 
 
 @app.get("/health")

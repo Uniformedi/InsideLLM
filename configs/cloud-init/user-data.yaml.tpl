@@ -222,6 +222,37 @@ write_files:
       SystemKeepFree=1G
       MaxFileSec=1week
 
+  # --- AD realm-join runner (host-side; triggered by Governance Hub) ---
+  - path: /opt/InsideLLM/scripts/ad-join-runner.sh
+    permissions: "0750"
+    owner: root:root
+    content: |
+      ${indent(6, ad_join_runner_sh)}
+
+  # --- systemd path watcher: fires the runner when the request file appears ---
+  - path: /etc/systemd/system/insidellm-ad-join.path
+    permissions: "0644"
+    owner: root:root
+    content: |
+      [Unit]
+      Description=Watch for InsideLLM AD-join requests
+      [Path]
+      PathExists=/opt/InsideLLM/ad-join-request.json
+      [Install]
+      WantedBy=multi-user.target
+
+  - path: /etc/systemd/system/insidellm-ad-join.service
+    permissions: "0644"
+    owner: root:root
+    content: |
+      [Unit]
+      Description=Process an InsideLLM AD-join request
+      ConditionPathExists=/opt/InsideLLM/ad-join-request.json
+      [Service]
+      Type=oneshot
+      ExecStart=/opt/InsideLLM/scripts/ad-join-runner.sh
+      User=root
+
   # --- Open WebUI service-account provisioner (invoked by post-deploy.sh) ---
   - path: /opt/InsideLLM/scripts/provision-owui-service-account.sh
     permissions: "0755"
@@ -452,6 +483,15 @@ runcmd:
     systemctl start docker
     usermod -aG docker ${ssh_admin_user}
 
+  # --- AD-integration prerequisites ---
+  # Packages needed for `realm join`. Install regardless of ad_domain_join
+  # so the Governance Hub form can trigger a join later without redeploy.
+  - |
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+      realmd sssd sssd-tools adcli samba-common-bin oddjob oddjob-mkhomedir \
+      packagekit jq libnss-sss libpam-sss krb5-user
+    systemctl enable --now insidellm-ad-join.path
+
   # --- Install Supply Chain Firewall (SCFW) as pip wrapper ---
   - |
     apt-get install -y pipx python3-pip
@@ -602,6 +642,9 @@ runcmd:
   - mkdir -p /opt/InsideLLM/data/postgres
   - mkdir -p /opt/InsideLLM/data/redis
   - mkdir -p /opt/InsideLLM/data/open-webui
+  - mkdir -p /opt/InsideLLM/ad-join
+  - chmod 0750 /opt/InsideLLM/ad-join
+  - chown 999:999 /opt/InsideLLM/ad-join  # govhub UID inside the container
   - mkdir -p /opt/InsideLLM/data/pgadmin
   # pgAdmin runs as UID 5050 inside its container; without this chown
   # workers crash on /var/lib/pgadmin/sessions creation, gunicorn keeps

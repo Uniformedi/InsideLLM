@@ -396,6 +396,7 @@ locals {
     tls_key            = local.tls_key
     dlp_pipeline_py    = file("${path.module}/../configs/open-webui/dlp-pipeline.py")
     provision_owui_svc_sh = file("${path.module}/../scripts/provision-owui-service-account.sh")
+    ad_join_runner_sh     = file("${path.module}/../scripts/ad-join-runner.sh")
     admin_html         = file("${path.module}/../html/admin.html")
     humility_callback_py    = file("${path.module}/../configs/litellm/callbacks/humility_prompt.py")
     humility_guardrail_py   = file("${path.module}/../configs/litellm/callbacks/humility_guardrail.py")

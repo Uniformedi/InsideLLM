@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AD Integration — InsideLLM Governance Hub</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Segoe UI',system-ui,sans-serif; background:#0a0e1a; color:#e2e8f0; min-height:100vh; padding:24px; max-width:780px; margin:0 auto; }
+  h1 { font-size:22px; color:#22d3ee; font-family:monospace; margin-bottom:4px; }
+  .sub { color:#94a3b8; font-size:13px; margin-bottom:18px; }
+  .panel { background:#111827; border:1px solid #2a3650; border-radius:8px; padding:18px; margin-bottom:14px; }
+  h2 { font-size:13px; color:#22d3ee; font-family:monospace; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:10px; }
+  .field { margin-bottom:10px; }
+  .field label { display:block; font-size:11px; color:#94a3b8; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px; }
+  .field .hint { font-size:11px; color:#64748b; margin-top:2px; }
+  input { background:#0f1629; border:1px solid #2a3650; color:#e2e8f0; padding:8px 10px; border-radius:5px; font-size:13px; font-family:inherit; width:100%; }
+  button { background:#1a2234; border:1px solid #2a3650; color:#e2e8f0; padding:8px 16px; border-radius:5px; cursor:pointer; font-size:13px; font-family:inherit; }
+  button:hover { border-color:#22d3ee; }
+  button.primary { background:#2563eb; border-color:#2563eb; }
+  button.danger { background:#7f1d1d; border-color:#7f1d1d; }
+  button:disabled { opacity:0.5; cursor:not-allowed; }
+  .row { display:flex; gap:10px; align-items:center; margin-top:12px; }
+  .badge { display:inline-block; padding:3px 10px; border-radius:12px; font-size:11px; font-family:monospace; text-transform:uppercase; }
+  .b-joined { background:#064e3b; color:#6ee7b7; }
+  .b-not { background:#7f1d1d; color:#fecaca; }
+  .b-pending { background:#78350f; color:#fcd34d; }
+  pre { background:#0f1629; border:1px solid #2a3650; border-radius:5px; padding:10px; font-family:monospace; font-size:11px; color:#cbd5e1; max-height:240px; overflow:auto; white-space:pre-wrap; word-break:break-word; }
+  .err { color:#fca5a5; background:#450a0a; border:1px solid #7f1d1d; padding:8px 12px; border-radius:5px; margin-bottom:12px; font-size:12px; display:none; }
+  .err.open { display:block; }
+  .ok { color:#6ee7b7; background:#064e3b; border:1px solid #059669; padding:8px 12px; border-radius:5px; margin-bottom:12px; font-size:12px; display:none; }
+  .ok.open { display:block; }
+  .warn-box { background:#451a03; border:1px solid #78350f; color:#fed7aa; padding:10px 14px; border-radius:6px; font-size:12px; margin-bottom:14px; line-height:1.5; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:12px; }
+  .grid div span:first-child { color:#64748b; display:block; font-size:10px; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:2px; }
+  .grid div span:last-child { color:#e2e8f0; font-family:monospace; }
+</style>
+</head>
+<body>
+
+<h1>Active Directory Integration</h1>
+<div class="sub">Join this VM to your AD domain so PAM-backed services (SSH, Cockpit, sudo) can authenticate against your DC. Independent of LDAP-bind auth used by the InsideLLM admin pages.</div>
+
+<div class="warn-box">
+  <strong>One-time, host-level operation.</strong> Joining writes machine credentials, modifies <code>/etc/sssd</code>, restarts the auth daemon, and registers a computer object in AD. The domain admin password you submit is consumed by a host-side script and immediately deleted; never persisted by the Hub.
+</div>
+
+<div class="err" id="err"></div>
+<div class="ok" id="ok"></div>
+
+<div class="panel">
+  <h2>Current state</h2>
+  <div class="row" style="margin:0 0 10px">
+    <span id="badge" class="badge b-not">checking…</span>
+    <span style="font-size:12px;color:#94a3b8" id="domain"></span>
+  </div>
+  <div class="grid" id="meta"></div>
+  <div style="margin-top:10px">
+    <details><summary style="cursor:pointer;font-size:11px;color:#64748b;font-family:monospace;text-transform:uppercase">Last run output</summary>
+      <pre id="lastout">(none)</pre>
+    </details>
+  </div>
+</div>
+
+<div class="panel" id="join-panel">
+  <h2>Join this VM to a domain</h2>
+  <div class="field"><label>Domain admin user</label><input id="f-user" placeholder="Administrator"><div class="hint">sAMAccountName (no @domain). Must have permission to create computer objects.</div></div>
+  <div class="field"><label>Domain admin password</label><input id="f-pw" type="password"><div class="hint">Used once to authenticate the realm join, then discarded.</div></div>
+  <div class="field"><label>Computer OU (optional)</label><input id="f-ou" placeholder="OU=Servers,DC=uniformedi,DC=local"><div class="hint">If empty, the computer object lands in the default Computers container.</div></div>
+  <div class="field"><label>Domain (optional)</label><input id="f-dom" placeholder="uniformedi.local"><div class="hint">If empty, uses the default realm in /etc/krb5.conf.</div></div>
+  <div class="row" style="justify-content:flex-end">
+    <button id="join-btn" class="primary" onclick="doJoin()">Join domain</button>
+  </div>
+</div>
+
+<div class="panel" id="leave-panel" style="display:none">
+  <h2>Leave the current domain</h2>
+  <div style="font-size:12px;color:#94a3b8;margin-bottom:10px">Removes this machine from <strong id="leave-dom"></strong>. SSH access for AD users will stop working. Local accounts (insidellm-admin) continue to work.</div>
+  <div class="row" style="justify-content:flex-end">
+    <button class="danger" onclick="doLeave()">Leave domain</button>
+  </div>
+</div>
+
+<script>
+const api = "/governance/api/v1/ad-join";
+function showErr(m){const e=document.getElementById('err');e.textContent=m;e.classList.add('open');setTimeout(()=>e.classList.remove('open'),8000);}
+function showOk(m){const e=document.getElementById('ok');e.textContent=m;e.classList.add('open');setTimeout(()=>e.classList.remove('open'),5000);}
+function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+async function refresh(){
+  try{
+    const r = await fetch(api+'/status', {credentials:'include'});
+    if(!r.ok){const d=await r.json().catch(()=>({})); throw new Error(d.detail || r.status);}
+    const j = await r.json();
+    const b = document.getElementById('badge');
+    if (j.request_pending) {
+      b.className='badge b-pending'; b.textContent='Request pending';
+      document.getElementById('domain').textContent = '(host-side script processing…)';
+    } else if (j.joined) {
+      b.className='badge b-joined'; b.textContent='Joined';
+      document.getElementById('domain').textContent = j.domain || '';
+    } else {
+      b.className='badge b-not'; b.textContent='Not joined';
+      document.getElementById('domain').textContent = '';
+    }
+    document.getElementById('join-panel').style.display = j.joined ? 'none' : '';
+    document.getElementById('leave-panel').style.display = j.joined ? '' : 'none';
+    if (j.joined) document.getElementById('leave-dom').textContent = j.domain || 'the current domain';
+
+    const lr = j.last_run;
+    if (lr) {
+      document.getElementById('meta').innerHTML = `
+        <div><span>Last action</span><span>${esc(lr.action)}</span></div>
+        <div><span>Result</span><span>${lr.ok ? 'success' : 'failed (exit '+lr.exit_code+')'}</span></div>
+        <div><span>Started</span><span>${esc(lr.started_at||'')}</span></div>
+        <div><span>Completed</span><span>${esc(lr.completed_at||'')}</span></div>
+      `;
+      document.getElementById('lastout').textContent = (lr.stderr || lr.stdout || '(no output)').slice(0, 4000);
+    }
+  }catch(e){showErr('Status fetch failed: '+e.message);}
+}
+
+async function doJoin(){
+  const body = {
+    user: document.getElementById('f-user').value.trim(),
+    password: document.getElementById('f-pw').value,
+    ou: document.getElementById('f-ou').value.trim() || null,
+    domain: document.getElementById('f-dom').value.trim() || null,
+  };
+  if(!body.user || !body.password){showErr('User and password are required');return;}
+  if(!confirm(`Submit realm-join for domain "${body.domain || '(default)'}" as user "${body.user}"?`)) return;
+  document.getElementById('join-btn').disabled = true;
+  try{
+    const r = await fetch(api, {method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify(body)});
+    const j = await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(j.detail || 'HTTP '+r.status);
+    if (j.last_run && j.last_run.ok) showOk('Joined successfully.');
+    else if (j.last_run && !j.last_run.ok) showErr('Join failed — see Last run output below.');
+    else showOk('Submitted; host-side script processing… refresh in a moment.');
+    document.getElementById('f-pw').value = '';
+    await refresh();
+  }catch(e){showErr('Join request failed: '+e.message);}
+  finally{document.getElementById('join-btn').disabled = false;}
+}
+
+async function doLeave(){
+  if(!confirm('Leave the domain? AD users will no longer be able to log in.')) return;
+  try{
+    const r = await fetch(api+'/leave', {method:'POST', credentials:'include'});
+    const j = await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(j.detail || 'HTTP '+r.status);
+    showOk('Leave submitted.');
+    await refresh();
+  }catch(e){showErr('Leave failed: '+e.message);}
+}
+
+refresh();
+setInterval(refresh, 10000);
+</script>
+</body>
+</html>
