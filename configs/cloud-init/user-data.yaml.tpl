@@ -60,6 +60,16 @@ packages:
 # Write configuration files
 # ---------------------------------------------------------------------------
 write_files:
+  # --- Runtime secrets env file (Docker Compose reads this automatically) ---
+  # Lives next to docker-compose.yml; `$${VAR}` tokens in that file
+  # substitute from here at `docker compose up` time, so the rendered
+  # compose on disk never contains the secret values.
+  - path: /opt/InsideLLM/.env
+    permissions: "0600"
+    owner: root:root
+    content: |
+      ${indent(6, env_file_contents)}
+
   # --- Docker Compose ---
   - path: /opt/InsideLLM/docker-compose.yml
     permissions: "0640"

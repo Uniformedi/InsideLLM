@@ -14,7 +14,7 @@ services:
     environment:
       POSTGRES_DB: litellm
       POSTGRES_USER: litellm
-      POSTGRES_PASSWORD: "${postgres_password}"
+      POSTGRES_PASSWORD: "$${POSTGRES_PASSWORD}"
     volumes:
       - /opt/InsideLLM/data/postgres:/var/lib/postgresql/data
     healthcheck:
@@ -53,17 +53,17 @@ services:
     ports:
       - "4000:4000"
     environment:
-      DATABASE_URL: "postgresql://litellm:${postgres_password}@postgres:5432/litellm"
+      DATABASE_URL: "postgresql://litellm:$${POSTGRES_PASSWORD}@postgres:5432/litellm"
       STORE_MODEL_IN_DB: "True"
       REDIS_HOST: redis
       REDIS_PORT: "6379"
-      LITELLM_MASTER_KEY: "${litellm_master_key}"
-      ANTHROPIC_API_KEY: "${anthropic_api_key}"
-      OPENAI_API_KEY: "${openai_api_key}"
-      GEMINI_API_KEY: "${gemini_api_key}"
-      MISTRAL_API_KEY: "${mistral_api_key}"
-      COHERE_API_KEY: "${cohere_api_key}"
-      AZURE_OPENAI_API_KEY: "${azure_openai_api_key}"
+      LITELLM_MASTER_KEY: "$${LITELLM_MASTER_KEY}"
+      ANTHROPIC_API_KEY: "$${ANTHROPIC_API_KEY}"
+      OPENAI_API_KEY: "$${OPENAI_API_KEY}"
+      GEMINI_API_KEY: "$${GEMINI_API_KEY}"
+      MISTRAL_API_KEY: "$${MISTRAL_API_KEY}"
+      COHERE_API_KEY: "$${COHERE_API_KEY}"
+      AZURE_OPENAI_API_KEY: "$${AZURE_OPENAI_API_KEY}"
       AZURE_API_BASE: "${azure_openai_endpoint}"
       AZURE_API_VERSION: "${azure_openai_api_version}"
       AWS_ACCESS_KEY_ID: "${aws_bedrock_access_key_id}"
@@ -93,7 +93,7 @@ services:
       DLP_LOG_DETECTIONS: "true"
       DLP_CUSTOM_PATTERNS: '${dlp_custom_patterns}'
       UI_USERNAME: "admin"
-      UI_PASSWORD: "${litellm_master_key}"
+      UI_PASSWORD: "$${LITELLM_MASTER_KEY}"
 %{ if sso_provider == "azure_ad" ~}
       # --- Azure AD SSO ---
       MICROSOFT_CLIENT_ID: "${sso_env["MICROSOFT_CLIENT_ID"]}"
@@ -155,10 +155,10 @@ services:
     environment:
       # Route all API calls through LiteLLM
       OPENAI_API_BASE_URL: "http://litellm:4000/v1"
-      OPENAI_API_KEY: "${litellm_master_key}"
+      OPENAI_API_KEY: "$${LITELLM_MASTER_KEY}"
 
       # WebUI settings
-      WEBUI_SECRET_KEY: "${webui_secret}"
+      WEBUI_SECRET_KEY: "$${WEBUI_SECRET_KEY}"
       WEBUI_NAME: "InsideLLM"
       ENABLE_SIGNUP: "true"
       DEFAULT_USER_ROLE: "user"
@@ -198,7 +198,7 @@ services:
       # (e.g. objectClass=user). Users log in with their sAMAccountName.
       LDAP_SEARCH_FILTERS: "(objectClass=user)"
       LDAP_APP_DN: "${ldap_bind_dn}"
-      LDAP_APP_PASSWORD: "${ldap_bind_password}"
+      LDAP_APP_PASSWORD: "$${LDAP_APP_PASSWORD}"
 %{ endif ~}
 %{ if sso_provider != "none" }
       # SSO / OIDC
@@ -207,14 +207,14 @@ services:
 %{ if sso_provider == "azure_ad" }
       OAUTH_PROVIDER_NAME: "Microsoft"
       OAUTH_CLIENT_ID: "${sso_client_id}"
-      OAUTH_CLIENT_SECRET: "${sso_client_secret}"
+      OAUTH_CLIENT_SECRET: "$${SSO_CLIENT_SECRET}"
       OPENID_PROVIDER_URL: "https://login.microsoftonline.com/${sso_tenant_id}/v2.0/.well-known/openid-configuration"
       OAUTH_SCOPES: "openid email profile"
 %{ endif }
 %{ if sso_provider == "okta" }
       OAUTH_PROVIDER_NAME: "Okta"
       OAUTH_CLIENT_ID: "${sso_client_id}"
-      OAUTH_CLIENT_SECRET: "${sso_client_secret}"
+      OAUTH_CLIENT_SECRET: "$${SSO_CLIENT_SECRET}"
       OPENID_PROVIDER_URL: "https://${sso_okta_domain}/.well-known/openid-configuration"
       OAUTH_SCOPES: "openid email profile"
 %{ endif }
@@ -274,7 +274,7 @@ services:
     environment:
       PGADMIN_DEFAULT_EMAIL: "admin@insidellm.io"
       PGADMIN_CONFIG_CHECK_EMAIL_DELIVERABILITY: "False"
-      PGADMIN_DEFAULT_PASSWORD: "${litellm_master_key}"
+      PGADMIN_DEFAULT_PASSWORD: "$${LITELLM_MASTER_KEY}"
       PGADMIN_CONFIG_SERVER_MODE: "True"
 %{ if ldap_enable_services ~}
       # LDAP / Active Directory. pgAdmin requires values to be wrapped in
@@ -287,7 +287,7 @@ services:
       PGADMIN_CONFIG_LDAP_SEARCH_FILTER: "'(objectClass=user)'"
       PGADMIN_CONFIG_LDAP_SEARCH_SCOPE: "'SUBTREE'"
       PGADMIN_CONFIG_LDAP_BIND_USER: "'${ldap_bind_dn}'"
-      PGADMIN_CONFIG_LDAP_BIND_PASSWORD: "'${ldap_bind_password}'"
+      PGADMIN_CONFIG_LDAP_BIND_PASSWORD: "'$${LDAP_APP_PASSWORD}'"
       PGADMIN_CONFIG_LDAP_USE_STARTTLS: "False"
 %{ endif ~}
     volumes:
@@ -456,7 +456,7 @@ services:
     container_name: insidellm-governance-hub
     restart: always
     environment:
-      GOVERNANCE_HUB_DATABASE_URL: "postgresql+asyncpg://litellm:${postgres_password}@postgres:5432/litellm"
+      GOVERNANCE_HUB_DATABASE_URL: "postgresql+asyncpg://litellm:$${POSTGRES_PASSWORD}@postgres:5432/litellm"
       # Central fleet DB is configured via the Admin UI Fleet tab (stored in local DB)
       GOVERNANCE_HUB_PLATFORM_VERSION: "${platform_version}"
       GOVERNANCE_HUB_INSTANCE_ID: "${governance_hub_instance_id}"
@@ -465,12 +465,12 @@ services:
       GOVERNANCE_HUB_SUPERVISOR_EMAILS: "${governance_hub_supervisor_emails}"
       GOVERNANCE_HUB_HUB_SECRET: "${governance_hub_secret}"
       GOVERNANCE_HUB_LITELLM_URL: "http://litellm:4000"
-      GOVERNANCE_HUB_LITELLM_API_KEY: "${litellm_master_key}"
+      GOVERNANCE_HUB_LITELLM_API_KEY: "$${LITELLM_MASTER_KEY}"
       # Hyper-V WinRM (reuses Terraform's hyperv provider creds) — used by
       # the /governance/hosts page for inventory + start/stop/snapshot.
       HYPERV_HOST: "${hyperv_host}"
       HYPERV_USER: "${hyperv_user}"
-      HYPERV_PASSWORD: "${hyperv_password}"
+      HYPERV_PASSWORD: "$${HYPERV_PASSWORD}"
       HYPERV_PORT: "${hyperv_port}"
       HYPERV_HTTPS: "${hyperv_https}"
       HYPERV_INSECURE: "${hyperv_insecure}"
@@ -493,7 +493,7 @@ services:
 %{ if admin_auth_mode == "oidc" }
       GOVERNANCE_HUB_OIDC_ISSUER_URL: "${oidc_issuer_url}"
       GOVERNANCE_HUB_OIDC_CLIENT_ID: "${sso_client_id}"
-      GOVERNANCE_HUB_OIDC_CLIENT_SECRET: "${sso_client_secret}"
+      GOVERNANCE_HUB_OIDC_CLIENT_SECRET: "$${SSO_CLIENT_SECRET}"
 %{ endif }
     volumes:
       - /opt/InsideLLM/data/governance-hub:/app/data
@@ -610,7 +610,7 @@ services:
     environment:
       GF_SERVER_ROOT_URL: "https://${server_name}/grafana/"
       GF_SERVER_SERVE_FROM_SUB_PATH: "true"
-      GF_SECURITY_ADMIN_PASSWORD: "${grafana_admin_password}"
+      GF_SECURITY_ADMIN_PASSWORD: "$${GRAFANA_ADMIN_PASSWORD}"
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_AUTH_ANONYMOUS_ENABLED: "false"
 %{ if ldap_enable_services ~}
@@ -625,7 +625,7 @@ services:
       GF_AUTH_GENERIC_OAUTH_NAME: "InsideLLM SSO"
       GF_AUTH_GENERIC_OAUTH_ALLOW_SIGN_UP: "true"
       GF_AUTH_GENERIC_OAUTH_CLIENT_ID: "${sso_client_id}"
-      GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET: "${sso_client_secret}"
+      GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET: "$${SSO_CLIENT_SECRET}"
       GF_AUTH_GENERIC_OAUTH_SCOPES: "openid email profile"
 %{ if sso_provider == "azure_ad" }
       GF_AUTH_GENERIC_OAUTH_AUTH_URL: "https://login.microsoftonline.com/${sso_tenant_id}/oauth2/v2.0/authorize"
@@ -704,7 +704,7 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      PGPASSWORD: "${postgres_password}"
+      PGPASSWORD: "$${POSTGRES_PASSWORD}"
     entrypoint:
       - sh
       - -c
@@ -726,7 +726,7 @@ services:
         condition: service_completed_successfully
     environment:
       MM_SQLSETTINGS_DRIVERNAME: "postgres"
-      MM_SQLSETTINGS_DATASOURCE: "postgres://litellm:${postgres_password}@postgres:5432/mattermost?sslmode=disable&connect_timeout=10"
+      MM_SQLSETTINGS_DATASOURCE: "postgres://litellm:$${POSTGRES_PASSWORD}@postgres:5432/mattermost?sslmode=disable&connect_timeout=10"
       MM_SERVICESETTINGS_SITEURL: "${chat_site_url}"
       MM_SERVICESETTINGS_LISTENADDRESS: ":8065"
       MM_SERVICESETTINGS_ENABLELOCALMODE: "true"
@@ -748,7 +748,7 @@ services:
 %{ if admin_auth_mode == "oidc" ~}
       MM_GITLABSETTINGS_ENABLE: "true"
       MM_GITLABSETTINGS_ID: "${sso_client_id}"
-      MM_GITLABSETTINGS_SECRET: "${sso_client_secret}"
+      MM_GITLABSETTINGS_SECRET: "$${SSO_CLIENT_SECRET}"
       MM_GITLABSETTINGS_AUTHENDPOINT: "${oidc_issuer_url}/oauth2/v2.0/authorize"
       MM_GITLABSETTINGS_TOKENENDPOINT: "${oidc_issuer_url}/oauth2/v2.0/token"
       MM_GITLABSETTINGS_USERAPIENDPOINT: "https://graph.microsoft.com/oidc/userinfo"

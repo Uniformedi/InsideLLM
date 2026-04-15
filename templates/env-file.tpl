@@ -1,0 +1,34 @@
+# InsideLLM runtime secrets — consumed by Docker Compose variable
+# substitution. Written by cloud-init to /opt/InsideLLM/.env (0600, root).
+#
+# Do not commit. Do not bake into images. Do not log.
+#
+# Docker Compose auto-reads .env from the same directory as the compose
+# file, so `$${VAR}` tokens in docker-compose.yml substitute from here at
+# `docker compose up` time — the rendered compose on disk never contains
+# these values.
+
+# --- Gateway / LLM API keys -------------------------------------------------
+LITELLM_MASTER_KEY=${litellm_master_key}
+ANTHROPIC_API_KEY=${anthropic_api_key}
+OPENAI_API_KEY=${openai_api_key}
+GEMINI_API_KEY=${gemini_api_key}
+MISTRAL_API_KEY=${mistral_api_key}
+COHERE_API_KEY=${cohere_api_key}
+AZURE_OPENAI_API_KEY=${azure_openai_api_key}
+
+# --- Database / cache -------------------------------------------------------
+POSTGRES_PASSWORD=${postgres_password}
+
+# --- Frontend secrets -------------------------------------------------------
+WEBUI_SECRET_KEY=${webui_secret}
+GRAFANA_ADMIN_PASSWORD=${grafana_admin_password}
+
+# --- SSO (OIDC) -------------------------------------------------------------
+SSO_CLIENT_SECRET=${sso_client_secret}
+
+# --- LDAP bind (Grafana / Open WebUI / pgAdmin lookup account) -------------
+LDAP_APP_PASSWORD=${ldap_bind_password}
+
+# --- Hyper-V management (WinRM creds for /governance/hosts) ----------------
+HYPERV_PASSWORD=${hyperv_password}

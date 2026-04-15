@@ -277,6 +277,25 @@ locals {
   })
 }
 
+# --- Runtime secrets env file (sourced by Docker Compose at `up` time) ---
+locals {
+  env_file = templatefile("${path.module}/../templates/env-file.tpl", {
+    litellm_master_key     = local.litellm_master_key
+    anthropic_api_key      = var.anthropic_api_key
+    openai_api_key         = var.openai_api_key
+    gemini_api_key         = var.gemini_api_key
+    mistral_api_key        = var.mistral_api_key
+    cohere_api_key         = var.cohere_api_key
+    azure_openai_api_key   = var.azure_openai_api_key
+    postgres_password      = local.postgres_password
+    webui_secret           = local.webui_secret
+    grafana_admin_password = local.grafana_password
+    sso_client_secret      = var.sso_provider == "azure_ad" ? var.azure_ad_client_secret : var.sso_provider == "okta" ? var.okta_client_secret : ""
+    ldap_bind_password     = var.ldap_bind_password
+    hyperv_password        = var.hyperv_password
+  })
+}
+
 # --- Docker Compose ---
 locals {
   docker_compose = templatefile("${path.module}/../templates/docker-compose.yml.tpl", {
@@ -390,6 +409,7 @@ locals {
     ssh_admin_user     = var.ssh_admin_user
     ssh_public_key     = local.ssh_public_key
     docker_compose_yml = local.docker_compose
+    env_file_contents  = local.env_file
     litellm_config     = local.litellm_config
     nginx_conf         = local.nginx_conf
     tls_cert           = local.tls_cert
