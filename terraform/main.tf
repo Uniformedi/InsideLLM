@@ -551,6 +551,15 @@ resource "null_resource" "ensure_vm_switch" {
 resource "null_resource" "prepare_vm_disk" {
   depends_on = [null_resource.ensure_vm_switch]
 
+  # Keepers force this resource to be replaced when the VM name or source
+  # image changes, so a stale VHDX from a previous deploy doesn't get reused.
+  triggers = {
+    vm_name            = var.vm_name
+    vhd_path           = var.vm_vhd_path
+    ubuntu_vhdx_source = var.ubuntu_vhdx_source
+    disk_size          = var.vm_disk_size_bytes
+  }
+
   provisioner "local-exec" {
     command     = <<-EOT
       # Ensure directories exist
@@ -559,16 +568,37 @@ resource "null_resource" "prepare_vm_disk" {
 
       $destVhdx = Join-Path "${var.vm_vhd_path}" "${var.vm_name}-boot.vhdx"
 
-      # Copy the golden image
-      if (-not (Test-Path $destVhdx)) {
-        Write-Host "Copying Ubuntu cloud image to $destVhdx ..."
-        Copy-Item -Path "${var.ubuntu_vhdx_source}" -Destination $destVhdx -Force
+      # Always start from a pristine copy on create. A pre-existing VHDX
+      # would have /var/lib/cloud/instance/boot-finished set, which makes
+      # cloud-init skip write_files on boot — the source of the dry-run
+      # failure where old .env / docker-compose.yml from a prior deploy
+      # persisted and new secrets never rendered.
+      if (Test-Path $destVhdx) {
+        Write-Host "Removing stale VHDX at $destVhdx ..."
+        Remove-Item -Path $destVhdx -Force
+      }
+      Write-Host "Copying Ubuntu cloud image to $destVhdx ..."
+      Copy-Item -Path "${var.ubuntu_vhdx_source}" -Destination $destVhdx -Force
 
-        # Resize to target size
-        Write-Host "Resizing disk to ${var.vm_disk_size_bytes / 1073741824} GB ..."
-        Resize-VHD -Path $destVhdx -SizeBytes ${var.vm_disk_size_bytes}
-      } else {
-        Write-Host "Boot disk already exists at $destVhdx"
+      # Resize to target size
+      Write-Host "Resizing disk to ${var.vm_disk_size_bytes / 1073741824} GB ..."
+      Resize-VHD -Path $destVhdx -SizeBytes ${var.vm_disk_size_bytes}
+    EOT
+    interpreter = ["PowerShell", "-Command"]
+  }
+
+  # Clean up the boot VHDX + any cloud-init ISO on destroy so the next
+  # apply cycle doesn't reuse a stale disk. Without this, terraform
+  # destroy removes the null_resource from state but leaves disk
+  # artifacts on the host, causing the "fresh deploy isn't actually fresh"
+  # bug we hit during the dry-run.
+  provisioner "local-exec" {
+    when       = destroy
+    command    = <<-EOT
+      $vhd = Join-Path "${self.triggers.vhd_path}" "${self.triggers.vm_name}-boot.vhdx"
+      if (Test-Path $vhd) {
+        Write-Host "Destroy: removing boot VHDX $vhd"
+        Remove-Item -Path $vhd -Force -ErrorAction SilentlyContinue
       }
     EOT
     interpreter = ["PowerShell", "-Command"]
@@ -607,6 +637,15 @@ resource "null_resource" "create_cloud_init_iso" {
     local_file.cloud_init_network,
   ]
 
+  # Triggers + destroy provisioner match the VHDX resource: ensure the
+  # ISO is rebuilt from fresh user-data on VM name changes and cleaned
+  # up on destroy so the next apply starts from a known state.
+  triggers = {
+    vm_name  = var.vm_name
+    vm_path  = var.vm_path
+    userdata = local.cloud_init_userdata
+  }
+
   provisioner "local-exec" {
     command     = <<-EOT
       $isoDir  = Join-Path "${var.vm_path}" "${var.vm_name}-cloud-init"
@@ -614,6 +653,18 @@ resource "null_resource" "create_cloud_init_iso" {
 
       # Build cloud-init ISO (tries: oscdimg > WSL genisoimage > PowerShell native)
       & "${path.module}\..\scripts\New-CloudInitIso.ps1" -SourceDir $isoDir -OutputIso $isoFile -VolumeLabel "cidata"
+    EOT
+    interpreter = ["PowerShell", "-Command"]
+  }
+
+  provisioner "local-exec" {
+    when        = destroy
+    command     = <<-EOT
+      $isoDir  = Join-Path "${self.triggers.vm_path}" "${self.triggers.vm_name}-cloud-init"
+      $isoFile = Join-Path "${self.triggers.vm_path}" "${self.triggers.vm_name}-cloud-init.iso"
+      if (Test-Path $isoFile) { Remove-Item -Path $isoFile -Force -ErrorAction SilentlyContinue }
+      if (Test-Path $isoDir)  { Remove-Item -Path $isoDir  -Recurse -Force -ErrorAction SilentlyContinue }
+      Write-Host "Destroy: cleaned cloud-init ISO + dir"
     EOT
     interpreter = ["PowerShell", "-Command"]
   }
