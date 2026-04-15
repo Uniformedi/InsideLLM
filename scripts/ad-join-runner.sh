@@ -92,10 +92,25 @@ case "$ACTION" in
     code=$?
     log "realm join exit=$code"
     if [ $code -eq 0 ]; then
-      # Restart sssd + add pam_mkhomedir so home dirs auto-create on first
-      # login. Best-effort — non-fatal if it fails.
+      # Post-join wiring for Cockpit / SSH SSSD-backed logins:
+      #   - sss PAM stack gets enabled (usually auto-added by realm join, but
+      #     --enable is idempotent and guarantees it when a prior leave has
+      #     left a stale state)
+      #   - mkhomedir creates /home/<user>@<domain> on first login
+      #   - sssd is restarted so enumeration, group caching, and pam_sss
+      #     reflect the freshly-written sssd.conf
+      # Best-effort: non-fatal if any step errors; realm join is already done.
+      pam-auth-update --enable sss --enable mkhomedir 2>/dev/null || true
       systemctl restart sssd 2>/dev/null || true
-      pam-auth-update --enable mkhomedir 2>/dev/null || true
+
+      # Smoke test: confirm SSSD can resolve the account we joined with.
+      # Log the result into stdout so it surfaces in the Hub status card.
+      resolve_check=$(getent passwd "$USER@$DOMAIN" 2>&1 || echo "(not resolved)")
+      out="${out}
+
+[ad-join-runner] post-join smoke test:
+  getent passwd $USER@$DOMAIN -> ${resolve_check}"
+
       write_status true 0 "$out" ""
     else
       write_status false "$code" "" "$out"

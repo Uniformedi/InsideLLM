@@ -453,6 +453,11 @@ runcmd:
   # Lightweight Linux equivalent of Windows Admin Center: web shell,
   # service control, log viewer, container management. Runs on host
   # port 9090; nginx exposes it at /cockpit/ inside the same TLS cert.
+  #
+  # PAM: Ubuntu's default /etc/pam.d/cockpit includes common-auth, which
+  # gets pam_sss.so injected automatically when `realm join` runs (see the
+  # Governance Hub AD-integration form). So SSSD-backed AD logins work
+  # post-join with zero extra configuration here.
   - |
     apt-get update
     apt-get install -y --no-install-recommends cockpit cockpit-podman cockpit-storaged
@@ -468,6 +473,23 @@ runcmd:
     ForwardedForHeader = X-Forwarded-For
     LoginTitle = InsideLLM ${vm_hostname}
     COCKPITEOF
+    # Restrict Cockpit login to local admins + members of ad_admin_groups.
+    # pam_access reads /etc/security/access.conf.d/cockpit-insidellm.conf
+    # (order matters: first match wins).
+    install -d -m 0755 /etc/security/access.conf.d
+    cat > /etc/security/access.conf.d/cockpit-insidellm.conf <<ACCESSEOF
+    # InsideLLM Cockpit access policy. Permit the local admin user and
+    # members of the configured AD admin groups; deny everything else.
+    + : ${ssh_admin_user} : ALL
+%{ for grp in split(",", ad_admin_groups) ~}
+    + : (${trimspace(grp)}) : ALL
+%{ endfor ~}
+    - : ALL : ALL
+    ACCESSEOF
+    # Wire pam_access into the Cockpit PAM stack (not applied by default).
+    if ! grep -q "pam_access.so" /etc/pam.d/cockpit 2>/dev/null; then
+      sed -i '/^auth\s/i account    required     pam_access.so accessfile=/etc/security/access.conf.d/cockpit-insidellm.conf' /etc/pam.d/cockpit 2>/dev/null || true
+    fi
     systemctl daemon-reload
     systemctl enable cockpit.socket
     systemctl restart cockpit.socket
