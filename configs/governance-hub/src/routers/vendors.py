@@ -126,6 +126,20 @@ async def list_vendors(
     for v in rows:
         if favorites_only and v.id not in fav_ids:
             continue
+        # Count MODULE_EXTRACTION contributions separately — tracked as a
+        # distinct KPI (⚙ badge) because piecemeal decoupling is a stronger
+        # signal of commons contribution than generic OSS maintenance.
+        extraction_count_q = await db.execute(
+            select(func.count(VendorContribution.id))
+            .select_from(VendorContribution)
+            .join(ContributionType, ContributionType.id == VendorContribution.contribution_type_id)
+            .where(
+                (VendorContribution.vendor_id == v.id) &
+                (ContributionType.code == "MODULE_EXTRACTION")
+            )
+        )
+        extractions = int(extraction_count_q.scalar() or 0)
+
         out.append({
             "id": v.id,
             "slug": v.slug,
@@ -134,6 +148,7 @@ async def list_vendors(
             "website_url": v.website_url,
             "category": v.category,
             "total_stars": v.total_stars,
+            "extractions": extractions,
             "is_favorite": v.id in fav_ids,
         })
     return {"vendors": out, "count": len(out)}

@@ -79,6 +79,13 @@ DEFAULT_CONTRIBUTION_TYPES = [
         "points": 1,
         "sort_order": 70,
     },
+    {
+        "code": "MODULE_EXTRACTION",
+        "name": "Breaks own work into reusable standalone components",
+        "description": "Vendor decouples a meaningful piece of its own platform (not just a minor utility) into a separately installable, independently licensed package so other projects can adopt it piecemeal. Counted separately from generic OSS maintenance because it takes conscious design and usually loses some commercial leverage — a stronger signal of genuine commons contribution.",
+        "points": 2,
+        "sort_order": 45,
+    },
 ]
 
 
@@ -208,6 +215,7 @@ DEFAULT_VENDORS = [
             ("OSS_PROJECT", "https://github.com/Uniformedi/humility-guardrail", "humility-guardrail under MIT."),
             ("PERMISSIVE_LICENSE", "https://github.com/Uniformedi/humility-guardrail/blob/main/LICENSE", "MIT (canonical Humility implementation)."),
             ("TRANSPARENCY_PUBLICATION", "https://github.com/Uniformedi/InsideLLM/tree/master/docs", "Publishes architecture and integrity-design documentation."),
+            ("MODULE_EXTRACTION", "https://github.com/uniformedi/humility-guardrail", "Extracted the SAIVAS/Humility policy enforcement as a standalone MIT-licensed pip package so it can be adopted by LLM gateways outside InsideLLM (not coupled to the platform)."),
         ],
     },
 
@@ -286,6 +294,25 @@ DEFAULT_VENDORS = [
         "contributions": [
             ("OSS_PROJECT", "https://github.com/python/cpython", "CPython reference implementation under PSF License."),
             ("PERMISSIVE_LICENSE", "https://docs.python.org/3/license.html", "PSF-2.0 — OSI-approved, BSD-style."),
+        ],
+    },
+
+    # ----- AI gateway / control-plane peers -------------------------------
+    # Peers whose tooling overlaps with parts of InsideLLM. They're acknowledged
+    # here because their open-source work reduces the work InsideLLM has to
+    # do itself — a deployment can defer overlapping modules to the peer
+    # when the customer already operates it. See docs/comparison.md.
+    {
+        "slug": "tyk",
+        "name": "Tyk Technologies",
+        "category": "ai-gateway",
+        "website_url": "https://tyk.io",
+        "description": "Maintains Tyk Gateway (API gateway) and Tyk AI Studio (AI control plane). Open-sourced AI Studio's core in 2026. Overlaps with InsideLLM on routing, policy, observability, and cost visibility; does NOT overlap on Humility alignment, DLP gateway layer, or the industry compliance overlays.",
+        "contributions": [
+            ("OSS_PROJECT", "https://github.com/TykTechnologies/tyk", "Tyk Gateway under MPL 2.0, actively maintained."),
+            ("PERMISSIVE_LICENSE", "https://github.com/TykTechnologies/tyk/blob/master/LICENSE.md", "MPL 2.0 — weak copyleft, commercial-use friendly."),
+            ("MODULE_EXTRACTION", "https://tyk.io/blog/ai-studio-is-going-open-source-and-why-the-ai-control-plane-must-be-extensible/", "Open-sourced Tyk AI Studio Community Edition in 2026, extracting gateway + UI control plane from their commercial platform."),
+            ("TRANSPARENCY_PUBLICATION", "https://tyk.io/blog/", "Publishes ongoing architecture + AI-control-plane design posts."),
         ],
     },
 ]
