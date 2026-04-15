@@ -543,6 +543,62 @@ try {
     Write-Host ""
     terraform output -no-color 2>$null | ForEach-Object { Write-Host "  $_" }
     Write-Host ""
+
+    # -----------------------------------------------------------------
+    # Trust the VM's SSH host key. Every fresh deploy generates new host
+    # keys; without this step operators hit "REMOTE HOST IDENTIFICATION
+    # HAS CHANGED!" and either have to manually ssh-keygen -R or (worse)
+    # disable strict host checking. We pre-seed known_hosts with the new
+    # key so subsequent SSH / terraform provisioner / Ansible-style use
+    # works cleanly.
+    # -----------------------------------------------------------------
+    try {
+        $vmIp = ""
+        try { $vmIp = (terraform output -raw vm_ip 2>$null) } catch {}
+        if (-not $vmIp) {
+            # Fall back to parsing vm_static_ip from tfvars (strip /CIDR)
+            $tfvarsFile = Get-ChildItem -Path (Get-Location) -Filter "*.tfvars" -File | Select-Object -First 1
+            if ($tfvarsFile) {
+                $line = Select-String -Path $tfvarsFile.FullName -Pattern '^\s*vm_static_ip\s*=' | Select-Object -First 1
+                if ($line) {
+                    $vmIp = ($line.Line -split '=')[1].Trim() -replace '"', '' -replace '\s.*', ''
+                    $vmIp = ($vmIp -split '/')[0]
+                }
+            }
+        }
+
+        if ($vmIp) {
+            Write-Host "  Trusting VM SSH host key ($vmIp)..." -ForegroundColor Cyan
+            $knownHostsLocations = @(
+                Join-Path $env:USERPROFILE ".ssh\known_hosts"
+            )
+            # Also cover git-bash's HOME if it differs (resolves to I:\ or
+            # similar on some Windows setups — ssh-keyscan from bash uses
+            # that one).
+            if ($env:HOME -and ($env:HOME -ne $env:USERPROFILE)) {
+                $knownHostsLocations += (Join-Path $env:HOME ".ssh\known_hosts")
+            }
+            foreach ($kh in $knownHostsLocations) {
+                $dir = Split-Path $kh
+                if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
+                if (-not (Test-Path $kh))  { New-Item -ItemType File -Force -Path $kh | Out-Null }
+                # Drop any stale keys for this IP (silent if none present)
+                & ssh-keygen -R $vmIp -f $kh 2>&1 | Out-Null
+            }
+            # Scan the fresh key(s) once and append to every known_hosts
+            $scan = & ssh-keyscan -T 5 -H $vmIp 2>$null
+            if ($scan) {
+                foreach ($kh in $knownHostsLocations) {
+                    Add-Content -Path $kh -Value $scan -Encoding ASCII
+                }
+                Write-Host "  Host key trusted in: $($knownHostsLocations -join ', ')" -ForegroundColor Green
+            } else {
+                Write-Host "  (ssh-keyscan returned no keys — VM may still be booting; rerun ssh-keyscan -H $vmIp >> ~/.ssh/known_hosts manually once SSH is up)" -ForegroundColor Yellow
+            }
+        }
+    } catch {
+        Write-Host "  (host-key trust step failed: $($_.Exception.Message); not fatal)" -ForegroundColor Yellow
+    }
 }
 finally {
     Pop-Location
