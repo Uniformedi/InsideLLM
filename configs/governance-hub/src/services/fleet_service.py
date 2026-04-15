@@ -22,9 +22,13 @@ async def list_instances() -> list[dict]:
     from ..db.central_sql import SQL
 
     def _query(db):
-        result = db.execute(text(SQL.list_instances))
+        # Materialize the full list FIRST (pymssql/MSSQL: issuing another
+        # execute() on the same connection while iterating a previous
+        # cursor can silently drop remaining rows — which hid an orphan
+        # row on a live fleet). Pull everything into memory, then loop.
+        rows = list(db.execute(text(SQL.list_instances)).mappings())
         instances = []
-        for row in result.mappings():
+        for row in rows:
             tel = db.execute(text(SQL.latest_telemetry), {"iid": row["instance_id"]})
             tel_row = tel.mappings().first()
             overrides = None
