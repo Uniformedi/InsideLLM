@@ -1467,12 +1467,46 @@ async function loadComplianceDashboard() {
       sections.sections.filter(s => s.compliance_type !== 'informational').map(s => {
         const badge = _complianceBadge(s.compliance_status);
         const typeBadge = s.compliance_type === 'automated' ? '<span class="badge badge-info">Auto</span>' : '<span class="badge badge-pending">Manual</span>';
-        return `<tr><td><code>${s.section_number}</code></td><td>${s.title}</td><td>${typeBadge}</td><td>${badge}</td><td>${s.assessed_at?.slice(0,16).replace('T',' ') || '--'}</td></tr>`;
+        // Linked row: click takes you to the Framework tab with that
+        // section selected and its markdown rendered. Lets you review
+        // the rule that backs a compliance status without tab-juggling.
+        const snEsc = String(s.section_number).replace(/'/g, "\\'");
+        return `<tr onclick="jumpToFrameworkSection('${snEsc}')" style="cursor:pointer" title="Open ${s.section_number} in the Framework viewer">
+          <td><code>${s.section_number}</code></td>
+          <td>${s.title}</td>
+          <td>${typeBadge}</td>
+          <td>${badge}</td>
+          <td>${s.assessed_at?.slice(0,16).replace('T',' ') || '--'}</td>
+        </tr>`;
       }).join('') +
       `</tbody></table>`;
   } else {
     table.innerHTML = '<div class="loading">No framework sections loaded. <button class="btn btn-action" onclick="seedFramework()">Seed Framework</button></div>';
   }
+}
+
+// Shared helper used by the compliance table (and anywhere else that wants
+// to deep-link to a framework section). Switches the Governance sub-tab to
+// Framework, waits for the tree to render, then selects + scrolls to the
+// target section.
+async function jumpToFrameworkSection(sn) {
+  const frameworkTab = document.querySelector('#panel-governance .tab[onclick*="\'framework\'"]');
+  switchGovView('framework', frameworkTab);
+  // Wait a tick for the tree render (loadFrameworkTree is async but
+  // govViewLoaded caches — so second visits are instant). On the first
+  // visit we poll briefly for the target node to appear.
+  for (let i = 0; i < 20; i++) {
+    const node = document.querySelector(`.fw-node[data-sn="${sn}"]`);
+    if (node) {
+      node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      await selectSection(sn);
+      return;
+    }
+    await new Promise(r => setTimeout(r, 100));
+  }
+  // Tree didn't render in time — fall back to just calling select; it
+  // will fetch the section content even without a tree node to highlight.
+  await selectSection(sn);
 }
 
 async function runComplianceChecks() {
