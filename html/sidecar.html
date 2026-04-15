@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>InsideLLM Browser Sidecar — Documentation</title>
+<style>
+  :root {
+    --bg:#0a0e1a; --panel:#111827; --panel-2:#1a2234; --border:#2a3650;
+    --text:#e2e8f0; --text-muted:#94a3b8; --muted-deep:#64748b;
+    --cyan:#22d3ee; --green:#6ee7b7; --amber:#fcd34d; --red:#fca5a5;
+    --blue:#60a5fa; --purple:#a78bfa;
+    --font-mono:'Menlo','Consolas','Courier New',monospace;
+  }
+  @media print {
+    :root { --bg:#fff; --panel:#fff; --panel-2:#f5f5f5; --border:#ccc;
+            --text:#111; --text-muted:#555; --muted-deep:#777;
+            --cyan:#0369a1; --green:#065f46; --amber:#92400e; --red:#991b1b;
+            --blue:#1d4ed8; --purple:#6d28d9; }
+    body { font-size:11pt !important; }
+    pre, .matrix, table { page-break-inside:avoid; }
+    .noprint { display:none !important; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:32px; max-width:880px; margin:0 auto;
+         font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg);
+         color:var(--text); line-height:1.55; font-size:14px; }
+  h1 { font-size:26px; color:var(--cyan); font-family:var(--font-mono);
+       letter-spacing:-0.01em; margin:0 0 4px; }
+  .lede { color:var(--text-muted); font-size:15px; max-width:640px; margin:0 0 8px; }
+  .meta { font-family:var(--font-mono); font-size:11px; color:var(--muted-deep);
+          text-transform:uppercase; letter-spacing:0.06em; margin-bottom:28px;
+          border-bottom:1px solid var(--border); padding-bottom:16px; }
+  .meta span { display:inline-block; margin-right:18px; }
+  .meta b { color:var(--cyan); }
+  h2 { font-size:20px; color:var(--cyan); font-family:var(--font-mono);
+       margin:36px 0 10px; padding-top:10px; border-top:1px solid var(--border); }
+  h3 { font-size:15px; color:var(--text); margin:24px 0 6px; }
+  p { margin:0 0 12px; }
+  a { color:var(--blue); }
+  code { background:var(--panel-2); border:1px solid var(--border);
+         padding:1px 6px; border-radius:3px; font-family:var(--font-mono);
+         font-size:0.88em; color:var(--cyan); }
+  pre { background:var(--panel); border:1px solid var(--border);
+        border-radius:6px; padding:14px 16px; overflow:auto;
+        font-family:var(--font-mono); font-size:12px; line-height:1.5;
+        color:var(--text); margin:12px 0; }
+  pre code { background:transparent; border:none; padding:0; color:inherit; font-size:inherit; }
+  table { width:100%; border-collapse:collapse; margin:12px 0;
+          background:var(--panel); border:1px solid var(--border); border-radius:6px; overflow:hidden; }
+  th, td { padding:10px 12px; text-align:left; border-bottom:1px solid var(--border);
+           font-size:13px; vertical-align:top; }
+  th { background:var(--panel-2); color:var(--cyan); font-weight:600;
+       font-size:11px; text-transform:uppercase; letter-spacing:0.05em; }
+  tr:last-child td { border-bottom:none; }
+  ul, ol { margin:0 0 14px 24px; padding:0; }
+  li { margin-bottom:4px; }
+  blockquote { margin:12px 0; padding:10px 16px; background:var(--panel-2);
+               border-left:3px solid var(--cyan); border-radius:4px; color:var(--text-muted); }
+  .tag { display:inline-block; padding:2px 8px; border-radius:3px;
+         font-family:var(--font-mono); font-size:10px; text-transform:uppercase;
+         letter-spacing:0.05em; margin-right:4px; }
+  .tag-ok { background:#064e3b; color:var(--green); }
+  .tag-warn { background:#78350f; color:var(--amber); }
+  .tag-info { background:#1e3a8a; color:var(--blue); }
+  .diagram { background:var(--panel); border:1px solid var(--border);
+             border-radius:6px; padding:16px; font-family:var(--font-mono);
+             font-size:11px; line-height:1.5; color:var(--text-muted);
+             white-space:pre; overflow-x:auto; margin:12px 0; }
+  nav.toc { background:var(--panel-2); border:1px solid var(--border);
+            border-radius:6px; padding:14px 18px; margin-bottom:24px;
+            font-size:13px; }
+  nav.toc h4 { margin:0 0 6px; font-size:11px; color:var(--cyan);
+               text-transform:uppercase; letter-spacing:0.06em;
+               font-family:var(--font-mono); }
+  nav.toc ol { margin:0 0 0 20px; columns:2; column-gap:24px; }
+  nav.toc a { text-decoration:none; color:var(--text-muted); }
+  nav.toc a:hover { color:var(--cyan); }
+  .footer { margin-top:48px; padding-top:16px; border-top:1px solid var(--border);
+            color:var(--muted-deep); font-size:11px; font-family:var(--font-mono); }
+  @media (max-width:720px) { nav.toc ol { columns:1; } body { padding:20px; } }
+</style>
+</head>
+<body>
+
+<h1>InsideLLM Browser Sidecar</h1>
+<p class="lede">
+A Chrome / Edge / Firefox extension that gives every employee an AI
+sidebar wired to only talk to the InsideLLM gateway — inheriting DLP,
+Humility, OPA policy, budgets, and hash-chained audit on every request.
+</p>
+<div class="meta">
+  <span><b>Product:</b> InsideLLM Assist</span>
+  <span><b>Codename:</b> page-assist-insidellm</span>
+  <span><b>Base:</b> fork of n4ze3m/page-assist (MIT)</span>
+  <span><b>Status:</b> scaffolding complete; not yet built/signed</span>
+</div>
+
+<nav class="toc noprint">
+  <h4>Contents</h4>
+  <ol>
+    <li><a href="#what">What it is</a></li>
+    <li><a href="#why">Why a sidecar</a></li>
+    <li><a href="#arch">Architecture</a></li>
+    <li><a href="#config">Configuration surface</a></li>
+    <li><a href="#security">Security posture</a></li>
+    <li><a href="#deploy">Deployment guide</a></li>
+    <li><a href="#user">End-user guide</a></li>
+    <li><a href="#trouble">Troubleshooting</a></li>
+    <li><a href="#roadmap">Roadmap</a></li>
+    <li><a href="#refs">References</a></li>
+  </ol>
+</nav>
+
+<h2 id="what">What it is</h2>
+<p>
+A browser extension delivered to endpoints via Windows Group Policy. It
+surfaces a <b>side panel chat</b>, <b>right-click context actions</b>
+(rewrite, summarize, translate), and an <b>"ask about this page"</b>
+action that includes the current tab's DOM as context. Every request
+terminates at your InsideLLM gateway; none goes to OpenAI or Anthropic
+directly from the browser.
+</p>
+<p>
+Users get AI ubiquity across every tab they're in. Administrators get
+a single control plane: the same DLP, Humility, and audit that guard
+Open WebUI also guard every sidecar request, because the sidecar
+<i>is</i> just another client of the gateway.
+</p>
+
+<h2 id="why">Why a sidecar (vs. just pointing users at Open WebUI)</h2>
+<table>
+<thead><tr><th>Workflow</th><th>Open WebUI</th><th>Sidecar</th></tr></thead>
+<tbody>
+<tr><td>"Summarize this 40-page PDF I'm reading"</td><td>copy-paste into chat</td><td>right-click → summarize</td></tr>
+<tr><td>"Rewrite this paragraph in Confluence"</td><td>copy-paste → edit → paste back</td><td>selection → accept inline</td></tr>
+<tr><td>"What does this dashboard error mean?"</td><td>screenshot → upload → ask</td><td>right-click → ask AI</td></tr>
+<tr><td>Shadow-AI friction</td><td>quick tasks still tempt employees to public tools</td><td>in-browser ubiquity removes the "it's faster elsewhere" excuse</td></tr>
+</tbody>
+</table>
+<p>
+Open WebUI remains the deep-work surface — long conversations, RAG
+over documents, knowledge-base search. The sidecar is the
+<i>everywhere-else</i> surface.
+</p>
+
+<h2 id="arch">Architecture</h2>
+<pre class="diagram">Employee's Chrome / Edge / Firefox
+  │
+  │  InsideLLM Assist extension
+  │    - Side panel chat
+  │    - Context menu actions
+  │    - Page Q&amp;A (reads current tab DOM as context)
+  │    - Config locked: only talks to gateway URL below
+  │
+  │  HTTPS /v1/chat/completions
+  │  Authorization: Bearer &lt;user-virtual-key&gt;
+  ▼
+InsideLLM gateway (on-prem VM / VLAN)
+  │
+  │  Nginx (TLS terminator, path-routed /v1/ → LiteLLM)
+  │
+  │  LiteLLM proxy callback chain:
+  │    1. dynamic_rate_limiter_v3 (per-key tpm/rpm + budget)
+  │    2. humility_prompt    (SAIVAS prompt injection)
+  │    3. humility_guardrail (enforced rules; OPA-backed)
+  │    4. dlp_guardrail      (inbound: PII/PHI/credentials/financials)
+  │    5. forward to Anthropic / OpenAI / Bedrock / etc.
+  │    6. dlp_guardrail      (outbound: redact echoed secrets)
+  │
+  │  Hash-chained audit → Governance Hub → fleet DB</pre>
+<p>
+The extension's HTTP base URL is pushed via Windows Group Policy
+(<code>chrome.storage.managed</code>). Users cannot change it from the
+extension settings when <code>lockdown</code> mode is on. Every request
+carries a per-user LiteLLM virtual key, also GPO-pushed. If the key is
+revoked in the Governance Hub, the next request fails with 401 — no
+tail of cached auth.
+</p>
+
+<h2 id="config">Configuration surface (<code>chrome.storage.managed</code>)</h2>
+<p>
+Defined in <code>policy/managed-schema.json</code> in the sidecar repo.
+Seven settings, all mapped 1:1 to the Windows ADMX/ADML templates in
+<code>policy/gpo/</code>:
+</p>
+<table>
+<thead><tr><th>Setting</th><th>Type</th><th>Required</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>gatewayBaseUrl</code></td><td>URL</td><td>✓</td><td>e.g. <code>https://insidellm.corp.example.com/v1</code></td></tr>
+<tr><td><code>virtualApiKey</code></td><td>string</td><td>✓</td><td>LiteLLM virtual key issued per user/team</td></tr>
+<tr><td><code>modelAllowlist</code></td><td>array</td><td></td><td>Model IDs shown in the picker</td></tr>
+<tr><td><code>lockdown</code></td><td>bool</td><td>default ✓</td><td>Hide "add provider" / "edit endpoint" controls</td></tr>
+<tr><td><code>systemPrompt</code></td><td>string</td><td></td><td>Optional prepended system prompt</td></tr>
+<tr><td><code>temperatureCap</code></td><td>0–2</td><td></td><td>Upper bound on temperature slider</td></tr>
+<tr><td><code>pageQaEnabled</code></td><td>bool</td><td>default ✓</td><td>Allow "ask about this page"</td></tr>
+<tr><td><code>fileUploadEnabled</code></td><td>bool</td><td>default ✓</td><td>Allow file attachments</td></tr>
+</tbody>
+</table>
+
+<h2 id="security">Security posture</h2>
+
+<h3>What the sidecar does NOT have</h3>
+<ul>
+<li><b>No vendor API keys.</b> The extension never sees an Anthropic / OpenAI / Bedrock key. Only the gateway URL + a per-user virtual key.</li>
+<li><b>No direct internet access to LLM providers.</b> Traffic must terminate at your gateway.</li>
+<li><b>No local storage of conversation content</b> beyond the browser's standard extension storage. The authoritative audit record is on the gateway.</li>
+<li><b>No way to disable DLP.</b> The callback runs at LiteLLM regardless of what the client sends.</li>
+</ul>
+
+<h3>What the sidecar DOES inherit</h3>
+<ul>
+<li><b>DLP gateway scanning</b> on every message in both directions (PII / PHI / credentials / financials + custom regex).</li>
+<li><b>Humility alignment</b> — SAIVAS-violating requests rejected before the model sees them.</li>
+<li><b>OPA industry overlays</b> (HIPAA, SOX, FERPA, GLBA, FDCPA, PCI-DSS) when enabled.</li>
+<li><b>Per-user budgets and rate limits</b> from the virtual key.</li>
+<li><b>Hash-chained audit</b> of every request in the Governance Hub.</li>
+</ul>
+
+<h3>Attack surface vs. shadow AI</h3>
+<table>
+<thead><tr><th>Concern</th><th>Sidecar</th><th>Shadow AI (employee on ChatGPT.com)</th></tr></thead>
+<tbody>
+<tr><td>Where does the prompt go?</td><td>Your gateway</td><td>OpenAI, outside VLAN</td></tr>
+<tr><td>Where is the API key?</td><td>Per-user virtual key, on gateway</td><td>Employee's personal account</td></tr>
+<tr><td>DLP</td><td>At gateway, unavoidable</td><td>Nothing</td></tr>
+<tr><td>Audit trail</td><td>Yes, hash-chained</td><td>Nothing</td></tr>
+<tr><td>Model allowlist</td><td>Yes</td><td>Nothing</td></tr>
+<tr><td>Revocation</td><td>One click in Governance Hub</td><td>Impossible</td></tr>
+<tr><td>Cost attribution</td><td>Per-user virtual-key billing</td><td>Zero visibility</td></tr>
+</tbody>
+</table>
+
+<h2 id="deploy">Deployment guide (for administrators)</h2>
+
+<h3>Prerequisites</h3>
+<ul>
+<li>Windows domain with GPO authority over target endpoints</li>
+<li>A scratch Windows machine with <a href="https://bun.sh">Bun</a> installed</li>
+<li>An existing InsideLLM deployment reachable over HTTPS from endpoints</li>
+<li><code>ssh</code> + <code>scp</code> + <code>gh</code> CLI available</li>
+</ul>
+
+<h3>Step 1 — Clone + build</h3>
+<pre>gh repo clone Uniformedi/page-assist-insidellm
+cd page-assist-insidellm
+
+.\scripts\fork.ps1          # apply overlay on upstream
+cd build\upstream
+bun install
+bun run build               # produces build/chrome-mv3/</pre>
+
+<h3>Step 2 — Sign</h3>
+<p>
+Sign the packed extension with your organization's signing key. Guard
+this key — changing it invalidates every installed instance and
+triggers Chrome's "extension corrupted" dialog.
+</p>
+<pre>openssl genrsa -out signing-key.pem 2048  # once; keep in secret manager
+
+chrome.exe --pack-extension="C:\...\build\chrome-mv3" `
+           --pack-extension-key="signing-key.pem"
+# → produces chrome-mv3.crx</pre>
+
+<h3>Step 3 — Host the update channel on the InsideLLM VM</h3>
+<pre># on dev box
+scp build/upstream/build/chrome-mv3.crx \
+    insidellm-admin@&lt;vm&gt;:/tmp/insidellm-assist.crx
+
+sed -e 's|{{EXTENSION_ID}}|&lt;your-extension-id&gt;|' \
+    -e 's|{{GATEWAY}}|insidellm.corp.example.com|' \
+    update/updates.xml.tpl &gt; updates.xml
+scp updates.xml insidellm-admin@&lt;vm&gt;:/tmp/
+
+# on VM
+sudo mv /tmp/insidellm-assist.crx /opt/InsideLLM/extensions/
+sudo mv /tmp/updates.xml /opt/InsideLLM/extensions/</pre>
+<p>
+The nginx snippet at <code>update/nginx-snippet.conf</code> shows how
+to expose <code>/extensions/</code> as a public read-only path. Add it
+to your nginx template.
+</p>
+
+<h3>Step 4 — GPO</h3>
+<ol>
+<li>GPMC → <b>Computer Configuration → Administrative Templates → Google → Google Chrome → Extensions</b>.</li>
+<li>Enable <b>Configure the list of force-installed apps and extensions</b>. Entry format:
+<pre>&lt;extension-id&gt;;https://&lt;vm&gt;/extensions/updates.xml</pre></li>
+<li>Import the ADMX:
+<pre>Copy policy/gpo/insidellm-assist.admx to %SystemRoot%\PolicyDefinitions\
+Copy policy/gpo/insidellm-assist.adml to %SystemRoot%\PolicyDefinitions\en-US\</pre></li>
+<li>Configure the seven settings under <b>Administrative Templates → InsideLLM → InsideLLM Assist</b>.</li>
+<li>Link the GPO to the target OU. Wait for Chrome's next policy refresh (~90 minutes) or run <code>gpupdate /force</code> on a test endpoint.</li>
+</ol>
+
+<h3>Step 5 — Verify on a test endpoint</h3>
+<ol>
+<li>Chrome → <code>chrome://policy</code> — <code>ExtensionInstallForcelist</code> should show your entry.</li>
+<li>Chrome → <code>chrome://extensions</code> — extension present, marked "Installed by your administrator".</li>
+<li>Open the side panel — chat UI loads, no "add provider" controls.</li>
+<li>Send a test prompt. Confirm the request shows up in the Governance Hub audit log tagged with the virtual key's user identity.</li>
+</ol>
+
+<h2 id="user">End-user guide</h2>
+<p>Once installed, the extension adds:</p>
+<ul>
+<li><b>Side panel button</b> in the toolbar → opens chat panel</li>
+<li><b>Context menu</b>: right-click selected text for rewrite / summarize / ask / translate</li>
+<li><b>Keyboard shortcut</b>: <code>Ctrl+Shift+L</code> (configurable) opens the side panel</li>
+</ul>
+
+<h3>Chat</h3>
+<p>
+The side panel behaves like a mini Open WebUI: conversation history
+(stored locally in browser profile), model picker (restricted to the
+GPO allowlist), file attachments (if enabled).
+</p>
+
+<h3>Page Q&amp;A</h3>
+<p>
+Toggle "Ask about this page" in the side panel to include the current
+tab's DOM as context. The DOM is sent to the gateway with the
+message, so DLP scans it. Large pages are summarized client-side before
+sending to stay within token budget.
+</p>
+
+<h3>What gets audited</h3>
+<p>
+Every message — inbound and outbound — is hash-chained and logged to
+the Governance Hub with user identity, timestamp, model, tokens
+consumed, DLP hits, Humility decisions. Users should assume everything
+they type is audit-logged.
+</p>
+
+<h2 id="trouble">Troubleshooting</h2>
+<table>
+<thead><tr><th>Symptom</th><th>Check</th></tr></thead>
+<tbody>
+<tr><td>Extension didn't install on endpoint</td><td><code>chrome://policy</code> — force-install entry present? <code>gpupdate /force</code> run?</td></tr>
+<tr><td>Extension installed but side panel empty</td><td><code>chrome://extensions → Details → Errors</code>. Common: <code>gatewayBaseUrl</code> missing in managed policy</td></tr>
+<tr><td>"Network error" in chat</td><td>From the endpoint, <code>curl https://&lt;gateway&gt;/v1/models</code> with the virtual key. 401 = key revoked; 502 = gateway down</td></tr>
+<tr><td>"DLP blocked your message"</td><td>Expected — user's message contained a pattern in the DLP ruleset. Rephrase and retry.</td></tr>
+<tr><td>"This model is not available"</td><td>Virtual key lacks access. Check the key's team in LiteLLM admin.</td></tr>
+<tr><td>Key rotated but endpoints still using old one</td><td>Chrome caches <code>chrome.storage.managed</code>. <code>gpupdate /force</code> + relaunch Chrome.</td></tr>
+</tbody>
+</table>
+
+<h2 id="roadmap">Roadmap</h2>
+<ul>
+<li><b>Build automation</b> — CI that builds signed <code>.crx</code> on every release tag, signing key in GitHub Actions secret</li>
+<li><b>Electron/Tauri desktop shell</b> — for workflows outside the browser (IDE assistance, native apps). Lower priority; browser covers 80% of knowledge-worker AI use.</li>
+<li><b>macOS / Linux deployment profile</b> — <code>managed-schema.json</code> works on Chrome across platforms; just need per-OS distribution story (MDM on macOS, Chromebook enrollment, etc.)</li>
+<li><b>Mobile</b> — Chrome extensions don't run on mobile. A React Native app is the answer, not a port of this.</li>
+</ul>
+
+<h2 id="refs">References</h2>
+<ul>
+<li>Sidecar repo: <a href="https://github.com/Uniformedi/page-assist-insidellm">Uniformedi/page-assist-insidellm</a></li>
+<li>Upstream base: <a href="https://github.com/n4ze3m/page-assist">n4ze3m/page-assist</a> (MIT)</li>
+<li>Platform repo: <a href="https://github.com/Uniformedi/InsideLLM">Uniformedi/InsideLLM</a></li>
+<li>Related: <a href="../docs/architecture/guardrails.md">Guardrail architecture</a>, <a href="../docs/architecture/policy-library.md">Policy library</a>, <a href="../docs/ATTRIBUTIONS.md">Attributions</a>, <a href="../docs/comparison.md">Comparison vs peer AI gateways</a></li>
+</ul>
+
+<div class="footer">
+  <span class="tag tag-info">DOC</span>
+  InsideLLM Browser Sidecar — maintained in <code>docs/sidecar.md</code> / <code>html/sidecar.html</code> in the Uniformedi/InsideLLM repository.
+</div>
+
+</body>
+</html>
