@@ -2026,7 +2026,7 @@ async function loadFleet() {
 // ================================================================
 // SERVICES panel
 // ================================================================
-function buildServiceCards() {
+async function buildServiceCards() {
   const h = H();
   const services = [
     { icon: 'OW', bg: '#2563eb', name: 'Open WebUI', desc: 'Chat interface with RAG, DLP pipeline, and tool functions', links: [`https://${h}`, `https://${h}/health`] },
@@ -2048,7 +2048,27 @@ function buildServiceCards() {
       return u.port ? `:${u.port}${path === '/' ? '' : path}` : path;
     } catch { return url; }
   };
-  document.getElementById('serviceCards').innerHTML = services.map(s => {
+  // Liveness probe: the card list is declarative (Mattermost, Ollama,
+  // etc. always in the array) but some services are optional per-deploy.
+  // When an optional service isn't deployed, nginx falls through to the
+  // catch-all / location and the card appears to "link to Open WebUI".
+  // Probe each card's primary URL; drop cards that don't respond with a
+  // service-shaped status. Cached in-memory for the life of the tab.
+  const probe = async (url) => {
+    try {
+      const ctrl = new AbortController();
+      setTimeout(() => ctrl.abort(), 2500);
+      const r = await fetch(url, { signal: ctrl.signal, cache: 'no-store', redirect: 'manual' });
+      // 200/204/401/403 all count as "something specific is listening there".
+      // 301/302 is fine too (service redirecting to its own login). opaqueredirect
+      // (from redirect:'manual' + cross-origin) also counts.
+      return r.type === 'opaqueredirect' || r.ok || [301,302,401,403].includes(r.status);
+    } catch { return false; }
+  };
+  const liveFlags = await Promise.all(services.map(s => probe(s.links[0])));
+  const liveServices = services.filter((_, i) => liveFlags[i]);
+
+  document.getElementById('serviceCards').innerHTML = liveServices.map(s => {
     // The card is a <div>, not a nested <a>. Nested anchors are a parse
     // error — browsers auto-close the outer anchor when they hit an
     // inner one, leaving the inner links as orphan sibling elements
