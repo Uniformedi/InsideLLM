@@ -154,9 +154,14 @@ services:
     ports:
       - "8080:8080"
     environment:
-      # Route all API calls through LiteLLM
+      # Route all API calls through LiteLLM. Newer Open WebUI prefers the
+      # plural *_URLS / *_KEYS vars; keep the singular forms too for compat
+      # with older versions.
+      ENABLE_OPENAI_API: "true"
       OPENAI_API_BASE_URL: "http://litellm:4000/v1"
       OPENAI_API_KEY: "$${LITELLM_MASTER_KEY}"
+      OPENAI_API_BASE_URLS: "http://litellm:4000/v1"
+      OPENAI_API_KEYS: "$${LITELLM_MASTER_KEY}"
 
       # WebUI settings
       WEBUI_SECRET_KEY: "$${WEBUI_SECRET_KEY}"
@@ -490,12 +495,19 @@ services:
 %{ if admin_auth_mode == "ldap" }
       GOVERNANCE_HUB_AD_DOMAIN: "${ad_domain}"
       GOVERNANCE_HUB_AD_ADMIN_GROUPS: "${ad_admin_groups}"
+      GOVERNANCE_HUB_AD_VIEW_GROUPS: "${ad_view_groups}"
+      GOVERNANCE_HUB_AD_APPROVER_GROUPS: "${ad_approver_groups}"
 %{ endif }
 %{ if admin_auth_mode == "oidc" }
       GOVERNANCE_HUB_OIDC_ISSUER_URL: "${oidc_issuer_url}"
       GOVERNANCE_HUB_OIDC_CLIENT_ID: "${sso_client_id}"
       GOVERNANCE_HUB_OIDC_CLIENT_SECRET: "$${SSO_CLIENT_SECRET}"
+      GOVERNANCE_HUB_OIDC_VIEW_GROUP_IDS: "${oidc_view_group_ids}"
+      GOVERNANCE_HUB_OIDC_ADMIN_GROUP_IDS: "${oidc_admin_group_ids}"
+      GOVERNANCE_HUB_OIDC_APPROVER_GROUP_IDS: "${oidc_approver_group_ids}"
 %{ endif }
+      # Break-glass: local insidellm-admin account uses this as the password.
+      LITELLM_MASTER_KEY: "$${LITELLM_MASTER_KEY}"
     volumes:
       - /opt/InsideLLM/data/governance-hub:/app/data
       - /opt/InsideLLM/governance-hub/framework:/app/framework:ro
@@ -603,7 +615,7 @@ services:
   # Grafana — Compliance Dashboards & Visualization
   # -------------------------------------------------------------------------
   grafana:
-    image: grafana/grafana-oss:latest
+    image: grafana/grafana-oss:11.3.0
     container_name: insidellm-grafana
     restart: always
     ports:

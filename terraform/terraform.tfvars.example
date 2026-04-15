@@ -126,5 +126,23 @@ dlp_block_credentials = true
 # tls_cert_path = "C:\\certs\\InsideLLM.crt"
 # tls_key_path  = "C:\\certs\\InsideLLM.key"
 
+# =============================================================================
+# Governance Hub RBAC — three roles: view / admin / approver
+# =============================================================================
+# AD (LDAP) group names — case-insensitive CN match against memberOf
+# ad_view_groups     = "InsideLLM-View"
+# ad_admin_groups    = "InsideLLM-Admin"
+# ad_approver_groups = "InsideLLM-Approve"
+#
+# OIDC (Azure AD / Okta) — group object IDs (GUIDs) sent in the 'groups' claim
+# oidc_view_group_ids     = ["11111111-2222-3333-4444-555555555555"]
+# oidc_admin_group_ids    = ["66666666-7777-8888-9999-aaaaaaaaaaaa"]
+# oidc_approver_group_ids = ["bbbbbbbb-cccc-dddd-eeee-ffffffffffff"]
+#
+# Break-glass: the local 'insidellm-admin' account is ALWAYS on. Password equals
+# LITELLM_MASTER_KEY (/opt/InsideLLM/.env). Every login is recorded in the
+# governance_audit_chain as event_type=break_glass_login. Rotate the master key
+# after any break-glass use.
+
 environment = "production"
 owner       = "[YOUR ORG]"

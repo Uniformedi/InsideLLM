@@ -24,11 +24,20 @@ SESSION_HOURS = 8
 COOKIE_NAME = "insidellm_session"
 
 
-def create_session_token(username: str, groups: list[str] | None = None) -> str:
-    """Create a signed JWT session token."""
+def create_session_token(
+    username: str,
+    groups: list[str] | None = None,
+    roles: list[str] | None = None,
+    email: str = "",
+    name: str = "",
+) -> str:
+    """Create a signed JWT session token with RBAC roles embedded."""
     payload = {
         "sub": username,
+        "email": email,
+        "name": name or username,
         "groups": groups or [],
+        "roles": roles or [],
         "iat": datetime.now(timezone.utc),
         "exp": datetime.now(timezone.utc) + timedelta(hours=SESSION_HOURS),
     }
@@ -110,16 +119,9 @@ def ldap_authenticate(username: str, password: str) -> tuple[bool, list[str]]:
                         groups.append(part.strip()[3:])
                         break
 
-        # Check if user is in any allowed admin group
-        allowed = {g.strip().lower() for g in settings.ad_admin_groups.split(",") if g.strip()}
-        user_groups_lower = {g.lower() for g in groups}
-
-        if not allowed or allowed & user_groups_lower:
-            logger.info(f"LDAP auth success: {upn}, groups: {groups}")
-            return True, groups
-        else:
-            logger.warning(f"LDAP auth denied: {upn} not in allowed groups {allowed}")
-            return False, groups
+        # Return all resolved groups; RBAC role mapping happens in rbac.py
+        logger.info(f"LDAP auth success: {upn}, groups: {groups}")
+        return True, groups
 
     except Exception as e:
         logger.error(f"LDAP search error: {e}")

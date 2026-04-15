@@ -2447,10 +2447,53 @@ loadOverview();
       if (u.authenticated) {
         document.getElementById('authUsername').textContent = u.username;
         document.getElementById('authUser').style.display = 'flex';
+        // Apply RBAC gating based on roles claim in the server-issued JWT.
+        // Server enforces authoritatively; this only hides UI to reduce noise.
+        applyRoleGating(u.roles || []);
       }
     }
   } catch(e) {}
 })();
+
+// Hide admin/approver-only controls when the user lacks the role.
+function applyRoleGating(roles) {
+  const isAdmin = roles.includes('admin');
+  const isApprover = roles.includes('approver');
+
+  // Admin-only controls: Seed Framework, Upload, Edit Prompts, Configure Fleet DB, etc.
+  if (!isAdmin) {
+    document.querySelectorAll(
+      // Inline onclick handlers used throughout admin.html
+      "button[onclick*='seedFramework'], " +
+      "button[onclick*='frameworkMdFile'], " +        // Upload .md trigger
+      "button[onclick*='uploadFramework'], " +
+      "button[onclick*='editPrompt'], " +
+      "button[onclick*='configureFleetDb'], " +
+      "button[onclick*='saveFleetDb'], " +
+      "button[onclick*='publishSkill'], " +
+      "[data-requires-role='admin']"
+    ).forEach(el => { el.style.display = 'none'; });
+  }
+
+  // Approver-only controls: Approve / Reject buttons on changes.
+  // These are rendered dynamically via loadChanges() — openModal gate below
+  // removes them after render. Also hide any with data-requires-role=approver.
+  if (!isApprover) {
+    document.querySelectorAll("[data-requires-role='approver']").forEach(el => {
+      el.style.display = 'none';
+    });
+    // Intercept dynamically-rendered approve/reject controls.
+    const observer = new MutationObserver(() => {
+      document.querySelectorAll(".btn-approve, .btn-reject").forEach(el => {
+        el.style.display = 'none';
+      });
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+  }
+
+  // Expose for debugging
+  window.__rbacRoles = roles;
+}
 </script>
 
 </body>

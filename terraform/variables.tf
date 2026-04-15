@@ -187,9 +187,39 @@ variable "ad_dns_register" {
 }
 
 variable "ad_admin_groups" {
-  description = "Comma-separated AD groups allowed to access the Admin Command Center (e.g., 'Domain Admins,IT Administrators')"
+  description = "Comma-separated AD groups for the Governance Hub 'admin' role (CRUD except approvals)."
   type        = string
-  default     = "Domain Admins"
+  default     = "InsideLLM-Admin"
+}
+
+variable "ad_view_groups" {
+  description = "Comma-separated AD groups for the Governance Hub 'view' role (GET-only)."
+  type        = string
+  default     = "InsideLLM-View"
+}
+
+variable "ad_approver_groups" {
+  description = "Comma-separated AD groups for the Governance Hub 'approver' role (change approve/reject)."
+  type        = string
+  default     = "InsideLLM-Approve"
+}
+
+variable "oidc_view_group_ids" {
+  description = "OIDC group object IDs (GUIDs) mapped to the 'view' role."
+  type        = list(string)
+  default     = []
+}
+
+variable "oidc_admin_group_ids" {
+  description = "OIDC group object IDs (GUIDs) mapped to the 'admin' role."
+  type        = list(string)
+  default     = []
+}
+
+variable "oidc_approver_group_ids" {
+  description = "OIDC group object IDs (GUIDs) mapped to the 'approver' role."
+  type        = list(string)
+  default     = []
 }
 
 variable "dc_dns_servers" {

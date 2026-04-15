@@ -1325,6 +1325,11 @@ knowledge needed to configure -- just fill in the form and click Download.
 ```powershell
 # 1. Open html/Setup.html in your browser and generate terraform.tfvars
 #    Save it to the terraform/ directory
+#    NOTE: Set `owner` to your real org name (e.g. "Uniformedi LLC"). It is a
+#    label only — stamped into the self-signed TLS cert's O= field and
+#    deployment metadata — NOT a Linux user. Leaving it as "CHANGE_ME" works
+#    but shows up in browser cert dialogs. /opt/InsideLLM is always root-owned
+#    regardless of this value.
 
 # 2. Run prerequisites + deploy (requires admin)
 .\scripts\SetupInstall.ps1
@@ -1844,6 +1849,70 @@ Open WebUI Tool for planning deployments:
 - `estimate_costs` — monthly cost projections by user count and model tier
 - `recommend_config` — optimized settings for industry + compliance level
 - `plan_fleet` — multi-instance architecture with per-instance configurations
+
+---
+
+## 15a. Gov-Hub Role-Based Access
+
+The Governance Hub enforces three RBAC roles on its APIs and admin UI:
+
+| Role       | Permissions                                      | Default AD group    | OIDC override variable        |
+|------------|--------------------------------------------------|---------------------|-------------------------------|
+| `view`     | GET-only across all gov-hub endpoints            | `InsideLLM-View`    | `oidc_view_group_ids`         |
+| `admin`    | CRUD everywhere *except* change approve/reject   | `InsideLLM-Admin`   | `oidc_admin_group_ids`        |
+| `approver` | `POST /api/v1/changes/{id}/approve` and `/reject`| `InsideLLM-Approve` | `oidc_approver_group_ids`     |
+
+A user's roles are the **union** of all matching groups; `admin` and `approver` both imply `view`. Users in no matching group receive HTTP 403.
+
+**OIDC overrides** take group object IDs (Azure AD GUIDs), matched against the `groups` claim in the id_token. Set them as lists in `terraform.tfvars`, e.g.:
+
+```hcl
+oidc_admin_group_ids = ["11111111-2222-3333-4444-555555555555"]
+```
+
+**Backcompat:** Deployments that set only `ad_admin_groups` continue to work — users in that group are granted all three roles, and a WARNING is logged the first time the fallback fires.
+
+### Break-Glass Local Account
+
+A static local account `insidellm-admin` is always available, independent of LDAP/OIDC health. Its password equals the current value of `LITELLM_MASTER_KEY` (in `/opt/InsideLLM/.env`). In Governance Hub it carries all three roles.
+
+- Use it to recover access when SSO/AD is broken.
+- Every successful login is recorded at INFO level in the gov-hub log **and** appended to `governance_audit_chain` with `event_type=break_glass_login` (tamper-evident SHA-256 chain).
+- **Security:** rotate `LITELLM_MASTER_KEY` after any incident use. The account cannot be disabled — it exists specifically for lockout recovery. Protect your master key accordingly.
+
+Authenticate via HTTP Basic:
+
+```bash
+curl -u insidellm-admin:$LITELLM_MASTER_KEY https://<vm>/governance/auth/token
+# → {"access_token":"<jwt>","token_type":"bearer","roles":["admin","approver","view"]}
+```
+
+Use the returned JWT as `Authorization: Bearer <jwt>` on subsequent API calls.
+
+### Break-Glass Admin Across Bundled Subsites
+
+In addition to Governance Hub, the post-deploy script seeds the same `insidellm-admin` / `$LITELLM_MASTER_KEY` account as a local administrator in every bundled service that maintains its own auth database. This gives operators a single emergency credential when SSO is down or a service's remote auth integration is misconfigured.
+
+| Service     | Login URL                         | Username          | Password              | Role/Scope         |
+|-------------|-----------------------------------|-------------------|-----------------------|--------------------|
+| Grafana     | `https://<vm>/grafana/login`      | `insidellm-admin` | `$LITELLM_MASTER_KEY` | Server admin       |
+| Open WebUI  | `https://<vm>/`                   | `insidellm-admin@local` | `$LITELLM_MASTER_KEY` | `admin`         |
+| LiteLLM UI  | `https://<vm>/litellm/ui`         | `insidellm-admin` | `$LITELLM_MASTER_KEY` | `proxy_admin`      |
+| Uptime Kuma | `https://<vm>/status/`            | `insidellm-admin` | `$LITELLM_MASTER_KEY` | Superadmin         |
+| pgAdmin     | `http://<vm>:5050`                | `insidellm-admin@local` | `$LITELLM_MASTER_KEY` | pgAdmin admin   |
+
+**Rotation.** To change the break-glass password:
+
+```bash
+# On the VM
+sudo sed -i 's/^LITELLM_MASTER_KEY=.*/LITELLM_MASTER_KEY=<new-value>/' /opt/InsideLLM/.env
+cd /opt/InsideLLM && sudo docker compose up -d
+sudo bash /opt/InsideLLM/post-deploy.sh    # re-seeds all five services idempotently
+```
+
+The seed logic is idempotent: on every deploy it updates the account's password in place if the master key has changed, and creates it if it's missing.
+
+**Security warning.** Compromise of `LITELLM_MASTER_KEY` compromises all five services plus the LiteLLM proxy itself. This account is intentionally un-disable-able — it exists only for lockout recovery. Treat the master key as a tier-0 secret: store it in a hardware-backed vault, restrict `/opt/InsideLLM/.env` to `root:root 0600`, and rotate immediately after any incident use or suspected exposure.
 
 ---
 

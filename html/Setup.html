@@ -691,6 +691,7 @@
     <div class="field">
       <label>Owner / Organization</label>
       <input type="text" id="owner" value="Your Company Name">
+      <div class="help">Label only — stamped into the self-signed TLS cert's <code>O=</code> (organization) field and recorded in deployment metadata. Not a Linux user and not tied to filesystem ownership (<code>/opt/InsideLLM</code> is always root-owned). Set to your real org name so browser cert dialogs don't show <code>CHANGE_ME</code>.</div>
     </div>
 
     <!-- Hyper-V specific fields -->

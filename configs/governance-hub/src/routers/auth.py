@@ -10,18 +10,30 @@ nginx calls GET /auth/validate as an auth_request subrequest.
 On 401, nginx redirects the user to GET /auth/login.
 """
 
+import base64
+import binascii
+import hmac
 import logging
 
 from fastapi import APIRouter, Cookie, Form, Request, Response
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from ..config import settings
+from ..db.local_db import AsyncSessionLocal
+from ..services.audit_chain import append_event
 from ..services.auth_service import (
     COOKIE_NAME,
     create_session_token,
     ldap_authenticate,
     validate_session_token,
 )
+from ..services.rbac import (
+    ALL_ROLES,
+    resolve_roles_from_ldap_groups,
+    resolve_roles_from_oidc_groups,
+)
+
+BREAK_GLASS_USER = "insidellm-admin"
 
 logger = logging.getLogger("governance-hub.auth")
 
@@ -82,6 +94,68 @@ def _render_login(error: str = "") -> HTMLResponse:
     ))
 
 
+# ── Break-glass (local admin) ────────────────────────────────────────────────
+
+async def _try_break_glass_basic(request: Request) -> str | None:
+    """
+    If the request carries Authorization: Basic insidellm-admin:<LITELLM_MASTER_KEY>,
+    mint a JWT with all roles, log to governance audit chain, and return the token.
+    Returns None if break-glass does not apply.
+    """
+    header = request.headers.get("authorization", "")
+    if not header.lower().startswith("basic "):
+        return None
+
+    master_key = settings.litellm_master_key or ""
+    if not master_key:
+        return None
+
+    try:
+        raw = base64.b64decode(header.split(" ", 1)[1].strip(), validate=True).decode("utf-8")
+    except (binascii.Error, UnicodeDecodeError):
+        return None
+
+    if ":" not in raw:
+        return None
+    user, _, pw = raw.partition(":")
+    if user != BREAK_GLASS_USER:
+        return None
+    # Constant-time compare
+    if not hmac.compare_digest(pw, master_key):
+        logger.warning("Break-glass login rejected: bad password")
+        return None
+
+    token = create_session_token(
+        username=BREAK_GLASS_USER,
+        groups=["break-glass"],
+        roles=list(ALL_ROLES),
+        email="",
+        name="InsideLLM Break-Glass Admin",
+    )
+
+    client_ip = request.client.host if request.client else "unknown"
+    logger.info(f"Break-glass login: user={BREAK_GLASS_USER} ip={client_ip}")
+
+    # Best-effort audit chain insert
+    try:
+        async with AsyncSessionLocal() as db:
+            await append_event(
+                db,
+                event_type="break_glass_login",
+                event_id=None,
+                payload={
+                    "user": BREAK_GLASS_USER,
+                    "ip": client_ip,
+                    "user_agent": request.headers.get("user-agent", ""),
+                },
+            )
+            await db.commit()
+    except Exception as e:
+        logger.error(f"Failed to record break-glass audit event: {e}")
+
+    return token
+
+
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @router.get("/validate")
@@ -128,10 +202,21 @@ async def login_page(request: Request):
 
 
 @router.post("/login")
-async def login_submit(username: str = Form(...), password: str = Form(...)):
+async def login_submit(request: Request, username: str = Form(None), password: str = Form(None)):
     """
-    LDAP login form submission. Authenticates against AD, sets session cookie.
+    Login submission. Try break-glass Basic auth first; then LDAP form flow.
     """
+    # Break-glass (Basic auth) — works in any admin_auth_mode, always on.
+    bg_token = await _try_break_glass_basic(request)
+    if bg_token:
+        response = RedirectResponse("/admin", status_code=302)
+        response.set_cookie(
+            COOKIE_NAME, bg_token,
+            httponly=True, secure=True, samesite="lax",
+            max_age=8 * 3600, path="/",
+        )
+        return response
+
     if settings.admin_auth_mode != "ldap":
         return RedirectResponse("/admin", status_code=302)
 
@@ -140,11 +225,15 @@ async def login_submit(username: str = Form(...), password: str = Form(...)):
 
     success, groups = ldap_authenticate(username, password)
     if not success:
-        return _render_login("Invalid credentials or insufficient permissions")
+        return _render_login("Invalid credentials")
 
-    # Create session and redirect to admin
+    roles = resolve_roles_from_ldap_groups(groups)
+    if not roles:
+        logger.warning(f"LDAP user {username} denied: no matching RBAC groups (groups={groups})")
+        return _render_login("Access denied: your account is not a member of any InsideLLM role group")
+
     clean_user = username.split("@")[0] if "@" in username else username
-    token = create_session_token(clean_user, groups)
+    token = create_session_token(clean_user, groups=groups, roles=roles, name=clean_user)
     response = RedirectResponse("/admin", status_code=302)
     response.set_cookie(
         COOKIE_NAME, token,
@@ -153,6 +242,23 @@ async def login_submit(username: str = Form(...), password: str = Form(...)):
         path="/",
     )
     return response
+
+
+@router.post("/token")
+async def api_token(request: Request):
+    """
+    API-friendly login. Supports:
+      - Break-glass: Authorization: Basic base64(insidellm-admin:<LITELLM_MASTER_KEY>)
+    Returns {access_token, token_type, roles} on success.
+    """
+    bg_token = await _try_break_glass_basic(request)
+    if bg_token:
+        return {
+            "access_token": bg_token,
+            "token_type": "bearer",
+            "roles": list(ALL_ROLES),
+        }
+    return JSONResponse({"detail": "Invalid credentials"}, status_code=401)
 
 
 @router.get("/callback")
@@ -191,9 +297,20 @@ async def oidc_callback(request: Request, code: str = "", state: str = ""):
 
     # Extract user info
     username = claims.get("preferred_username") or claims.get("email") or claims.get("sub", "unknown")
-    groups = claims.get("groups", [])
+    email = claims.get("email", "")
+    display_name = claims.get("name", "") or username
+    groups = claims.get("groups", []) or []
 
-    token = create_session_token(username, groups)
+    roles = resolve_roles_from_oidc_groups(groups)
+    if not roles:
+        logger.warning(f"OIDC user {username} denied: no matching RBAC groups (groups={groups})")
+        return HTMLResponse(
+            "Access denied: your account is not a member of any InsideLLM role group. "
+            "<a href='/auth/login'>Try again</a>",
+            status_code=403,
+        )
+
+    token = create_session_token(username, groups=groups, roles=roles, email=email, name=display_name)
     response = RedirectResponse("/admin", status_code=302)
     response.set_cookie(
         COOKIE_NAME, token,
@@ -228,5 +345,8 @@ async def whoami(request: Request):
     return {
         "authenticated": True,
         "username": claims.get("sub", ""),
+        "email": claims.get("email", ""),
+        "name": claims.get("name", ""),
         "groups": claims.get("groups", []),
+        "roles": claims.get("roles", []),
     }

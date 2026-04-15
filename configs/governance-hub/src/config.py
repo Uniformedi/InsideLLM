@@ -1,3 +1,4 @@
+from pydantic import Field
 from pydantic_settings import BaseSettings
 
 
@@ -56,23 +57,62 @@ class Settings(BaseSettings):
 
     # LDAP / Active Directory (when admin_auth_mode = "ldap")
     ad_domain: str = ""
-    ad_admin_groups: str = "Domain Admins"  # comma-separated groups allowed access
+    ad_admin_groups: str = "InsideLLM-Admin"  # CRUD role; comma-separated
+    ad_view_groups: str = "InsideLLM-View"  # GET-only role; comma-separated
+    ad_approver_groups: str = "InsideLLM-Approve"  # change approval role; comma-separated
 
     # OIDC (when admin_auth_mode = "oidc")
     oidc_issuer_url: str = ""
     oidc_client_id: str = ""
     oidc_client_secret: str = ""
+    # OIDC group GUIDs (Azure AD object IDs) mapped to each RBAC role.
+    # Stored as comma-separated strings (docker-compose join); parsed via properties below.
+    oidc_view_group_ids: str = ""
+    oidc_admin_group_ids: str = ""
+    oidc_approver_group_ids: str = ""
+
+    # Break-glass local account (always-on; password == LITELLM_MASTER_KEY).
+    # Read from the plain LITELLM_MASTER_KEY env var (no GOVERNANCE_HUB_ prefix).
+    litellm_master_key: str = Field(default="", validation_alias="LITELLM_MASTER_KEY")
 
     # Chat (Mattermost embed)
     chat_enable: bool = False
     chat_team_name: str = "insidellm"
     chat_default_channel: str = "general"
 
-    model_config = {"env_prefix": "GOVERNANCE_HUB_"}
+    model_config = {"env_prefix": "GOVERNANCE_HUB_", "populate_by_name": True}
 
     @property
     def supervisor_email_list(self) -> list[str]:
         return [e.strip() for e in self.supervisor_emails.split(",") if e.strip()]
+
+    @staticmethod
+    def _split_csv(value: str) -> list[str]:
+        return [v.strip() for v in value.split(",") if v.strip()]
+
+    @property
+    def ad_view_group_list(self) -> list[str]:
+        return self._split_csv(self.ad_view_groups)
+
+    @property
+    def ad_admin_group_list(self) -> list[str]:
+        return self._split_csv(self.ad_admin_groups)
+
+    @property
+    def ad_approver_group_list(self) -> list[str]:
+        return self._split_csv(self.ad_approver_groups)
+
+    @property
+    def oidc_view_group_id_list(self) -> list[str]:
+        return self._split_csv(self.oidc_view_group_ids)
+
+    @property
+    def oidc_admin_group_id_list(self) -> list[str]:
+        return self._split_csv(self.oidc_admin_group_ids)
+
+    @property
+    def oidc_approver_group_id_list(self) -> list[str]:
+        return self._split_csv(self.oidc_approver_group_ids)
 
     @property
     def central_db_url(self) -> str:

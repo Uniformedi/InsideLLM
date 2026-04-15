@@ -2,6 +2,7 @@ apiVersion: 1
 
 datasources:
   - name: Loki
+    uid: Loki
     type: loki
     access: proxy
     url: http://loki:3100
@@ -9,7 +10,8 @@ datasources:
     editable: false
 
   - name: PostgreSQL
-    type: postgres
+    uid: PostgreSQL
+    type: grafana-postgresql-datasource
     url: postgres:5432
     database: litellm
     user: litellm

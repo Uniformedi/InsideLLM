@@ -335,6 +335,11 @@ locals {
     admin_auth_mode    = var.sso_provider != "none" ? "oidc" : var.ad_domain_join ? "ldap" : "none"
     ad_domain          = var.vm_domain
     ad_admin_groups    = var.ad_admin_groups
+    ad_view_groups     = var.ad_view_groups
+    ad_approver_groups = var.ad_approver_groups
+    oidc_view_group_ids     = join(",", var.oidc_view_group_ids)
+    oidc_admin_group_ids    = join(",", var.oidc_admin_group_ids)
+    oidc_approver_group_ids = join(",", var.oidc_approver_group_ids)
     dc_dns_servers     = var.dc_dns_servers
     ldap_enable_services  = var.ldap_enable_services
     ldap_bind_dn          = var.ldap_bind_dn
@@ -479,6 +484,11 @@ locals {
     dc_dns_servers               = var.dc_dns_servers
     ad_domain                    = var.vm_domain
     ad_admin_groups              = var.ad_admin_groups
+    ad_view_groups               = var.ad_view_groups
+    ad_approver_groups           = var.ad_approver_groups
+    oidc_view_group_ids          = join(",", var.oidc_view_group_ids)
+    oidc_admin_group_ids         = join(",", var.oidc_admin_group_ids)
+    oidc_approver_group_ids      = join(",", var.oidc_approver_group_ids)
     ldap_enable_services         = var.ldap_enable_services
     ldap_bind_dn                 = var.ldap_bind_dn
     ldap_bind_password           = var.ldap_bind_password

@@ -38,6 +38,11 @@ app.openapi = custom_openapi
 
 if settings.admin_auth_mode != "none":
     app.include_router(auth.router)
+    # Global RBAC middleware — enforces view on GETs and admin on mutations,
+    # method-based. Exempts /auth/*, /health, /, docs. The changes router
+    # explicitly overrides approve/reject to require the approver role.
+    from .services.rbac import rbac_middleware
+    app.middleware("http")(rbac_middleware)
 
 app.include_router(sync.router)
 app.include_router(changes.router)

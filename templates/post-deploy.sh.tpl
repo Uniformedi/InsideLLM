@@ -779,6 +779,249 @@ log "Systemd service created and enabled"
 VM_IP=$(hostname -I | awk '{print $1}')
 
 log ""
+log "Seeding Open WebUI model visibility (public)..."
+# Mark all models surfaced by LiteLLM as public so regular users see them.
+# Idempotent — re-running updates the same rows. Safe if OWUI isn't up yet
+# (we retry a few times).
+docker exec insidellm-open-webui python3 <<'PYEOF' || log "  [warn] model-visibility seed failed (non-fatal)"
+import os, sys, time, json
+from urllib import request, error
+
+base = "http://litellm:4000/v1"
+key = os.environ.get("OPENAI_API_KEY", "")
+if not key:
+    print("no OPENAI_API_KEY; skipping"); sys.exit(0)
+
+# Fetch models from LiteLLM
+def fetch():
+    req = request.Request(base + "/models", headers={"Authorization": f"Bearer {key}"})
+    with request.urlopen(req, timeout=5) as r:
+        return json.load(r).get("data", [])
+
+models = []
+for attempt in range(6):
+    try:
+        models = fetch(); break
+    except Exception as e:
+        print(f"litellm models fetch retry {attempt}: {e}"); time.sleep(5)
+
+if not models:
+    print("no models found"); sys.exit(0)
+
+# Mark each model public via Open WebUI internal DB
+sys.path.insert(0, "/app/backend")
+try:
+    from open_webui.models.models import Models, ModelForm, ModelMeta, ModelParams
+except Exception as e:
+    print(f"open_webui import failed: {e}"); sys.exit(0)
+
+for m in models:
+    mid = m["id"]
+    try:
+        existing = Models.get_model_by_id(mid)
+        if existing:
+            Models.update_model_by_id(mid, ModelForm(
+                id=mid, name=existing.name or mid,
+                meta=existing.meta or ModelMeta(),
+                params=existing.params or ModelParams(),
+                access_control=None,  # None == public in OWUI
+                is_active=True,
+            ))
+            print(f"updated (public): {mid}")
+        else:
+            Models.insert_new_model(ModelForm(
+                id=mid, name=mid,
+                meta=ModelMeta(),
+                params=ModelParams(),
+                access_control=None,
+                is_active=True,
+            ), user_id="system")
+            print(f"created (public): {mid}")
+    except Exception as e:
+        print(f"failed {mid}: {e}")
+PYEOF
+log "  done."
+
+# ---------------------------------------------------------------------------
+# Break-glass local admin account
+#
+# Seeds a single local admin — username `insidellm-admin`, password =
+# LITELLM_MASTER_KEY — in every bundled service that has its own local auth
+# DB. Idempotent: re-running after a master-key rotation updates passwords
+# in place. Each block is fail-soft (non-fatal) so one bad service can't
+# abort the deploy. Never echo the password to the log.
+# ---------------------------------------------------------------------------
+log ""
+log "Seeding break-glass admin (insidellm-admin) across bundled services..."
+
+# Load master key from .env without printing it.
+BG_USER="insidellm-admin"
+BG_PASS="$(grep -E '^LITELLM_MASTER_KEY=' /opt/InsideLLM/.env | head -n1 | cut -d= -f2- | tr -d '\r\n' | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'\$//")"
+# Grafana admin password is used to auth into Grafana's admin API.
+GF_ADMIN_PASS="$(grep -E '^GRAFANA_ADMIN_PASSWORD=' /opt/InsideLLM/.env | head -n1 | cut -d= -f2- | tr -d '\r\n' | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'\$//")"
+
+if [ -z "$BG_PASS" ]; then
+  log "  [warn] LITELLM_MASTER_KEY not found in /opt/InsideLLM/.env; skipping break-glass seed"
+else
+
+  # --- Grafana ---------------------------------------------------------------
+  if docker ps --format '{{.Names}}' | grep -q '^insidellm-grafana$'; then
+    log "  [grafana] seeding break-glass admin..."
+    (
+      set -e
+      GF_URL="http://localhost:3000"
+      # Wait briefly for Grafana API
+      for i in 1 2 3 4 5 6; do
+        if docker exec insidellm-grafana wget -q --spider "$GF_URL/api/health" 2>/dev/null; then break; fi
+        sleep 3
+      done
+      # Look up user by login (auth as admin:GF_ADMIN_PASS)
+      USER_JSON=$(docker exec -e U="$BG_USER" -e P="$GF_ADMIN_PASS" insidellm-grafana \
+        sh -c 'curl -sf -u "admin:$P" "http://localhost:3000/api/users/lookup?loginOrEmail=$U"' 2>/dev/null || echo "")
+      if echo "$USER_JSON" | grep -q '"id"'; then
+        UID_GF=$(echo "$USER_JSON" | sed -n 's/.*"id":\([0-9]*\).*/\1/p' | head -n1)
+        # Update password
+        docker exec -e P="$GF_ADMIN_PASS" -e NEWPW="$BG_PASS" insidellm-grafana \
+          sh -c 'curl -sf -u "admin:$P" -H "Content-Type: application/json" -X PUT "http://localhost:3000/api/admin/users/'"$UID_GF"'/password" -d "{\"password\":\"$NEWPW\"}"' >/dev/null
+        # Ensure Grafana server-admin flag
+        docker exec -e P="$GF_ADMIN_PASS" insidellm-grafana \
+          sh -c 'curl -sf -u "admin:$P" -H "Content-Type: application/json" -X PUT "http://localhost:3000/api/admin/users/'"$UID_GF"'/permissions" -d "{\"isGrafanaAdmin\":true}"' >/dev/null
+        log "    [grafana] updated break-glass admin password"
+      else
+        # Create user
+        docker exec -e U="$BG_USER" -e P="$GF_ADMIN_PASS" -e NEWPW="$BG_PASS" insidellm-grafana \
+          sh -c 'curl -sf -u "admin:$P" -H "Content-Type: application/json" -X POST "http://localhost:3000/api/admin/users" -d "{\"name\":\"InsideLLM Break-Glass\",\"login\":\"$U\",\"email\":\"insidellm-admin@local\",\"password\":\"$NEWPW\"}"' >/dev/null
+        NEW_JSON=$(docker exec -e U="$BG_USER" -e P="$GF_ADMIN_PASS" insidellm-grafana \
+          sh -c 'curl -sf -u "admin:$P" "http://localhost:3000/api/users/lookup?loginOrEmail=$U"')
+        UID_GF=$(echo "$NEW_JSON" | sed -n 's/.*"id":\([0-9]*\).*/\1/p' | head -n1)
+        docker exec -e P="$GF_ADMIN_PASS" insidellm-grafana \
+          sh -c 'curl -sf -u "admin:$P" -H "Content-Type: application/json" -X PUT "http://localhost:3000/api/admin/users/'"$UID_GF"'/permissions" -d "{\"isGrafanaAdmin\":true}"' >/dev/null
+        log "    [grafana] seeded new break-glass admin"
+      fi
+    ) || log "  [warn] break-glass seed for Grafana failed (non-fatal)"
+  fi
+
+  # --- Open WebUI ------------------------------------------------------------
+  if docker ps --format '{{.Names}}' | grep -q '^insidellm-open-webui$'; then
+    log "  [open-webui] seeding break-glass admin..."
+    docker exec -e BG_USER="$BG_USER" -e BG_PASS="$BG_PASS" insidellm-open-webui python3 <<'PYEOF' >> "$LOG" 2>&1 || log "  [warn] break-glass seed for Open WebUI failed (non-fatal)"
+import os, sys, time, uuid
+sys.path.insert(0, "/app/backend")
+from open_webui.models.users import Users
+from open_webui.models.auths import Auths
+from open_webui.utils.auth import get_password_hash
+
+u = os.environ["BG_USER"]
+p = os.environ["BG_PASS"]
+email = f"{u}@local"
+pw_hash = get_password_hash(p)
+
+existing = Users.get_user_by_email(email)
+if existing:
+    # Update role to admin and reset password via Auths table.
+    Users.update_user_role_by_id(existing.id, "admin")
+    try:
+        Auths.update_user_password_by_id(existing.id, pw_hash)
+    except Exception:
+        # Older API
+        Auths.update_password_by_id(existing.id, pw_hash)
+    print("open-webui: updated break-glass admin")
+else:
+    uid = str(uuid.uuid4())
+    Auths.insert_new_auth(
+        email=email,
+        password=pw_hash,
+        name="InsideLLM Break-Glass",
+        profile_image_url="/user.png",
+        role="admin",
+    )
+    print("open-webui: created break-glass admin")
+PYEOF
+  fi
+
+  # --- LiteLLM ---------------------------------------------------------------
+  if docker ps --format '{{.Names}}' | grep -q '^insidellm-litellm$'; then
+    log "  [litellm] seeding break-glass admin user row..."
+    (
+      set -e
+      EXIST=$(curl -sf -H "Authorization: Bearer $LITELLM_KEY" \
+        "$LITELLM_URL/user/info?user_id=$BG_USER" 2>/dev/null || echo "")
+      if echo "$EXIST" | grep -q '"user_id"'; then
+        curl -sf -X POST "$LITELLM_URL/user/update" \
+          -H "Authorization: Bearer $LITELLM_KEY" \
+          -H "Content-Type: application/json" \
+          -d "{\"user_id\":\"$BG_USER\",\"user_role\":\"proxy_admin\",\"user_email\":\"insidellm-admin@local\"}" >/dev/null
+        log "    [litellm] updated break-glass admin user (proxy_admin)"
+      else
+        curl -sf -X POST "$LITELLM_URL/user/new" \
+          -H "Authorization: Bearer $LITELLM_KEY" \
+          -H "Content-Type: application/json" \
+          -d "{\"user_id\":\"$BG_USER\",\"user_role\":\"proxy_admin\",\"user_email\":\"insidellm-admin@local\",\"auto_create_key\":false}" >/dev/null
+        log "    [litellm] created break-glass admin user (proxy_admin)"
+      fi
+      # Note: the master key itself already grants proxy_admin; no virtual
+      # key is minted here to avoid duplicating the secret material.
+    ) || log "  [warn] break-glass seed for LiteLLM failed (non-fatal)"
+  fi
+
+  # --- Uptime Kuma -----------------------------------------------------------
+  if docker ps --format '{{.Names}}' | grep -q '^insidellm-uptime-kuma$'; then
+    log "  [uptime-kuma] seeding break-glass admin..."
+    (
+      set -e
+      # Try the first-run setup API first (works only when no user exists).
+      SETUP_RESP=$(docker exec -e U="$BG_USER" -e P="$BG_PASS" insidellm-uptime-kuma \
+        sh -c 'wget -qO- --header="Content-Type: application/json" --post-data="{\"username\":\"$U\",\"password\":\"$P\"}" http://localhost:3001/api/setup 2>/dev/null || true')
+      # If a user already exists, patch sqlite directly. Kuma uses bcryptjs
+      # hashes in the `user` table (`password` column).
+      COUNT=$(docker exec insidellm-uptime-kuma sh -c 'sqlite3 /app/data/kuma.db "SELECT COUNT(*) FROM user;"' 2>/dev/null || echo "0")
+      if [ "$COUNT" -gt 0 ]; then
+        # Generate bcrypt hash inside the Kuma container (node + bcryptjs bundled).
+        HASH=$(docker exec -e PW="$BG_PASS" insidellm-uptime-kuma \
+          node -e 'const b=require("bcryptjs");process.stdout.write(b.hashSync(process.env.PW,10));' 2>/dev/null)
+        if [ -n "$HASH" ]; then
+          # Upsert: update if exists, else insert. Using parameterized-ish single statement.
+          docker exec -e U="$BG_USER" -e H="$HASH" insidellm-uptime-kuma \
+            sh -c 'sqlite3 /app/data/kuma.db "INSERT INTO user (username, password, active) VALUES ('"'"'$U'"'"', '"'"'$H'"'"', 1) ON CONFLICT(username) DO UPDATE SET password='"'"'$H'"'"', active=1;"' >/dev/null
+          log "    [uptime-kuma] upserted break-glass admin via sqlite"
+        else
+          log "  [warn] break-glass seed for Uptime Kuma failed (bcrypt hash) (non-fatal)"
+        fi
+      else
+        log "    [uptime-kuma] setup API called for first-run admin"
+      fi
+    ) || log "  [warn] break-glass seed for Uptime Kuma failed (non-fatal)"
+  fi
+
+  # --- pgAdmin ---------------------------------------------------------------
+  if docker ps --format '{{.Names}}' | grep -q '^insidellm-pgadmin$'; then
+    log "  [pgadmin] seeding break-glass admin..."
+    (
+      set -e
+      PGA_EMAIL="insidellm-admin@local"
+      # Recent pgAdmin images ship /pgadmin4/setup.py with subcommands
+      # `add-user` / `update-user`. Try update first (idempotent-friendly),
+      # fall back to add on "not found".
+      if docker exec insidellm-pgadmin sh -c "test -f /pgadmin4/setup.py" 2>/dev/null; then
+        if docker exec -e E="$PGA_EMAIL" -e P="$BG_PASS" insidellm-pgadmin \
+             sh -c 'python /pgadmin4/setup.py update-user "$E" --password "$P" 2>/dev/null'; then
+          log "    [pgadmin] updated break-glass admin password"
+        else
+          docker exec -e E="$PGA_EMAIL" -e P="$BG_PASS" insidellm-pgadmin \
+            sh -c 'python /pgadmin4/setup.py add-user "$E" "$P" --admin' >/dev/null
+          log "    [pgadmin] created break-glass admin"
+        fi
+      else
+        log "  [warn] /pgadmin4/setup.py not found; skipping pgAdmin break-glass seed (non-fatal)"
+      fi
+    ) || log "  [warn] break-glass seed for pgAdmin failed (non-fatal)"
+  fi
+
+  unset BG_PASS GF_ADMIN_PASS
+  log "Break-glass admin seeding complete."
+fi
+
+log ""
 log "=========================================="
 log "  Inside LLM — READY"
 log "=========================================="
@@ -808,6 +1051,8 @@ log "    (first user to sign up becomes Mattermost sysadmin)"
 log ""
 log "  First user to register on Open WebUI"
 log "  becomes the admin."
+log ""
+log "  Break-glass admin: insidellm-admin (pwd=LITELLM_MASTER_KEY — rotate after incident)"
 log ""
 log "  Claude Code CLI config:"
 log "    export ANTHROPIC_BASE_URL=http://${vm_fqdn}:4000"

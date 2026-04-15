@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db.local_db import get_local_db
 from ..middleware.auth import verify_api_key, verify_supervisor
+from ..services.rbac import require_approver
 from ..schemas.changes import ApprovalRequest, ChangeCreate, ChangeResponse, ImplementRequest
 from ..services.change_service import (
     approve_or_reject,
@@ -42,12 +43,26 @@ async def get_change(proposal_id: int, db: AsyncSession = Depends(get_local_db))
     return ChangeResponse.model_validate(proposal)
 
 
-@router.post("/{proposal_id}/approve", dependencies=[Depends(verify_supervisor)])
+@router.post("/{proposal_id}/approve", dependencies=[Depends(verify_supervisor), require_approver])
 async def approve_change(
     proposal_id: int,
     approval: ApprovalRequest,
     db: AsyncSession = Depends(get_local_db),
 ) -> ChangeResponse:
+    proposal = await approve_or_reject(db, proposal_id, approval)
+    if not proposal:
+        raise HTTPException(status_code=400, detail="Proposal not found or not in pending status")
+    return ChangeResponse.model_validate(proposal)
+
+
+@router.post("/{proposal_id}/reject", dependencies=[Depends(verify_supervisor), require_approver])
+async def reject_change(
+    proposal_id: int,
+    approval: ApprovalRequest,
+    db: AsyncSession = Depends(get_local_db),
+) -> ChangeResponse:
+    # Force the action to 'reject' regardless of payload.
+    approval = approval.model_copy(update={"action": "reject"}) if hasattr(approval, "model_copy") else approval
     proposal = await approve_or_reject(db, proposal_id, approval)
     if not proposal:
         raise HTTPException(status_code=400, detail="Proposal not found or not in pending status")
