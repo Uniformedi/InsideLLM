@@ -392,14 +392,18 @@ write_files:
       ${indent(6, promtail_config)}
 
   # --- Grafana datasources ---
-  - path: /opt/InsideLLM/grafana/provisioning/datasources.yml
+  # Grafana scans /etc/grafana/provisioning/{datasources,dashboards,...}/
+  # for *.yaml. The yaml files MUST live inside their typed subdirectory;
+  # putting them directly under provisioning/ makes Grafana log
+  # "no such file or directory" and silently provision nothing.
+  - path: /opt/InsideLLM/grafana/provisioning/datasources/datasources.yml
     permissions: "0644"
     owner: root:root
     content: |
       ${indent(6, grafana_datasources_yml)}
 
   # --- Grafana dashboard provisioning ---
-  - path: /opt/InsideLLM/grafana/provisioning/dashboards.yml
+  - path: /opt/InsideLLM/grafana/provisioning/dashboards/dashboards.yml
     permissions: "0644"
     owner: root:root
     content: |
