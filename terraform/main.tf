@@ -418,6 +418,7 @@ locals {
 locals {
   cloud_init_userdata = templatefile("${path.module}/../configs/cloud-init/user-data.yaml.tpl", {
     hostname           = var.vm_hostname
+    vm_hostname        = var.vm_hostname
     fqdn               = local.vm_fqdn
     ssh_admin_user     = var.ssh_admin_user
     ssh_public_key     = local.ssh_public_key
