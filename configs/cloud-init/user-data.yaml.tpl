@@ -140,6 +140,15 @@ write_files:
     content: |
       ${indent(6, admin_html)}
 
+  # --- Governance framework markdown (Governance Hub parses this into DB
+  # sections when an admin clicks "Seed Framework"). Mounted into the
+  # governance-hub container at /app/framework read-only via docker-compose.
+  - path: /opt/InsideLLM/governance-hub/framework/AI_Governance_Framework.md
+    permissions: "0644"
+    owner: root:root
+    content: |
+      ${indent(6, framework_md)}
+
   # --- Setup Wizard (used for clone-to-wizard flow) ---
   - path: /opt/InsideLLM/Setup.html
     permissions: "0644"

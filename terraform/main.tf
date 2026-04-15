@@ -418,6 +418,7 @@ locals {
     provision_owui_svc_sh = file("${path.module}/../scripts/provision-owui-service-account.sh")
     ad_join_runner_sh     = file("${path.module}/../scripts/ad-join-runner.sh")
     admin_html         = file("${path.module}/../html/admin.html")
+    framework_md       = file("${path.module}/../AI_Governance_Framework.md")
     humility_callback_py    = file("${path.module}/../configs/litellm/callbacks/humility_prompt.py")
     humility_guardrail_py   = file("${path.module}/../configs/litellm/callbacks/humility_guardrail.py")
     dlp_guardrail_py        = file("${path.module}/../configs/litellm/callbacks/dlp_guardrail.py")
