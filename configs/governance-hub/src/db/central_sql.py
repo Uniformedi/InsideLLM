@@ -55,7 +55,9 @@ class _PostgreSQL:
     list_instances = """
         SELECT instance_id, instance_name, industry, governance_tier, data_classification,
                schema_version, platform_version, last_sync_at, status, created_at
-        FROM governance_instances ORDER BY instance_name
+        FROM governance_instances
+        WHERE status = 'active'
+        ORDER BY instance_name
     """
 
     latest_telemetry = """
@@ -259,7 +261,9 @@ class _MSSQL:
     list_instances = """
         SELECT instance_id, instance_name, industry, governance_tier, data_classification,
                schema_version, platform_version, last_sync_at, status, created_at
-        FROM governance_instances ORDER BY instance_name
+        FROM governance_instances
+        WHERE status = 'active'
+        ORDER BY instance_name
     """
 
     latest_telemetry = """
