@@ -378,6 +378,19 @@ variable "litellm_master_key" {
   default     = ""
 }
 
+variable "litellm_salt_key" {
+  description = <<-EOT
+    LITELLM_SALT_KEY — used by LiteLLM to encrypt virtual API keys in its
+    database. Must remain stable across container recreates; if it changes,
+    previously issued virtual keys become unreadable. Auto-generated on first
+    deploy; for fleet deployments set this explicitly (same value on every VM
+    sharing a Postgres) or let each VM generate its own if DBs aren't shared.
+  EOT
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
 variable "litellm_default_model" {
   description = "Default model alias for LiteLLM routing"
   type        = string

@@ -10,6 +10,10 @@
 
 # --- Gateway / LLM API keys -------------------------------------------------
 LITELLM_MASTER_KEY=${litellm_master_key}
+# LITELLM_SALT_KEY encrypts virtual keys in LiteLLM's DB. Stability across
+# container recreates is critical — lose this and all previously-issued
+# virtual keys become unreadable.
+LITELLM_SALT_KEY=${litellm_salt_key}
 ANTHROPIC_API_KEY=${anthropic_api_key}
 OPENAI_API_KEY=${openai_api_key}
 GEMINI_API_KEY=${gemini_api_key}

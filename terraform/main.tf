@@ -12,6 +12,17 @@ resource "random_password" "litellm_master_key" {
   special = false
 }
 
+# LITELLM_SALT_KEY encrypts virtual API keys stored in LiteLLM's database.
+# Must be stable across container recreates — if it changes, previously
+# issued virtual keys become unreadable. Treat identically to master_key:
+# accept operator-provided value via var, generate a random one otherwise,
+# and carry through to /opt/InsideLLM/.env.
+resource "random_password" "litellm_salt_key" {
+  count   = var.litellm_salt_key == "" ? 1 : 0
+  length  = 32
+  special = false
+}
+
 resource "random_password" "postgres_password" {
   count   = var.postgres_password == "" ? 1 : 0
   length  = 24
@@ -42,6 +53,7 @@ resource "random_password" "governance_hub_secret" {
 
 locals {
   litellm_master_key = var.litellm_master_key != "" ? var.litellm_master_key : "sk-${random_password.litellm_master_key[0].result}"
+  litellm_salt_key   = var.litellm_salt_key != "" ? var.litellm_salt_key : random_password.litellm_salt_key[0].result
   postgres_password  = var.postgres_password != "" ? var.postgres_password : random_password.postgres_password[0].result
   webui_secret       = random_password.webui_secret.result
   xrdp_password      = random_password.xrdp_password.result
@@ -281,6 +293,7 @@ locals {
 locals {
   env_file = templatefile("${path.module}/../templates/env-file.tpl", {
     litellm_master_key     = local.litellm_master_key
+    litellm_salt_key       = local.litellm_salt_key
     anthropic_api_key      = var.anthropic_api_key
     openai_api_key         = var.openai_api_key
     gemini_api_key         = var.gemini_api_key
