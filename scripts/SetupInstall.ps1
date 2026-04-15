@@ -67,37 +67,77 @@ if ($hypervFeature.State -eq "Enabled") {
 # =============================================================================
 Write-Step "Configuring WinRM"
 
-# Enable PS Remoting
-Enable-PSRemoting -Force -SkipNetworkProfileCheck -ErrorAction SilentlyContinue
-Write-Ok "PS Remoting enabled"
+# Probe current state first. If everything is already in the shape we need,
+# we skip the config writes AND skip the service restart — important on
+# hosts that are actively serving another InsideLLM deployment, because
+# restarting WinRM can break existing PS-Remoting / Hyper-V sessions and
+# fails outright when dependent services are attached (Restart-Service
+# without -Force raises "can only be stopped if the Force flag is set").
+function Test-WinRMAlreadyConfigured {
+    try {
+        if (-not (Test-WSMan -ComputerName localhost -ErrorAction Stop)) { return $false }
+    } catch { return $false }
 
-# Configure WinRM for Terraform Hyper-V provider (HTTP on 5985)
-Set-Item WSMan:\localhost\Shell\MaxMemoryPerShellMB 1024 -ErrorAction SilentlyContinue
-Set-Item WSMan:\localhost\MaxTimeoutms 1800000 -ErrorAction SilentlyContinue
-try { Set-Item WSMan:\localhost\Client\TrustedHosts "*" -Force -ErrorAction Stop } catch { }
-Set-Item WSMan:\localhost\Service\Auth\Negotiate $true -ErrorAction SilentlyContinue
-Set-Item WSMan:\localhost\Service\Auth\Basic $true -ErrorAction SilentlyContinue
-Set-Item WSMan:\localhost\Service\AllowUnencrypted $true -ErrorAction SilentlyContinue
-Set-Item WSMan:\localhost\Client\AllowUnencrypted $true -ErrorAction SilentlyContinue
+    # HTTP listener on 5985 must exist
+    $listener = Get-WSManInstance -ResourceURI winrm/config/listener `
+        -SelectorSet @{Address="*";Transport="HTTP"} -ErrorAction SilentlyContinue
+    if (-not $listener) { return $false }
 
-# Configure via winrm command for settings not accessible via WSMan provider
-winrm set winrm/config/service '@{AllowUnencrypted="true"}' 2>$null
-winrm set winrm/config/service/auth '@{Basic="true";Negotiate="true"}' 2>$null
-winrm set winrm/config/client '@{AllowUnencrypted="true"}' 2>$null
+    # Service-side auth + transport flags must match what Terraform needs
+    $svc = Get-Item -Path WSMan:\localhost\Service -ErrorAction SilentlyContinue
+    try {
+        $au = (Get-Item WSMan:\localhost\Service\AllowUnencrypted).Value
+        $basic = (Get-Item WSMan:\localhost\Service\Auth\Basic).Value
+        $nego = (Get-Item WSMan:\localhost\Service\Auth\Negotiate).Value
+        if ($au -ne 'true' -or $basic -ne 'true' -or $nego -ne 'true') { return $false }
+    } catch { return $false }
 
-# Ensure HTTP listener exists on 5985
-$httpListener = Get-WSManInstance -ResourceURI winrm/config/listener -SelectorSet @{Address="*";Transport="HTTP"} -ErrorAction SilentlyContinue
-if (-not $httpListener) {
-    New-WSManInstance -ResourceURI winrm/config/listener -SelectorSet @{Address="*";Transport="HTTP"} -ValueSet @{Port=5985} -ErrorAction SilentlyContinue
-    Write-Ok "Created WinRM HTTP listener on port 5985"
-} else {
-    Write-Ok "WinRM HTTP listener already exists"
+    # TrustedHosts should include *
+    try {
+        $th = (Get-Item WSMan:\localhost\Client\TrustedHosts).Value
+        if ($th -notmatch '\*') { return $false }
+    } catch { return $false }
+
+    return $true
 }
 
-# Ensure WinRM service is running
-Set-Service WinRM -StartupType Automatic
-Restart-Service WinRM
-Write-Ok "WinRM configured and restarted"
+if (Test-WinRMAlreadyConfigured) {
+    Write-Ok "WinRM already configured — skipping reconfig and restart (existing deployments unaffected)"
+} else {
+    # Enable PS Remoting (idempotent — restarts WinRM internally on first run)
+    Enable-PSRemoting -Force -SkipNetworkProfileCheck -ErrorAction SilentlyContinue
+    Write-Ok "PS Remoting enabled"
+
+    # Configure WinRM for Terraform Hyper-V provider (HTTP on 5985)
+    Set-Item WSMan:\localhost\Shell\MaxMemoryPerShellMB 1024 -ErrorAction SilentlyContinue
+    Set-Item WSMan:\localhost\MaxTimeoutms 1800000 -ErrorAction SilentlyContinue
+    try { Set-Item WSMan:\localhost\Client\TrustedHosts "*" -Force -ErrorAction Stop } catch { }
+    Set-Item WSMan:\localhost\Service\Auth\Negotiate $true -ErrorAction SilentlyContinue
+    Set-Item WSMan:\localhost\Service\Auth\Basic $true -ErrorAction SilentlyContinue
+    Set-Item WSMan:\localhost\Service\AllowUnencrypted $true -ErrorAction SilentlyContinue
+    Set-Item WSMan:\localhost\Client\AllowUnencrypted $true -ErrorAction SilentlyContinue
+
+    # Configure via winrm command for settings not accessible via WSMan provider
+    winrm set winrm/config/service '@{AllowUnencrypted="true"}' 2>$null
+    winrm set winrm/config/service/auth '@{Basic="true";Negotiate="true"}' 2>$null
+    winrm set winrm/config/client '@{AllowUnencrypted="true"}' 2>$null
+
+    # Ensure HTTP listener exists on 5985
+    $httpListener = Get-WSManInstance -ResourceURI winrm/config/listener -SelectorSet @{Address="*";Transport="HTTP"} -ErrorAction SilentlyContinue
+    if (-not $httpListener) {
+        New-WSManInstance -ResourceURI winrm/config/listener -SelectorSet @{Address="*";Transport="HTTP"} -ValueSet @{Port=5985} -ErrorAction SilentlyContinue
+        Write-Ok "Created WinRM HTTP listener on port 5985"
+    } else {
+        Write-Ok "WinRM HTTP listener already exists"
+    }
+
+    # Ensure WinRM service is running. Pass -Force to Restart-Service so it
+    # can stop even when dependent services are attached (common on hosts
+    # that also run Hyper-V or IIS management).
+    Set-Service WinRM -StartupType Automatic
+    Restart-Service WinRM -Force
+    Write-Ok "WinRM configured and restarted"
+}
 
 # Test WinRM
 $winrmTest = Test-WSMan -ComputerName localhost -ErrorAction SilentlyContinue
