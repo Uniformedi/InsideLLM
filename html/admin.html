@@ -1935,9 +1935,13 @@ async function loadFleet() {
           <td>${score}</td>
           <td>${spend}</td>
           <td>${webhookCell}</td>
-          <td>${i._local ? '<span style="color:var(--text-muted);font-family:var(--font-mono);font-size:11px">Local</span>' :
+          <td>${i._local ?
+            `<div style="display:flex;gap:6px;flex-wrap:wrap">
+              <button class="btn btn-action" onclick="window.open('/governance/ad-join', '_blank')" title="Join or leave an Active Directory domain. Opens the Governance Hub AD form.">Manage AD</button>
+            </div>` :
             `<div style="display:flex;gap:6px;flex-wrap:wrap">
               <button class="btn btn-action" onclick="openCloneModal('${i.instance_id}','${nameEsc}')">Clone Config</button>
+              <button class="btn btn-action" onclick="remoteAdJoinHint('${nameEsc}')" title="AD membership is managed on each hub locally. Open that hub's own Governance Hub page.">Manage AD</button>
               <button class="btn btn-deny" onclick="deregisterInstance('${i.instance_id}','${nameEsc}')">Deregister</button>
             </div>`}</td>
         </tr>`;
@@ -2021,6 +2025,19 @@ async function editAlertWebhook(instanceId, instanceName, current) {
   } catch (e) {
     alert(`Save failed: ${e.message}`);
   }
+}
+
+function remoteAdJoinHint(instanceName) {
+  // Remote AD-join (from the central hub to a target hub) is queued as
+  // task H2 — needs a URL field on the instance record + authenticated RPC
+  // endpoint on each hub that forwards to its local AD request file.
+  // Until then, AD membership is managed on each hub individually.
+  alert(
+    `AD membership is managed locally on each hub.\n\n`
+    + `Open the Governance Hub on "${instanceName}" directly and use its `
+    + `AD Integration page to join or leave a domain.\n\n`
+    + `Cross-instance remote AD-join is on the roadmap (task H2).`
+  );
 }
 
 async function deregisterInstance(instanceId, instanceName) {
