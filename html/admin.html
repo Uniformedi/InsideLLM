@@ -446,13 +446,38 @@
 
     <!-- Framework Viewer -->
     <div class="gov-view active" id="gov-framework">
+      <!-- Explainer panel -->
+      <div style="background:var(--panel-2);border:1px solid var(--border);border-left:3px solid var(--cyan);border-radius:6px;padding:12px 16px;margin-bottom:14px;font-size:12px;line-height:1.55">
+        <div style="color:var(--cyan);font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px">About this view</div>
+        <div style="color:var(--text)">
+          The <strong>governance framework</strong> is the structured document that defines
+          your organization's AI governance rules: six pillars
+          (Philosophy / Industry / Data-class / Roles / Controls / Review),
+          data classifications, agentic-AI policies, and the compliance
+          sections you attest against over time.
+        </div>
+        <div style="color:var(--text-muted);margin-top:8px">
+          <strong style="color:var(--cyan);font-family:var(--font-mono)">Seed Framework</strong> parses the
+          <code style="background:var(--bg);padding:1px 6px;border-radius:3px">AI_Governance_Framework.md</code>
+          file shipped with this deployment and populates the database with every
+          section so it becomes navigable, attestable, and diffable. Re-seeding is
+          idempotent — existing attestations and change proposals stay attached to
+          their sections; only missing rows get inserted, and unchanged rows are
+          left alone.
+        </div>
+        <div style="color:var(--text-muted);margin-top:6px">
+          Run it once after a fresh deploy, and again whenever you edit the source
+          markdown (the version counter bumps on a content change so you can tell
+          which revision each attestation was made against).
+        </div>
+      </div>
       <div style="display:flex;gap:16px">
         <!-- Sidebar: section tree -->
-        <div style="flex:0 0 280px;max-height:70vh;overflow-y:auto;border-right:1px solid var(--border);padding-right:14px" id="frameworkTree">
+        <div style="flex:0 0 280px;max-height:60vh;overflow-y:auto;border-right:1px solid var(--border);padding-right:14px" id="frameworkTree">
           <div class="loading">Loading framework...</div>
         </div>
         <!-- Main content -->
-        <div style="flex:1;max-height:70vh;overflow-y:auto;padding:0 8px" id="frameworkContent">
+        <div style="flex:1;max-height:60vh;overflow-y:auto;padding:0 8px" id="frameworkContent">
           <div style="color:var(--text-muted);font-family:var(--font-mono);font-size:12px;padding:20px;text-align:center">
             Select a section from the tree to view its content and compliance status.
           </div>
@@ -1194,11 +1219,23 @@ async function submitAttestation(sectionId) {
 async function seedFramework() {
   const tree = document.getElementById('frameworkTree');
   tree.innerHTML = '<div class="loading">Seeding framework...</div>';
-  const res = await api('/api/v1/framework/seed');
-  if (res?.success) {
-    loadFrameworkTree();
-  } else {
-    tree.innerHTML = `<div class="loading" style="color:var(--red)">Seed failed: ${res?.message || 'Unknown error'}</div>`;
+  // /api/v1/framework/seed is POST, not GET — the generic api() helper
+  // does GET, so we call fetch directly here.
+  try {
+    const resp = await fetch(`${GOV()}/api/v1/framework/seed`, {
+      method: 'POST',
+      headers: { 'Accept': 'application/json' },
+      credentials: 'include',
+      signal: AbortSignal.timeout(60000),
+    });
+    const body = await resp.json().catch(() => ({}));
+    if (resp.ok && body.success !== false) {
+      loadFrameworkTree();
+    } else {
+      tree.innerHTML = `<div class="loading" style="color:var(--red)">Seed failed: ${body.message || body.detail || ('HTTP ' + resp.status)}</div>`;
+    }
+  } catch (e) {
+    tree.innerHTML = `<div class="loading" style="color:var(--red)">Seed failed: ${e.message}</div>`;
   }
 }
 
