@@ -457,19 +457,26 @@
           sections you attest against over time.
         </div>
         <div style="color:var(--text-muted);margin-top:8px">
-          <strong style="color:var(--cyan);font-family:var(--font-mono)">Seed Framework</strong> parses the
+          <strong style="color:var(--cyan);font-family:var(--font-mono)">Upload</strong> your
           <code style="background:var(--bg);padding:1px 6px;border-radius:3px">AI_Governance_Framework.md</code>
-          file shipped with this deployment and populates the database with every
-          section so it becomes navigable, attestable, and diffable. Re-seeding is
-          idempotent — existing attestations and change proposals stay attached to
-          their sections; only missing rows get inserted, and unchanged rows are
-          left alone.
+          — not shipped with the platform. Uploads land in the central Fleet DB so every
+          instance in the fleet pulls the same authoritative version automatically. Each
+          upload auto-increments the version counter; older versions are preserved for audit.
         </div>
         <div style="color:var(--text-muted);margin-top:6px">
-          Run it once after a fresh deploy, and again whenever you edit the source
-          markdown (the version counter bumps on a content change so you can tell
-          which revision each attestation was made against).
+          <strong style="color:var(--cyan);font-family:var(--font-mono)">Seed Framework</strong>
+          parses the current document and populates the navigable section tree.
+          Idempotent — existing attestations and change proposals stay attached;
+          only missing rows get inserted.
         </div>
+      </div>
+
+      <!-- Upload control -->
+      <div style="background:var(--panel-2);border:1px solid var(--border);border-radius:6px;padding:12px 16px;margin-bottom:14px;font-size:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <div id="frameworkDocStatus" style="flex:1;min-width:200px;color:var(--text-muted)">Loading document status&hellip;</div>
+        <input type="file" id="frameworkMdFile" accept=".md,.markdown,text/markdown,text/plain" style="display:none" onchange="handleFrameworkFileSelect(event)">
+        <button class="btn btn-action" onclick="document.getElementById('frameworkMdFile').click()">Upload .md</button>
+        <button class="btn btn-action" onclick="seedFramework()">Seed Framework</button>
       </div>
       <div style="display:flex;gap:16px">
         <!-- Sidebar: section tree -->
@@ -1062,7 +1069,7 @@ function switchGovView(name, el) {
   document.getElementById(`gov-${name}`).classList.add('active');
   if (el) el.classList.add('active');
 
-  if (name === 'framework' && !govViewLoaded.framework) { loadFrameworkTree(); govViewLoaded.framework = true; }
+  if (name === 'framework' && !govViewLoaded.framework) { loadFrameworkTree(); refreshFrameworkDocStatus(); govViewLoaded.framework = true; }
   if (name === 'compliance' && !govViewLoaded.compliance) { loadComplianceDashboard(); govViewLoaded.compliance = true; }
   if (name === 'changes') loadChanges('pending');
   if (name === 'keywords' && !govViewLoaded.keywords) { loadKeywordTemplates(); govViewLoaded.keywords = true; }
@@ -1214,6 +1221,56 @@ async function submitAttestation(sectionId) {
       result.innerHTML = `<span style="color:var(--red)">${res.detail || 'Failed'}</span>`;
     }
   } catch(e) { result.innerHTML = `<span style="color:var(--red)">Error: ${e.message}</span>`; }
+}
+
+async function refreshFrameworkDocStatus() {
+  const el = document.getElementById('frameworkDocStatus');
+  if (!el) return;
+  try {
+    const r = await fetch(`${GOV()}/api/v1/framework/document/current`, {credentials:'include'});
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    if (!d.exists) {
+      el.innerHTML = '<span style="color:var(--amber)">No framework document uploaded.</span> Upload one to enable seeding.';
+    } else {
+      const up = d.uploaded_at ? d.uploaded_at.slice(0,16).replace('T',' ') : '';
+      const fn = d.filename || 'AI_Governance_Framework.md';
+      const shaShort = (d.sha256 || '').slice(0,8);
+      el.innerHTML = `<strong>v${d.version}</strong> &middot; ${escapeHtml(fn)} &middot; <code style="font-size:11px;color:var(--text-muted)">sha256:${shaShort}</code> &middot; uploaded ${up} by ${escapeHtml(d.uploaded_by||'?')} from <code>${escapeHtml(d.uploaded_from_instance||'?')}</code>`;
+    }
+  } catch (e) {
+    el.innerHTML = '<span style="color:var(--amber)">Status fetch failed (central Fleet DB may not be configured).</span>';
+  }
+}
+
+function escapeHtml(s) { return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+async function handleFrameworkFileSelect(ev) {
+  const file = ev.target.files?.[0];
+  if (!file) return;
+  const tree = document.getElementById('frameworkTree');
+  tree.innerHTML = `<div class="loading">Uploading ${escapeHtml(file.name)}&hellip;</div>`;
+  try {
+    const content = await file.text();
+    const note = prompt('Optional note for this version (e.g. "Q2 revision, adds PHI section"):', '');
+    const r = await fetch(`${GOV()}/api/v1/framework/document`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      credentials: 'include',
+      body: JSON.stringify({content, filename: file.name, note: note || null}),
+    });
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      tree.innerHTML = `<div class="loading" style="color:var(--red)">Upload failed: ${escapeHtml(body.detail || 'HTTP ' + r.status)}</div>`;
+      return;
+    }
+    await refreshFrameworkDocStatus();
+    tree.innerHTML = `<div class="loading" style="color:var(--green)">Uploaded v${body.version}. Click Seed Framework to publish sections.</div>`;
+  } catch (e) {
+    tree.innerHTML = `<div class="loading" style="color:var(--red)">Upload failed: ${escapeHtml(e.message)}</div>`;
+  }
+  // Reset the input so the same file can be re-selected if needed
+  ev.target.value = '';
 }
 
 async function seedFramework() {

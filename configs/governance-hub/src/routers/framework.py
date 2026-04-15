@@ -240,20 +240,84 @@ async def submit_attestation(
 
 @router.post("/seed")
 async def seed_framework(db: AsyncSession = Depends(get_local_db)):
-    """Parse and seed framework sections from the markdown file."""
-    from ..services.framework_parser import seed_framework_sections
+    """Parse and seed framework sections.
 
-    # Run sync operation (parser uses sync DB calls)
+    Source precedence:
+      1. Central fleet DB (governance_framework_documents) — preferred;
+         ensures every instance in a fleet runs the same version.
+      2. Local file at settings.framework_path — fallback for legacy
+         deployments where the markdown was bundled in at deploy time.
+    Returns success:false with a clear message when neither source has
+    content, so the admin UI can show the Upload button instead of
+    looking broken.
+    """
+    from ..services.framework_parser import seed_framework_sections
+    from ..services.fleet_service import get_current_framework_document
     import asyncio
     from concurrent.futures import ThreadPoolExecutor
     from ..db.local_db import SyncSessionLocal
 
+    central_doc = await get_current_framework_document()
+    content = central_doc["content"] if central_doc else None
+
     def _seed():
         with SyncSessionLocal() as sync_db:
-            return seed_framework_sections(sync_db)
+            return seed_framework_sections(sync_db, content=content)
 
     loop = asyncio.get_event_loop()
     with ThreadPoolExecutor(max_workers=1) as pool:
         result = await loop.run_in_executor(pool, _seed)
 
+    if central_doc and result.get("success"):
+        result["source"] = "central_db"
+        result["document_version"] = central_doc.get("version")
+        result["document_sha256"] = central_doc.get("sha256")
+    elif result.get("success"):
+        result["source"] = "local_file"
     return result
+
+
+# ── Framework document upload (fleet-wide) ─────────────────────────────────
+
+class FrameworkDocumentUpload(BaseModel):
+    content: str
+    filename: str | None = None
+    note: str | None = None
+
+
+@router.post("/document")
+async def upload_framework_document(payload: FrameworkDocumentUpload):
+    """Admin upload endpoint. Stores the markdown in the central Fleet DB
+    so every instance in the fleet pulls the same version. Previous
+    versions are preserved (version auto-increments)."""
+    from ..services.fleet_service import upload_framework_document as _upload
+    from ..config import settings
+
+    uploaded_by = "admin"  # Replace with authenticated user from auth middleware
+    result = await _upload(
+        content=payload.content,
+        uploaded_by=uploaded_by,
+        instance_id=settings.instance_id or "local",
+        filename=payload.filename,
+        note=payload.note,
+    )
+    if not result.get("success"):
+        raise HTTPException(status_code=503, detail=result.get("message", "Central DB unavailable"))
+    return result
+
+
+@router.get("/document/current")
+async def get_current_framework_document():
+    """Return the latest framework document from the central fleet DB."""
+    from ..services.fleet_service import get_current_framework_document as _get
+    doc = await _get()
+    if not doc:
+        return {"exists": False}
+    return {"exists": True, **doc}
+
+
+@router.get("/document/versions")
+async def list_framework_document_versions():
+    """List all uploaded framework document versions (content excluded)."""
+    from ..services.fleet_service import list_framework_document_versions as _list
+    return {"versions": await _list()}

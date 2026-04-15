@@ -502,6 +502,17 @@ _TABLES_POSTGRESQL = [
         updated_at TIMESTAMP DEFAULT NOW(),
         updated_by VARCHAR(100)
     )""",
+    """CREATE TABLE IF NOT EXISTS governance_framework_documents (
+        id SERIAL PRIMARY KEY,
+        version INTEGER NOT NULL UNIQUE,
+        content TEXT NOT NULL,
+        sha256 VARCHAR(64) NOT NULL,
+        filename VARCHAR(255),
+        note TEXT,
+        uploaded_by VARCHAR(255) NOT NULL DEFAULT 'admin',
+        uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        uploaded_from_instance VARCHAR(255)
+    )""",
 ]
 
 _TABLES_MSSQL = [
@@ -616,6 +627,18 @@ _TABLES_MSSQL = [
         updated_at DATETIME2 DEFAULT GETDATE(),
         updated_by VARCHAR(100)
     )""",
+    """IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'governance_framework_documents')
+    CREATE TABLE governance_framework_documents (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        version INT NOT NULL UNIQUE,
+        content NVARCHAR(MAX) NOT NULL,
+        sha256 VARCHAR(64) NOT NULL,
+        filename NVARCHAR(255),
+        note NVARCHAR(MAX),
+        uploaded_by VARCHAR(255) NOT NULL DEFAULT 'admin',
+        uploaded_at DATETIME2 DEFAULT GETDATE(),
+        uploaded_from_instance VARCHAR(255)
+    )""",
 ]
 
 _TABLES_MARIADB = [
@@ -721,6 +744,17 @@ _TABLES_MARIADB = [
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_by VARCHAR(100)
     )""",
+    """CREATE TABLE IF NOT EXISTS governance_framework_documents (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        version INT NOT NULL UNIQUE,
+        content LONGTEXT NOT NULL,
+        sha256 VARCHAR(64) NOT NULL,
+        filename VARCHAR(255),
+        note TEXT,
+        uploaded_by VARCHAR(255) NOT NULL DEFAULT 'admin',
+        uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        uploaded_from_instance VARCHAR(255)
+    )""",
 ]
 
 
@@ -801,3 +835,81 @@ async def initialize_central_db(config: dict) -> dict:
             result["keyword_templates_seed_error"] = str(e)[:100]
 
     return result
+
+
+# ----------------------------------------------------------------------------
+# Framework document storage (fleet-wide source of truth)
+# ----------------------------------------------------------------------------
+async def upload_framework_document(
+    content: str,
+    uploaded_by: str,
+    instance_id: str,
+    filename: str | None = None,
+    note: str | None = None,
+) -> dict:
+    """Store a new version of the governance framework markdown in the
+    central DB. Auto-increments version. Returns the new version +
+    sha256. Fails cleanly if central DB isn't configured."""
+    from ..db.central_sql import SQL
+    from hashlib import sha256
+
+    digest = sha256(content.encode("utf-8")).hexdigest()
+
+    def _query(db):
+        db.execute(text(SQL.insert_framework_document), {
+            "content": content,
+            "sha256": digest,
+            "filename": filename,
+            "note": note,
+            "uploaded_by": uploaded_by,
+            "instance_id": instance_id,
+        })
+        db.commit()
+        # Read back the newly-inserted version (MAX)
+        row = db.execute(text(SQL.get_current_framework_document)).mappings().first()
+        return dict(row) if row else None
+
+    result = await run_central_query(_query)
+    if result is None:
+        return {"success": False, "message": "Central fleet DB not configured"}
+    return {
+        "success": True,
+        "version": result["version"],
+        "sha256": result["sha256"],
+        "uploaded_at": result["uploaded_at"].isoformat() if result["uploaded_at"] else None,
+    }
+
+
+async def get_current_framework_document() -> dict | None:
+    """Fetch the latest framework document from the central DB, or None if
+    none uploaded or central DB unreachable."""
+    from ..db.central_sql import SQL
+
+    def _query(db):
+        row = db.execute(text(SQL.get_current_framework_document)).mappings().first()
+        if not row:
+            return None
+        d = dict(row)
+        if d.get("uploaded_at"):
+            d["uploaded_at"] = d["uploaded_at"].isoformat()
+        return d
+
+    return await run_central_query(_query)
+
+
+async def list_framework_document_versions() -> list[dict]:
+    """List all framework document versions (content excluded for payload
+    size). Empty list if central DB unreachable or none uploaded."""
+    from ..db.central_sql import SQL
+
+    def _query(db):
+        rows = list(db.execute(text(SQL.list_framework_document_versions)).mappings())
+        out = []
+        for r in rows:
+            d = dict(r)
+            if d.get("uploaded_at"):
+                d["uploaded_at"] = d["uploaded_at"].isoformat()
+            out.append(d)
+        return out
+
+    return (await run_central_query(_query)) or []

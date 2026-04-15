@@ -140,14 +140,13 @@ write_files:
     content: |
       ${indent(6, admin_html)}
 
-  # --- Governance framework markdown (Governance Hub parses this into DB
-  # sections when an admin clicks "Seed Framework"). Mounted into the
-  # governance-hub container at /app/framework read-only via docker-compose.
-  - path: /opt/InsideLLM/governance-hub/framework/AI_Governance_Framework.md
-    permissions: "0644"
-    owner: root:root
-    content: |
-      ${indent(6, framework_md)}
+  # NOTE: AI_Governance_Framework.md is no longer bundled at deploy time.
+  # It's now uploaded through the admin UI (/governance on the Framework
+  # tab → Upload) and stored in the central Fleet DB, so every instance
+  # in a fleet sees the same authoritative version. Legacy fallback: if
+  # the file happens to exist at /opt/InsideLLM/governance-hub/framework/
+  # AI_Governance_Framework.md on a given host, the seed endpoint will
+  # still read it when the central DB has no document.
 
   # --- Setup Wizard (used for clone-to-wizard flow) ---
   - path: /opt/InsideLLM/Setup.html

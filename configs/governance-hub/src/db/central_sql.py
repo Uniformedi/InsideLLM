@@ -204,6 +204,29 @@ class _PostgreSQL:
         WHERE instance_id = :iid
     """
 
+    # Framework document storage (fleet-wide source of truth)
+    insert_framework_document = """
+        INSERT INTO governance_framework_documents
+            (version, content, sha256, filename, note, uploaded_by, uploaded_from_instance)
+        VALUES
+            ((SELECT COALESCE(MAX(version), 0) + 1 FROM governance_framework_documents),
+             :content, :sha256, :filename, :note, :uploaded_by, :instance_id)
+    """
+
+    get_current_framework_document = """
+        SELECT id, version, content, sha256, filename, note,
+               uploaded_by, uploaded_at, uploaded_from_instance
+        FROM governance_framework_documents
+        ORDER BY version DESC LIMIT 1
+    """
+
+    list_framework_document_versions = """
+        SELECT id, version, sha256, filename, note,
+               uploaded_by, uploaded_at, uploaded_from_instance
+        FROM governance_framework_documents
+        ORDER BY version DESC
+    """
+
     get_instance_overrides = """
         SELECT instance_id, alert_webhook, updated_at, updated_by
         FROM governance_instance_overrides
@@ -396,6 +419,30 @@ class _MSSQL:
 
     get_instance_overrides = _PostgreSQL.get_instance_overrides
 
+    # Framework document queries — MSSQL needs its own insert for the
+    # auto-increment pattern (no SERIAL; use IDENTITY column + the
+    # subquery-as-default-value pattern still works).
+    insert_framework_document = """
+        INSERT INTO governance_framework_documents
+            (version, content, sha256, filename, note, uploaded_by, uploaded_from_instance)
+        VALUES
+            ((SELECT ISNULL(MAX(version), 0) + 1 FROM governance_framework_documents),
+             :content, :sha256, :filename, :note, :uploaded_by, :instance_id)
+    """
+    # MSSQL uses TOP, not LIMIT
+    get_current_framework_document = """
+        SELECT TOP 1 id, version, content, sha256, filename, note,
+               uploaded_by, uploaded_at, uploaded_from_instance
+        FROM governance_framework_documents
+        ORDER BY version DESC
+    """
+    list_framework_document_versions = """
+        SELECT id, version, sha256, filename, note,
+               uploaded_by, uploaded_at, uploaded_from_instance
+        FROM governance_framework_documents
+        ORDER BY version DESC
+    """
+
     upsert_instance_overrides = """
         MERGE governance_instance_overrides AS target
         USING (SELECT :iid AS instance_id) AS source
@@ -453,6 +500,12 @@ class _MariaDB:
     snapshot_by_id = _PostgreSQL.snapshot_by_id
     snapshot_latest = _PostgreSQL.snapshot_latest
     snapshot_list = _PostgreSQL.snapshot_list
+
+    # Framework document — PostgreSQL SQL works for MariaDB too (no
+    # ON CONFLICT / MERGE needed; we just INSERT a fresh version each upload)
+    insert_framework_document = _PostgreSQL.insert_framework_document
+    get_current_framework_document = _PostgreSQL.get_current_framework_document
+    list_framework_document_versions = _PostgreSQL.list_framework_document_versions
 
     upsert_tfvars = """
         INSERT INTO governance_deployment_tfvars

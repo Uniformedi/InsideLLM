@@ -196,12 +196,35 @@ def _find_check_key(title: str) -> str | None:
     return None
 
 
-def seed_framework_sections(db: Session, version: int = 1) -> dict:
+def seed_framework_sections(db: Session, version: int = 1, content: str | None = None) -> dict:
     """Parse the framework and seed sections into the database.
 
     Idempotent: clears existing sections for the version and re-seeds.
+
+    Source precedence:
+      1. explicit content (str) passed in — used when the caller already
+         pulled the markdown from the central Fleet DB
+      2. settings.framework_path on disk — legacy fallback for deployments
+         where the file is still bundled (pre-upload-pattern)
     """
-    sections = parse_framework_markdown(settings.framework_path)
+    if content:
+        import tempfile, os
+        # The parser takes a path; materialize the in-memory content once
+        # into a temp file. Small + local, deleted after parsing.
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".md", delete=False, encoding="utf-8"
+        ) as tf:
+            tf.write(content)
+            tmp_path = tf.name
+        try:
+            sections = parse_framework_markdown(tmp_path)
+        finally:
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
+    else:
+        sections = parse_framework_markdown(settings.framework_path)
     if not sections:
         return {"success": False, "message": "No sections parsed from framework document", "count": 0}
 

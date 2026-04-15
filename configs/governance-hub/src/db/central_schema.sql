@@ -91,3 +91,19 @@ CREATE TABLE IF NOT EXISTS governance_audit_chain (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     UNIQUE (instance_id, sequence)
 );
+
+-- Governance framework source document (uploaded by an admin via
+-- /governance/framework → Upload. One row per version; Governance Hub
+-- reads the latest by version DESC on seed. Fleet-wide so every instance
+-- sees the same authoritative markdown without local distribution.)
+CREATE TABLE IF NOT EXISTS governance_framework_documents (
+    id SERIAL PRIMARY KEY,
+    version INTEGER NOT NULL UNIQUE,
+    content TEXT NOT NULL,
+    sha256 VARCHAR(64) NOT NULL,
+    filename VARCHAR(255),
+    note TEXT,
+    uploaded_by VARCHAR(255) NOT NULL DEFAULT 'admin',
+    uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    uploaded_from_instance VARCHAR(255)
+);
