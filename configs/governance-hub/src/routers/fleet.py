@@ -1,6 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+import logging
 
+import httpx
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
+from pydantic import BaseModel, Field
+
+from ..config import settings
 from ..middleware.auth import verify_api_key
 from ..services.fleet_service import (
     compare_instances,
@@ -180,3 +184,116 @@ async def register_instance(req: RegistrationRequest):
         "message": "Instance registered successfully",
         **result,
     }
+
+
+# =============================================================================
+# Fleet-wide AD-join proxy
+# =============================================================================
+# Forwards AD-join operations to a remote instance's Governance Hub.
+# Authentication: caller must present the LOCAL master key (standard RBAC),
+# plus the TARGET instance's master key in X-Fleet-Key header.
+# The target key is forwarded as Bearer auth to the remote governance hub.
+# =============================================================================
+
+_fleet_log = logging.getLogger("insidellm.fleet.ad-join")
+_PROXY_TIMEOUT = 30.0
+
+
+def _require_master_key(request: Request) -> None:
+    auth = request.headers.get("authorization", "")
+    token = auth.removeprefix("Bearer ").strip() if auth.lower().startswith("bearer ") else ""
+    mk = settings.litellm_master_key or ""
+    if not mk or token != mk:
+        raise HTTPException(status_code=401, detail="LITELLM_MASTER_KEY required")
+
+
+class FleetAdJoinRequest(BaseModel):
+    target_url: str = Field(..., description="Target instance gateway URL (e.g. https://10.0.0.11)")
+    target_key: str = Field(..., min_length=1, description="Target instance LITELLM_MASTER_KEY")
+    user: str = Field(..., min_length=1, description="AD admin sAMAccountName")
+    password: str = Field(..., min_length=1, description="AD admin password")
+    ou: str | None = Field(default=None, description="Optional Computer OU DN")
+    domain: str | None = Field(default=None, description="Override the target's default realm")
+
+
+class FleetAdStatusRequest(BaseModel):
+    target_url: str = Field(..., description="Target instance gateway URL")
+    target_key: str = Field(..., min_length=1, description="Target instance LITELLM_MASTER_KEY")
+
+
+class FleetAdLeaveRequest(BaseModel):
+    target_url: str = Field(..., description="Target instance gateway URL")
+    target_key: str = Field(..., min_length=1, description="Target instance LITELLM_MASTER_KEY")
+
+
+async def _proxy_to_target(target_url: str, target_key: str,
+                           method: str, path: str,
+                           json_body: dict | None = None) -> dict:
+    url = f"{target_url.rstrip('/')}/governance/api/v1/ad-join{path}"
+    # Mint a break-glass Basic auth token for the target hub
+    import base64
+    creds = base64.b64encode(f"insidellm-admin:{target_key}".encode()).decode()
+    headers = {"Authorization": f"Basic {creds}"}
+
+    # First get a JWT from the target's /auth/token endpoint
+    token_url = f"{target_url.rstrip('/')}/governance/auth/token"
+    try:
+        async with httpx.AsyncClient(verify=False, timeout=_PROXY_TIMEOUT) as client:
+            token_resp = await client.post(token_url, headers=headers)
+            if token_resp.status_code != 200:
+                return {"success": False, "error": f"target auth failed ({token_resp.status_code}): {token_resp.text}"}
+            jwt_token = token_resp.json().get("access_token", "")
+
+            bearer = {"Authorization": f"Bearer {jwt_token}"}
+            if method.upper() == "GET":
+                resp = await client.get(url, headers=bearer)
+            else:
+                resp = await client.post(url, headers=bearer, json=json_body)
+
+            return {"success": resp.status_code < 400, "status_code": resp.status_code,
+                    "response": resp.json() if resp.headers.get("content-type", "").startswith("application/json") else resp.text}
+    except httpx.ConnectError as exc:
+        return {"success": False, "error": f"cannot reach target: {exc}"}
+    except Exception as exc:
+        return {"success": False, "error": str(exc)}
+
+
+@router.post("/ad-join")
+async def fleet_ad_join(payload: FleetAdJoinRequest, request: Request):
+    """Trigger AD domain join on a remote fleet instance.
+
+    Requires LITELLM_MASTER_KEY of both the local hub (Bearer auth)
+    and the target instance (target_key in body).
+    """
+    _require_master_key(request)
+    _fleet_log.info(f"fleet ad-join → {payload.target_url} (user={payload.user})")
+    body = {"user": payload.user, "password": payload.password}
+    if payload.ou:
+        body["ou"] = payload.ou
+    if payload.domain:
+        body["domain"] = payload.domain
+    result = await _proxy_to_target(payload.target_url, payload.target_key, "POST", "", body)
+    if not result["success"]:
+        raise HTTPException(status_code=502, detail=result.get("error", result))
+    return result["response"]
+
+
+@router.post("/ad-join/status")
+async def fleet_ad_join_status(payload: FleetAdStatusRequest, request: Request):
+    """Check AD-join status on a remote fleet instance."""
+    _require_master_key(request)
+    result = await _proxy_to_target(payload.target_url, payload.target_key, "GET", "/status")
+    if not result["success"]:
+        raise HTTPException(status_code=502, detail=result.get("error", result))
+    return result["response"]
+
+
+@router.post("/ad-join/leave")
+async def fleet_ad_join_leave(payload: FleetAdLeaveRequest, request: Request):
+    """Trigger AD domain leave on a remote fleet instance."""
+    _require_master_key(request)
+    _fleet_log.warning(f"fleet ad-leave → {payload.target_url}")
+    result = await _proxy_to_target(payload.target_url, payload.target_key, "POST", "/leave")
+    if not result["success"]:
+        raise HTTPException(status_code=502, detail=result.get("error", result))
+    return result["response"]
