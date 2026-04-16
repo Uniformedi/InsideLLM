@@ -575,6 +575,14 @@
     </div>
 
     <div class="switch-row">
+      <label class="switch"><input type="checkbox" id="enableGuacamole"><span class="slider"></span></label>
+      <div>
+        <span class="switch-label">Apache Guacamole &mdash; Browser RDP/VNC/SSH</span>
+        <div class="switch-hint">Clientless remote access to VMs through the browser. Auto-seeds connections for each fleet member and supports AD/LDAP login. <strong>Route: /remote/</strong></div>
+      </div>
+    </div>
+
+    <div class="switch-row">
       <label class="switch"><input type="checkbox" id="enableGovernanceHub" onchange="toggleGovernanceHub()"><span class="slider"></span></label>
       <div>
         <span class="switch-label">Governance Hub &mdash; Enterprise Fleet Sync</span>
@@ -1655,7 +1663,8 @@ ops_watchtower_enable    = ${checked('opsWatchtower')}
 ops_trivy_enable         = ${checked('opsTrivy')}
 ops_grafana_enable       = ${checked('opsGrafana')}
 ops_uptime_kuma_enable   = ${checked('opsUptimeKuma')}
-ops_backup_schedule      = "${v('opsBackupSchedule')}"`;
+ops_backup_schedule      = "${v('opsBackupSchedule')}"
+guacamole_enable         = ${checked('enableGuacamole')}`;
   if (v('opsAlertWebhook')) out += `\nops_alert_webhook        = "${v('opsAlertWebhook')}"`;
 
   // Enterprise Governance Hub
@@ -1923,6 +1932,7 @@ function applyCloneData() {
   document.getElementById('opsTrivy').checked = ops.trivy_enable !== false;
   document.getElementById('opsGrafana').checked = ops.grafana_enable !== false;
   document.getElementById('opsUptimeKuma').checked = ops.uptime_kuma_enable !== false;
+  document.getElementById('enableGuacamole').checked = ops.guacamole_enable === true;
   _setVal('opsBackupSchedule', ops.backup_schedule || 'daily');
   _setVal('opsAlertWebhook', ops.alert_webhook || '');
 

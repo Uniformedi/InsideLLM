@@ -51,6 +51,12 @@ resource "random_password" "governance_hub_secret" {
   special = false
 }
 
+resource "random_password" "guacamole_db_password" {
+  count   = var.guacamole_enable ? 1 : 0
+  length  = 24
+  special = false
+}
+
 locals {
   litellm_master_key = var.litellm_master_key != "" ? var.litellm_master_key : "sk-${random_password.litellm_master_key[0].result}"
   litellm_salt_key   = var.litellm_salt_key != "" ? var.litellm_salt_key : random_password.litellm_salt_key[0].result
@@ -59,6 +65,7 @@ locals {
   xrdp_password      = random_password.xrdp_password.result
   grafana_password   = var.ops_grafana_enable ? random_password.grafana_password[0].result : ""
   governance_hub_secret = var.governance_hub_enable ? random_password.governance_hub_secret[0].result : ""
+  guacamole_db_password = var.guacamole_enable ? random_password.guacamole_db_password[0].result : ""
 
   vm_fqdn = "${var.vm_hostname}.${var.vm_domain}"
 
@@ -306,6 +313,7 @@ locals {
     sso_client_secret      = var.sso_provider == "azure_ad" ? var.azure_ad_client_secret : var.sso_provider == "okta" ? var.okta_client_secret : ""
     ldap_bind_password     = var.ldap_bind_password
     hyperv_password        = var.hyperv_password
+    guacamole_db_password  = local.guacamole_db_password
   })
 }
 
@@ -361,6 +369,7 @@ locals {
     ops_grafana_enable       = var.ops_grafana_enable
     ops_uptime_kuma_enable   = var.ops_uptime_kuma_enable
     ops_alert_webhook        = var.ops_alert_webhook
+    guacamole_enable         = var.guacamole_enable
     server_name                     = local.vm_fqdn
     grafana_admin_password          = local.grafana_password
     postgres_password_plain         = local.postgres_password
@@ -416,6 +425,7 @@ locals {
     chat_enable             = var.chat_enable
     ldap_enable_services   = var.ldap_enable_services
     cockpit_enable          = var.cockpit_enable
+    guacamole_enable        = var.guacamole_enable
   })
 }
 
@@ -452,6 +462,7 @@ locals {
     ops_uptime_kuma_enable   = var.ops_uptime_kuma_enable
     ops_trivy_enable         = var.ops_trivy_enable
     ops_backup_schedule      = var.ops_backup_schedule
+    guacamole_enable         = var.guacamole_enable
     grafana_datasources_yml  = var.ops_grafana_enable ? templatefile("${path.module}/../configs/grafana/provisioning/datasources/datasources.yml", { postgres_password = local.postgres_password }) : ""
     grafana_dashboards_yml   = var.ops_grafana_enable ? file("${path.module}/../configs/grafana/provisioning/dashboards/dashboards.yml") : ""
     grafana_compliance_json  = var.ops_grafana_enable ? file("${path.module}/../configs/grafana/dashboards/compliance.json") : ""
@@ -508,6 +519,7 @@ locals {
       governance_hub_enable    = var.governance_hub_enable
       policy_engine_enable     = var.policy_engine_enable
       chat_enable              = var.chat_enable
+      guacamole_enable         = var.guacamole_enable
     })
   })
 

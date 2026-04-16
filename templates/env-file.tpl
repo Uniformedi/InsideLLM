@@ -36,3 +36,6 @@ LDAP_APP_PASSWORD=${ldap_bind_password}
 
 # --- Hyper-V management (WinRM creds for /governance/hosts) ----------------
 HYPERV_PASSWORD=${hyperv_password}
+
+# --- Guacamole (remote access gateway) auth backend in Postgres -------------
+GUACAMOLE_DB_PASSWORD=${guacamole_db_password}

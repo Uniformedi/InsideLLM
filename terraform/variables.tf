@@ -757,6 +757,12 @@ variable "ops_alert_webhook" {
   default     = ""
 }
 
+variable "guacamole_enable" {
+  description = "Enable Apache Guacamole — browser-based RDP/VNC/SSH gateway at /remote/"
+  type        = bool
+  default     = false
+}
+
 variable "keyword_categories" {
   description = "Additional keyword categories for request analysis (map of category name => list of keywords)"
   type        = map(list(string))

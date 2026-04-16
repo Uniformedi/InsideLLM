@@ -1065,6 +1065,201 @@ PGAEOF
   log "Break-glass admin seeding complete."
 fi
 
+%{ if guacamole_enable ~}
+# ---------------------------------------------------------------------------
+# Guacamole — first-run seeding
+#
+# 1. Drop the LDAP auth extension JAR into /opt/InsideLLM/guacamole/extensions
+#    so LDAP logins work (skipped if already present or download fails).
+# 2. Initialise the `guacamole` database schema in Postgres (idempotent —
+#    detected by presence of the `guacamole_user` table).
+# 3. Rotate the default guacadmin/guacadmin account to the master key and
+#    seed an `insidellm-admin` break-glass admin with SYSTEM_ADMIN rights.
+# 4. Seed an RDP + SSH connection for this VM so operators can connect to
+#    themselves immediately via the browser.
+#
+# All failures are logged but non-fatal — Guacamole can still be driven
+# manually if seeding hits a snag.
+# ---------------------------------------------------------------------------
+log ""
+log "Configuring Apache Guacamole (browser RDP/VNC/SSH gateway)..."
+
+GUAC_VER="1.5.5"
+GUAC_EXT_DIR="/opt/InsideLLM/guacamole/extensions"
+GUAC_API="https://localhost/remote/api"
+# Master key doubles as the Guacamole admin + insidellm-admin password.
+GUAC_PASS="$(grep -E '^LITELLM_MASTER_KEY=' /opt/InsideLLM/.env | head -n1 | cut -d= -f2- | tr -d '\r\n' | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'\$//")"
+GUAC_DB_PASS="$(grep -E '^GUACAMOLE_DB_PASSWORD=' /opt/InsideLLM/.env | head -n1 | cut -d= -f2- | tr -d '\r\n' | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'\$//")"
+VM_IP_LOCAL="$(hostname -I | awk '{print $1}')"
+
+# --- 1. Download the LDAP extension JAR if we don't already have it --------
+mkdir -p "$GUAC_EXT_DIR"
+if ! ls "$GUAC_EXT_DIR"/guacamole-auth-ldap-*.jar >/dev/null 2>&1; then
+  log "  [guacamole] fetching LDAP auth extension v$GUAC_VER..."
+  TMPD=$(mktemp -d)
+  if curl -sfL "https://archive.apache.org/dist/guacamole/$GUAC_VER/binary/guacamole-auth-ldap-$GUAC_VER.tar.gz" -o "$TMPD/ldap.tgz" 2>>"$LOG"; then
+    if tar -xzf "$TMPD/ldap.tgz" -C "$TMPD" 2>>"$LOG"; then
+      if cp "$TMPD"/guacamole-auth-ldap-*/guacamole-auth-ldap-*.jar "$GUAC_EXT_DIR"/ 2>>"$LOG"; then
+        chmod 0644 "$GUAC_EXT_DIR"/guacamole-auth-ldap-*.jar
+        log "    [guacamole] LDAP extension installed"
+        # guacamole container already started before we dropped the jar —
+        # restart so it picks the extension up.
+        docker restart insidellm-guacamole >/dev/null 2>&1 || true
+      else
+        log "    [warn] LDAP extension: could not copy JAR (non-fatal)"
+      fi
+    else
+      log "    [warn] LDAP extension: tar extract failed (non-fatal)"
+    fi
+  else
+    log "    [warn] LDAP extension: download failed (non-fatal)"
+  fi
+  rm -rf "$TMPD"
+else
+  log "  [guacamole] LDAP extension already present — skipping fetch"
+fi
+
+# --- 2. Initialise the guacamole database schema ---------------------------
+# Create DB + user inside the main postgres container, idempotent.
+docker exec -e PGPASSWORD="$(grep -E '^POSTGRES_PASSWORD=' /opt/InsideLLM/.env | head -n1 | cut -d= -f2- | tr -d '\r\n')" \
+  insidellm-postgres psql -U litellm -d postgres -v ON_ERROR_STOP=0 <<EOSQL >> "$LOG" 2>&1 || log "  [warn] guacamole db/user bootstrap may have issues (non-fatal)"
+DO \$\$
+BEGIN
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='guacamole') THEN
+    CREATE ROLE guacamole LOGIN PASSWORD '$GUAC_DB_PASS';
+  ELSE
+    ALTER ROLE guacamole WITH LOGIN PASSWORD '$GUAC_DB_PASS';
+  END IF;
+END\$\$;
+SELECT 'CREATE DATABASE guacamole OWNER guacamole'
+ WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname='guacamole')\gexec
+EOSQL
+
+# Has the schema been applied already? guacamole_user is a stable table name.
+SCHEMA_READY=$(docker exec -e PGPASSWORD="$GUAC_DB_PASS" insidellm-postgres \
+  psql -U guacamole -d guacamole -tAc "SELECT to_regclass('public.guacamole_user') IS NOT NULL" 2>/dev/null || echo "f")
+
+if [ "$SCHEMA_READY" != "t" ]; then
+  log "  [guacamole] applying JDBC auth schema..."
+  # Use the schema files bundled inside the guacamole image — avoids GitHub
+  # download flakiness and guarantees version alignment with the container.
+  # Schema files live under /opt/guacamole/postgresql/schema/.
+  (
+    set -e
+    SCHEMA_OUT=$(docker run --rm --entrypoint "" guacamole/guacamole:"$GUAC_VER" \
+      sh -c 'cat /opt/guacamole/postgresql/schema/*.sql' 2>/dev/null)
+    if [ -z "$SCHEMA_OUT" ]; then
+      # Fallback: pull schema from upstream repo tag.
+      SCHEMA_OUT=$( { \
+        curl -sfL "https://raw.githubusercontent.com/apache/guacamole-client/$GUAC_VER/extensions/guacamole-auth-jdbc/modules/guacamole-auth-jdbc-postgresql/schema/001-create-schema.sql"; \
+        echo; \
+        curl -sfL "https://raw.githubusercontent.com/apache/guacamole-client/$GUAC_VER/extensions/guacamole-auth-jdbc/modules/guacamole-auth-jdbc-postgresql/schema/002-create-admin-user.sql"; \
+      } )
+    fi
+    echo "$SCHEMA_OUT" | docker exec -i -e PGPASSWORD="$GUAC_DB_PASS" insidellm-postgres \
+      psql -U guacamole -d guacamole -v ON_ERROR_STOP=1 >> "$LOG" 2>&1
+    log "    [guacamole] schema applied (default login: guacadmin/guacadmin — rotated below)"
+  ) || log "  [warn] guacamole schema init failed (non-fatal — UI will still load but logins will be empty)"
+  # Restart guacamole so the JDBC driver sees the fresh schema.
+  docker restart insidellm-guacamole >/dev/null 2>&1 || true
+else
+  log "  [guacamole] schema already present — skipping init"
+fi
+
+# Wait for the Guacamole webapp to answer on /remote/ via nginx.
+log "  [guacamole] waiting for web UI to come up..."
+for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
+  if curl -sk -o /dev/null -w '%{http_code}' "$GUAC_API/languages" 2>/dev/null | grep -qE '^(200|401|403)$'; then
+    break
+  fi
+  sleep 5
+done
+
+# --- 3. Seed break-glass admin via the REST API ----------------------------
+# First try default guacadmin creds. If schema had already been rotated in a
+# previous run, fall through silently.
+if [ -n "$GUAC_PASS" ]; then
+  log "  [guacamole] seeding break-glass admin..."
+  (
+    set -e
+    TOKEN_JSON=$(curl -sk -X POST "$GUAC_API/tokens" \
+      -d "username=guacadmin&password=guacadmin" 2>/dev/null || echo "")
+    if ! echo "$TOKEN_JSON" | grep -q '"authToken"'; then
+      # Maybe the password was already rotated to the master key — try that.
+      TOKEN_JSON=$(curl -sk -X POST "$GUAC_API/tokens" \
+        --data-urlencode "username=guacadmin" \
+        --data-urlencode "password=$GUAC_PASS" 2>/dev/null || echo "")
+    fi
+    TOKEN=$(echo "$TOKEN_JSON" | sed -n 's/.*"authToken"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+    if [ -z "$TOKEN" ]; then
+      log "    [warn] could not obtain guacadmin session token (non-fatal)"
+      exit 0
+    fi
+
+    DS="postgresql"
+    # Rotate guacadmin password to the master key. Guacamole 1.5.x expects
+    # PUT /api/session/data/{ds}/users/{user}/password with old+new body.
+    curl -sk -X PUT "$GUAC_API/session/data/$DS/users/guacadmin/password" \
+      -H "Guacamole-Token: $TOKEN" \
+      -H "Content-Type: application/json" \
+      -d "{\"oldPassword\":\"guacadmin\",\"newPassword\":\"$GUAC_PASS\"}" >/dev/null 2>&1 || true
+
+    # Create (or update) insidellm-admin.
+    EXISTS=$(curl -sk -H "Guacamole-Token: $TOKEN" \
+      "$GUAC_API/session/data/$DS/users/insidellm-admin" 2>/dev/null || echo "")
+    if echo "$EXISTS" | grep -q '"username"'; then
+      curl -sk -X PUT "$GUAC_API/session/data/$DS/users/insidellm-admin" \
+        -H "Guacamole-Token: $TOKEN" -H "Content-Type: application/json" \
+        -d "{\"username\":\"insidellm-admin\",\"password\":\"$GUAC_PASS\",\"attributes\":{\"guac-full-name\":\"InsideLLM Break-Glass\"}}" >/dev/null 2>&1 || true
+    else
+      curl -sk -X POST "$GUAC_API/session/data/$DS/users" \
+        -H "Guacamole-Token: $TOKEN" -H "Content-Type: application/json" \
+        -d "{\"username\":\"insidellm-admin\",\"password\":\"$GUAC_PASS\",\"attributes\":{\"guac-full-name\":\"InsideLLM Break-Glass\"}}" >/dev/null 2>&1 || true
+    fi
+
+    # Grant SYSTEM_ADMIN + CREATE_CONNECTION etc. via a JSON Patch.
+    curl -sk -X PATCH "$GUAC_API/session/data/$DS/users/insidellm-admin/permissions" \
+      -H "Guacamole-Token: $TOKEN" -H "Content-Type: application/json" \
+      -d '[{"op":"add","path":"/systemPermissions","value":"ADMINISTER"},
+            {"op":"add","path":"/systemPermissions","value":"CREATE_CONNECTION"},
+            {"op":"add","path":"/systemPermissions","value":"CREATE_CONNECTION_GROUP"},
+            {"op":"add","path":"/systemPermissions","value":"CREATE_USER"}]' >/dev/null 2>&1 || true
+
+    log "    [guacamole] seeded break-glass admin (insidellm-admin)"
+
+    # --- 4. Seed RDP + SSH connections for this VM ------------------------
+    HN=$(hostname -s)
+    for PROTO in rdp ssh; do
+      if [ "$PROTO" = "rdp" ]; then
+        PORT="3389"
+        BODY=$(printf '{"parentIdentifier":"ROOT","name":"RDP: %s","protocol":"rdp","parameters":{"hostname":"%s","port":"3389","ignore-cert":"true","security":"any","resize-method":"display-update"},"attributes":{}}' "$HN" "$VM_IP_LOCAL")
+      else
+        PORT="22"
+        BODY=$(printf '{"parentIdentifier":"ROOT","name":"SSH: %s","protocol":"ssh","parameters":{"hostname":"%s","port":"22"},"attributes":{}}' "$HN" "$VM_IP_LOCAL")
+      fi
+      # Dedupe by name — list current connections and skip if present.
+      EXIST=$(curl -sk -H "Guacamole-Token: $TOKEN" \
+        "$GUAC_API/session/data/$DS/connections" 2>/dev/null || echo "")
+      if echo "$EXIST" | grep -q "\"$PROTO: $HN\""; then
+        log "    [guacamole] connection '$PROTO: $HN' already present"
+      else
+        curl -sk -X POST "$GUAC_API/session/data/$DS/connections" \
+          -H "Guacamole-Token: $TOKEN" -H "Content-Type: application/json" \
+          -d "$BODY" >/dev/null 2>&1 \
+          && log "    [guacamole] seeded connection '$PROTO: $HN' ($VM_IP_LOCAL:$PORT)" \
+          || log "    [warn] failed to seed '$PROTO: $HN' connection (non-fatal)"
+      fi
+    done
+
+    # Invalidate the token so we don't leak a long-lived admin session.
+    curl -sk -X DELETE "$GUAC_API/tokens/$TOKEN" >/dev/null 2>&1 || true
+  ) || log "  [warn] guacamole seeding failed (non-fatal)"
+fi
+
+unset GUAC_PASS GUAC_DB_PASS
+log "Guacamole configuration complete."
+%{ endif ~}
+
 log ""
 log "=========================================="
 log "  Inside LLM — READY"
@@ -1091,6 +1286,10 @@ log "  Uptime Kuma:  https://$VM_IP/status/"
 %{ if chat_enable ~}
 log "  Team Chat:    https://$VM_IP/chat/"
 log "    (first user to sign up becomes Mattermost sysadmin)"
+%{ endif ~}
+%{ if guacamole_enable ~}
+log "  Remote (Guacamole): https://$VM_IP/remote/"
+log "    (login: insidellm-admin + LITELLM_MASTER_KEY; guacadmin default rotated)"
 %{ endif ~}
 log ""
 log "  First user to register on Open WebUI"

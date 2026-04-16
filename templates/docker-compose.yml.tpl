@@ -304,6 +304,58 @@ services:
     networks:
       - insidellm-internal
 
+%{ if guacamole_enable ~}
+  # -------------------------------------------------------------------------
+  # guacd — Guacamole proxy daemon (translates RDP/VNC/SSH <-> guac protocol)
+  # -------------------------------------------------------------------------
+  guacd:
+    image: guacamole/guacd:1.5.5
+    container_name: insidellm-guacd
+    restart: always
+    networks:
+      - insidellm-internal
+
+  # -------------------------------------------------------------------------
+  # Guacamole — Browser-based RDP/VNC/SSH gateway (web UI)
+  # -------------------------------------------------------------------------
+  guacamole:
+    image: guacamole/guacamole:1.5.5
+    container_name: insidellm-guacamole
+    restart: always
+    environment:
+      GUACD_HOSTNAME: guacd
+      GUACD_PORT: "4822"
+      # Serve at the container root so nginx can strip /remote/ cleanly.
+      WEBAPP_CONTEXT: ROOT
+      # --- Postgres auth backend ---
+      POSTGRES_HOSTNAME: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DATABASE: guacamole
+      POSTGRES_USER: guacamole
+      POSTGRES_PASSWORD: "$${GUACAMOLE_DB_PASSWORD}"
+      POSTGRES_AUTO_CREATE_ACCOUNTS: "true"
+%{ if ldap_enable_services ~}
+      # --- LDAP / Active Directory ---
+      LDAP_HOSTNAME: "${ad_domain}"
+      LDAP_PORT: "636"
+      LDAP_ENCRYPTION_METHOD: ssl
+      LDAP_SEARCH_BIND_DN: "${ldap_bind_dn}"
+      LDAP_SEARCH_BIND_PASSWORD: "$${LDAP_APP_PASSWORD}"
+      LDAP_USER_BASE_DN: "${ldap_user_search_base}"
+      LDAP_USERNAME_ATTRIBUTE: sAMAccountName
+%{ endif ~}
+    volumes:
+      # LDAP auth extension JAR is dropped here by post-deploy on first run.
+      - /opt/InsideLLM/guacamole/extensions:/etc/guacamole/extensions:ro
+    depends_on:
+      guacd:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+    networks:
+      - insidellm-internal
+
+%{ endif ~}
   # -------------------------------------------------------------------------
   # Netdata — Real-time System Monitoring
   # -------------------------------------------------------------------------

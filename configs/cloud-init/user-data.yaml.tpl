@@ -711,6 +711,12 @@ runcmd:
 %{ if ops_trivy_enable ~}
   - mkdir -p /opt/InsideLLM/data/trivy-reports
 %{ endif ~}
+%{ if guacamole_enable ~}
+  # Guacamole LDAP auth extension JAR is dropped in at first post-deploy run.
+  # Mode 0755 so the read-only bind-mount into the container works.
+  - mkdir -p /opt/InsideLLM/guacamole/extensions
+  - chmod 0755 /opt/InsideLLM/guacamole /opt/InsideLLM/guacamole/extensions
+%{ endif ~}
 %{ if policy_engine_enable ~}
   - mkdir -p /opt/InsideLLM/opa/policies
   - |

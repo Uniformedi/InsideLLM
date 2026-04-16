@@ -8,6 +8,7 @@
 
 ### What's New in 3.1
 
+- **Apache Guacamole (optional)** -- browser-based RDP/VNC/SSH gateway at `/remote/`. Enable with `guacamole_enable = true` in `terraform.tfvars`. Post-deploy seeds the `guacamole` Postgres DB, rotates the default `guacadmin` account, creates an `insidellm-admin` SYSTEM_ADMIN user (password = `LITELLM_MASTER_KEY`), and pre-populates RDP (port 3389) + SSH (port 22) connections for the local VM. When `ldap_enable_services = true`, the LDAP auth extension is installed automatically and AD users can log in with their `sAMAccountName`.
 - **Platform Versioning** -- `VERSION` file at project root (currently `3.1.0`), wired through Terraform/Docker/Governance Hub. Admin topbar shows version badge. Fleet tracks per-node versions with outdated detection.
 - **Unified SSO Across All Services** -- single IdP app registration (Azure AD or Okta) shared by Open WebUI, Grafana, LiteLLM, and the Admin Command Center. OIDC env vars auto-injected per service.
 - **Active Directory Authentication** -- when domain-joined without a cloud IdP, the Admin Center uses LDAP bind against AD with group-based access control (`ad_admin_groups`). Uses `ldap3` pure Python library.

@@ -29,6 +29,14 @@ http {
     types_hash_max_size 2048;
     client_max_body_size 50m;
 
+    # --- WebSocket upgrade map (used by Guacamole /remote/ and any other
+    # service proxying websockets). Maps the Upgrade header to the right
+    # Connection header value so nginx forwards WS handshakes correctly.
+    map $http_upgrade $http_connection {
+        default upgrade;
+        ''      close;
+    }
+
     # --- Security headers ---
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-Content-Type-Options "nosniff" always;
@@ -76,6 +84,12 @@ http {
 
     upstream mattermost {
         server mattermost:8065;
+    }
+%{ endif ~}
+%{ if guacamole_enable ~}
+
+    upstream guacamole {
+        server guacamole:8080;
     }
 %{ endif ~}
 
@@ -329,6 +343,25 @@ http {
             proxy_connect_timeout 90s;
             proxy_send_timeout 300s;
             proxy_pass_header Set-Cookie;
+        }
+
+%{ endif ~}
+%{ if guacamole_enable ~}
+        # --- Guacamole (browser-based RDP/VNC/SSH gateway) ---
+        # WEBAPP_CONTEXT=ROOT in the container, so we strip /remote/ on the way
+        # in and rewrite Set-Cookie paths back to /remote/ on the way out.
+        location /remote/ {
+            proxy_pass http://guacamole/;
+            proxy_buffering off;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection $http_connection;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header Host $http_host;
+            proxy_cookie_path / /remote/;
+            proxy_read_timeout 3600s;
+            access_log off;
         }
 
 %{ endif ~}
