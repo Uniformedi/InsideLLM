@@ -29,6 +29,12 @@ http {
     types_hash_max_size 2048;
     client_max_body_size 50m;
 
+    # map_hash_* must be set BEFORE the first map directive. Needed to fit
+    # the 48-char FLEET_EDGE_SECRET literal used by the fleet edge trust map
+    # further down (Stream C).
+    map_hash_bucket_size 256;
+    map_hash_max_size    2048;
+
     # --- WebSocket upgrade map (used by Guacamole /remote/ and any other
     # service proxying websockets). Maps the Upgrade header to the right
     # Connection header value so nginx forwards WS handshakes correctly.
@@ -43,6 +49,8 @@ http {
     # matching X-Edge-Secret accompanies them — preventing spoof attacks
     # from clients that could otherwise forge X-User-* directly.
     # $edge_trusted = 1 iff the request bears the right secret.
+    # map_hash_bucket_size is set earlier (above the first map directive)
+    # to accommodate the 48-char FLEET_EDGE_SECRET.
     map $http_x_edge_secret $edge_trusted {
         default                0;
         "${fleet_edge_secret}" 1;

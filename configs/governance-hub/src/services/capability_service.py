@@ -88,7 +88,10 @@ async def publish_once() -> int:
                     "endpoint": c["endpoint"],
                     "role": c["role"],
                     "status": c["status"],
-                    "capability_metadata": c.get("metadata", {}),
+                    # DB column is "metadata" (see FleetCapability model).
+                    # set_ takes the underlying column name, not the Python
+                    # attribute name capability_metadata.
+                    "metadata": c.get("metadata", {}),
                     "updated_at": now,
                 },
             )
