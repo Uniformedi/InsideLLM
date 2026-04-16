@@ -62,6 +62,24 @@ set in tfvars**.
 | `ssh_public_key_path` | `"~/.ssh/id_rsa.pub"` | string | SSH public key file on the Windows host |
 | `ssh_admin_user` | `"insidellm-admin"` | string | Admin username for the Ubuntu VM |
 
+### Fleet / Edge
+
+Role-aware fleet modularity (see [FleetArchitecture.md](FleetArchitecture.md)).
+Leave all of these empty for a standalone single-VM deployment — that is the
+historical default and nothing in the platform changes.
+
+| Variable | Default | Type | Description |
+|---|---|---|---|
+| `vm_role` | `""` | string | Role of this VM in the fleet: primary / gateway / workstation / voice / edge / storage, or empty for standalone |
+| `fleet_primary_host` | `""` | string | Hostname/IP of the fleet primary (Gov-Hub, Grafana, Loki) |
+| `fleet_virtual_ip` | `""` | string | VIP owned by keepalived on the active edge VM |
+| `edge_tls_source` | `"self-signed"` | string | self-signed / letsencrypt / custom |
+| `edge_tls_cert_path` | `""` | string | Edge cert path when tls_source=custom |
+| `edge_tls_key_path` | `""` | string | Edge key path when tls_source=custom |
+| `edge_domain` | `""` | string | FQDN served by the edge (TLS CN, OIDC redirect URI) |
+| `department` | `""` | string | Department label routed to by the edge based on OIDC claim |
+| `fallback_department` | `""` | string | Sibling backend for edge failover; empty = fail fast |
+
 ## 3. Gov-Hub RBAC
 
 | Variable | Default | Type | Description |

@@ -37,6 +37,27 @@ http {
         ''      close;
     }
 
+    # --- Fleet edge trust map (Stream C) ---
+    # The front-door edge VM forwards identity via X-User-* headers after
+    # OIDC authentication. Backends only honour those headers when the
+    # matching X-Edge-Secret accompanies them — preventing spoof attacks
+    # from clients that could otherwise forge X-User-* directly.
+    # $edge_trusted = 1 iff the request bears the right secret.
+    map $http_x_edge_secret $edge_trusted {
+        default                0;
+        "${fleet_edge_secret}" 1;
+    }
+
+    # --- Edge spoof gate ---
+    # If the request carries X-User-Email it claims edge-forwarded identity.
+    # Combined with $edge_trusted we decide: spoofed (deny) vs trusted edge
+    # (allow) vs direct access (no X-User-Email set — pass through to the
+    # service's own auth). One-off map result consumed by `if` in locations.
+    map "$http_x_user_email:$edge_trusted" $edge_spoof {
+        default      "";
+        "~^.+:0$"    "spoofed";  # claims identity but no matching secret
+    }
+
     # --- Security headers ---
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-Content-Type-Options "nosniff" always;
@@ -125,6 +146,12 @@ http {
 
         # --- Open WebUI (default route) ---
         location / {
+            # Stream C — edge trust gate. If the request claims a forwarded
+            # identity (X-User-Email set) but lacks the matching edge
+            # secret, reject it. Requests without X-User-Email (direct
+            # browser / bearer-token access) pass through unchanged.
+            if ($edge_spoof = "spoofed") { return 401; }
+
             proxy_pass http://open-webui;
             proxy_http_version 1.1;
             proxy_set_header Upgrade $http_upgrade;
@@ -171,6 +198,11 @@ http {
         # --- LiteLLM OpenAI-compatible endpoint ---
         # For Claude Code: ANTHROPIC_BASE_URL=https://host/v1
         location /v1/ {
+            # Stream C — edge trust gate (see "location /" for rationale).
+            # Requests without X-User-Email hit LiteLLM's own bearer auth
+            # directly; those with X-User-Email must prove the edge secret.
+            if ($edge_spoof = "spoofed") { return 401; }
+
             proxy_pass http://litellm/v1/;
             proxy_http_version 1.1;
             proxy_set_header Host $host;

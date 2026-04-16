@@ -658,7 +658,19 @@
     </div>
 
     <div class="tile-grid" id="fleetTiles"></div>
+
     <div class="section-head">
+      Topology <span class="accent">// capability matrix</span>
+      <span style="margin-left:auto;display:flex;gap:10px;align-items:center;font-family:var(--font-mono);font-size:11px;color:var(--text-muted)">
+        <span><span style="color:var(--green)">&#9679;</span> live</span>
+        <span><span style="color:var(--amber)">&#9680;</span> stale</span>
+        <span><span style="color:var(--text-muted)">&middot;</span> not present</span>
+        <span id="topologyRefreshMark"></span>
+      </span>
+    </div>
+    <div id="fleetTopology" class="loading">Loading topology...</div>
+
+    <div class="section-head" style="margin-top:24px">
       Instance Registry <span class="accent">// all deployments</span>
       <span style="margin-left:auto;display:flex;gap:8px;align-items:center">
         <span id="syncResult" class="wiz-result"></span>
@@ -851,6 +863,16 @@
     <div class="btn-row" style="margin-top:16px">
       <button class="btn" onclick="document.getElementById('complianceModal').classList.remove('show')">Close</button>
       <button class="btn btn-action" id="complianceGoToGov" style="display:none" onclick="document.getElementById('complianceModal').classList.remove('show');goToCompliance()">View in Governance Tab</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="topologyModal">
+  <div class="modal" style="width:680px;max-height:80vh;overflow-y:auto">
+    <h3 id="topologyModalTitle">Instance Topology</h3>
+    <div id="topologyModalContent" class="loading">Loading...</div>
+    <div class="btn-row" style="margin-top:16px">
+      <button class="btn" onclick="document.getElementById('topologyModal').classList.remove('show')">Close</button>
     </div>
   </div>
 </div>
@@ -1976,6 +1998,9 @@ async function triggerSync() {
 // ================================================================
 async function loadFleet() {
   await loadFleetDbConfig();
+  // Kick off topology load (non-blocking — it has its own error handling)
+  loadFleetTopology();
+  startTopologyAutoRefresh();
   const [summary, instances, localSync, localSchema] = await Promise.all([
     api('/api/v1/fleet/summary'),
     api('/api/v1/fleet/instances'),
@@ -2079,6 +2104,222 @@ async function loadFleet() {
       `</tbody></table>`;
   } else {
     table.innerHTML = '<div class="loading">No instances found.</div>';
+  }
+}
+
+// ================================================================
+// FLEET TOPOLOGY (capability matrix)
+// ================================================================
+// Canonical capability columns — kept in sync with capability_service.py
+// on the backend. Order matters: it drives column order in the matrix.
+const TOPOLOGY_CAPABILITIES = [
+  'governance-hub', 'litellm', 'open-webui', 'grafana',
+  'loki', 'guacamole', 'uptime-kuma', 'docforge'
+];
+
+let _topologyCache = null;      // last server response (for modal lookup)
+let _topologyTimer = null;      // setInterval handle
+let _topologyAbort = null;      // AbortController for in-flight fetch
+
+function _humanizeAge(iso) {
+  if (!iso) return 'never';
+  const then = new Date(iso).getTime();
+  if (!Number.isFinite(then)) return 'never';
+  const diffMs = Date.now() - then;
+  if (diffMs < 0) return 'just now';
+  const s = Math.floor(diffMs / 1000);
+  if (s < 60) return s + 's ago';
+  const m = Math.floor(s / 60);
+  if (m < 60) return m + 'm ago';
+  const h = Math.floor(m / 60);
+  if (h < 24) return h + 'h ago';
+  const d = Math.floor(h / 24);
+  return d + 'd ago';
+}
+
+function _escapeHtml(s) {
+  if (s == null) return '';
+  return String(s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function _roleBadge(role) {
+  if (!role) return '<span class="badge" style="background:rgba(148,163,184,0.15);color:var(--text-muted);border:1px solid var(--border);padding:2px 7px;border-radius:3px;font-size:10px;font-family:var(--font-mono);text-transform:uppercase">standalone</span>';
+  const colors = {
+    primary:     { bg: 'rgba(34,211,238,0.15)',  fg: 'var(--cyan)'   },
+    gateway:     { bg: 'rgba(96,165,250,0.15)',  fg: 'var(--blue)'   },
+    workstation: { bg: 'rgba(167,139,250,0.15)', fg: 'var(--purple)' },
+    voice:       { bg: 'rgba(52,211,153,0.15)',  fg: 'var(--green)'  },
+    edge:        { bg: 'rgba(251,191,36,0.15)',  fg: 'var(--amber)'  },
+    storage:     { bg: 'rgba(148,163,184,0.15)', fg: 'var(--text-dim)' }
+  };
+  const c = colors[role] || { bg: 'rgba(148,163,184,0.15)', fg: 'var(--text-muted)' };
+  return `<span class="badge" style="background:${c.bg};color:${c.fg};border:1px solid ${c.fg};padding:2px 7px;border-radius:3px;font-size:10px;font-family:var(--font-mono);text-transform:uppercase">${_escapeHtml(role)}</span>`;
+}
+
+function _matrixCell(capability, status) {
+  // capability absent → grey dot
+  if (!capability) {
+    return `<td style="text-align:center;color:var(--text-muted);font-size:16px" title="not present">&middot;</td>`;
+  }
+  // capability present but stale → amber
+  if (status === 'stale') {
+    return `<td style="text-align:center;color:var(--amber);font-size:14px" title="stale">&#9680;</td>`;
+  }
+  // live (or any other non-stale value)
+  return `<td style="text-align:center;color:var(--green);font-size:14px" title="${_escapeHtml(status || 'live')}">&#9679;</td>`;
+}
+
+async function loadFleetTopology() {
+  const container = document.getElementById('fleetTopology');
+  if (!container) return;
+
+  // Cancel any in-flight request before starting a new one
+  if (_topologyAbort) {
+    try { _topologyAbort.abort(); } catch (_) {}
+  }
+  _topologyAbort = new AbortController();
+
+  let data = null;
+  try {
+    const resp = await fetch(`${GOV()}/api/v1/fleet/topology`, {
+      credentials: 'include',
+      headers: { 'Accept': 'application/json' },
+      signal: _topologyAbort.signal
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    data = await resp.json();
+  } catch (e) {
+    if (e.name === 'AbortError') return;
+    container.innerHTML = `<div class="loading">Topology unavailable (${_escapeHtml(e.message || 'error')})</div>`;
+    return;
+  }
+
+  _topologyCache = data;
+  const instances = Array.isArray(data.instances) ? data.instances : [];
+
+  if (!instances.length) {
+    container.innerHTML = '<div class="loading">No capability data reported yet. Governance Hubs publish on startup and every 60s.</div>';
+    const mark = document.getElementById('topologyRefreshMark');
+    if (mark) mark.textContent = 'updated ' + new Date().toLocaleTimeString();
+    return;
+  }
+
+  // Build per-instance capability lookup for matrix
+  const headerCells = TOPOLOGY_CAPABILITIES
+    .map(c => `<th style="text-align:center;font-family:var(--font-mono);font-size:10px;letter-spacing:0.04em">${_escapeHtml(c)}</th>`)
+    .join('');
+
+  const rows = instances.map((inst, idx) => {
+    const capMap = {};
+    (inst.capabilities || []).forEach(c => { capMap[c.name] = c; });
+
+    const matrixCells = TOPOLOGY_CAPABILITIES.map(capName => {
+      const c = capMap[capName];
+      if (!c) return _matrixCell(null, null);
+      // Treat the whole instance as stale if health=stale; otherwise per-cap status
+      const effectiveStatus = inst.health === 'stale' ? 'stale' : (c.status || 'live');
+      return _matrixCell(capName, effectiveStatus);
+    }).join('');
+
+    const primaryBadge = (inst.instance_id === data.primary_id)
+      ? ' <span class="badge" style="background:rgba(34,211,238,0.2);color:var(--cyan);border:1px solid var(--cyan);padding:2px 6px;border-radius:3px;font-size:10px;font-family:var(--font-mono);margin-left:6px">PRIMARY</span>'
+      : '';
+    const healthColor = inst.health === 'healthy' ? 'var(--green)' : 'var(--amber)';
+
+    return `<tr style="cursor:pointer" onclick="openTopologyDetail(${idx})" title="Click for full capability list">
+      <td><strong>${_escapeHtml(inst.instance_id)}</strong>${primaryBadge}</td>
+      <td>${_roleBadge(inst.role)}</td>
+      ${matrixCells}
+      <td style="color:${healthColor};font-family:var(--font-mono);font-size:11px">${_escapeHtml(inst.health)}</td>
+      <td style="color:var(--text-muted);font-family:var(--font-mono);font-size:11px">${_humanizeAge(inst.last_seen)}</td>
+    </tr>`;
+  }).join('');
+
+  container.innerHTML = `
+    <table class="data-table" style="table-layout:auto">
+      <thead>
+        <tr>
+          <th>Instance</th>
+          <th>Role</th>
+          ${headerCells}
+          <th>Health</th>
+          <th>Last seen</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+
+  const mark = document.getElementById('topologyRefreshMark');
+  if (mark) mark.textContent = 'updated ' + new Date().toLocaleTimeString();
+}
+
+function openTopologyDetail(idx) {
+  if (!_topologyCache || !_topologyCache.instances || !_topologyCache.instances[idx]) return;
+  const inst = _topologyCache.instances[idx];
+
+  const title = document.getElementById('topologyModalTitle');
+  const content = document.getElementById('topologyModalContent');
+  if (!title || !content) return;
+
+  title.textContent = `${inst.instance_id} — topology detail`;
+
+  const capRows = (inst.capabilities || []).map(c => {
+    const metaStr = (c.metadata && Object.keys(c.metadata).length)
+      ? `<pre style="margin:4px 0 0;padding:8px;background:var(--bg-deep);border:1px solid var(--border);border-radius:4px;font-size:11px;color:var(--text-dim);font-family:var(--font-mono);max-height:120px;overflow:auto">${_escapeHtml(JSON.stringify(c.metadata, null, 2))}</pre>`
+      : '<span style="color:var(--text-muted);font-size:11px;font-family:var(--font-mono)">(no metadata)</span>';
+    const statusColor = c.status === 'live' ? 'var(--green)'
+                      : c.status === 'degraded' ? 'var(--amber)'
+                      : 'var(--red)';
+    return `<tr>
+      <td><code style="color:var(--cyan)">${_escapeHtml(c.name)}</code></td>
+      <td><code>${_escapeHtml(c.endpoint)}</code></td>
+      <td style="color:${statusColor};font-family:var(--font-mono);font-size:11px">${_escapeHtml(c.status || '')}</td>
+      <td style="color:var(--text-muted);font-family:var(--font-mono);font-size:11px">${_humanizeAge(c.updated_at)}</td>
+    </tr>
+    <tr><td colspan="4" style="padding-top:0;padding-bottom:10px">${metaStr}</td></tr>`;
+  }).join('');
+
+  const primaryNote = (inst.instance_id === _topologyCache.primary_id)
+    ? '<div style="color:var(--cyan);font-size:12px;font-family:var(--font-mono);margin-bottom:8px">// primary node</div>'
+    : '';
+
+  content.innerHTML = `
+    ${primaryNote}
+    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px;font-size:12px;color:var(--text-dim);font-family:var(--font-mono)">
+      <div><span style="color:var(--text-muted)">role:</span> ${_roleBadge(inst.role)}</div>
+      <div><span style="color:var(--text-muted)">health:</span> <span style="color:${inst.health === 'healthy' ? 'var(--green)' : 'var(--amber)'}">${_escapeHtml(inst.health)}</span></div>
+      <div><span style="color:var(--text-muted)">last seen:</span> ${_humanizeAge(inst.last_seen)}</div>
+    </div>
+    <table class="data-table" style="table-layout:auto">
+      <thead><tr><th>Capability</th><th>Endpoint</th><th>Status</th><th>Updated</th></tr></thead>
+      <tbody>${capRows || '<tr><td colspan="4" class="loading">No capabilities reported.</td></tr>'}</tbody>
+    </table>`;
+
+  document.getElementById('topologyModal').classList.add('show');
+}
+
+function startTopologyAutoRefresh() {
+  // 15-second refresh as specified in the Fleet spec
+  if (_topologyTimer !== null) return;
+  _topologyTimer = setInterval(() => {
+    // Only refresh while the Fleet panel is visible — pause work otherwise
+    const panel = document.getElementById('panel-fleet');
+    if (panel && panel.classList.contains('active')) {
+      loadFleetTopology();
+    }
+  }, 15000);
+}
+
+function stopTopologyAutoRefresh() {
+  if (_topologyTimer !== null) {
+    clearInterval(_topologyTimer);
+    _topologyTimer = null;
+  }
+  if (_topologyAbort) {
+    try { _topologyAbort.abort(); } catch (_) {}
+    _topologyAbort = null;
   }
 }
 

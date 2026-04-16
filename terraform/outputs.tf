@@ -132,12 +132,12 @@ output "deployment_notes" {
     ║  DLP Pipeline: ${var.dlp_enable ? "ENABLED" : "DISABLED"}                                     ║
     ║  DocForge:     ${var.docforge_enable ? "ENABLED" : "DISABLED"}                                     ║
     ║  Governance:   ${var.governance_tier} / ${var.data_classification}                        ║
-%{ if var.ops_grafana_enable ~}
+%{if var.ops_grafana_enable~}
     ║  Grafana:      https://${data.external.vm_ip.result.ip}/grafana/             ║
-%{ endif ~}
-%{ if var.ops_uptime_kuma_enable ~}
+%{endif~}
+%{if var.ops_uptime_kuma_enable~}
     ║  Uptime Kuma:  https://${data.external.vm_ip.result.ip}/status/              ║
-%{ endif ~}
+%{endif~}
     ║  SSO Provider: ${var.sso_provider}                                         ║
     ║                                                              ║
     ╚══════════════════════════════════════════════════════════════╝

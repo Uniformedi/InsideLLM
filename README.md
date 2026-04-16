@@ -8,6 +8,7 @@
 
 ### What's New in 3.1
 
+- **Role-aware fleet modularity + edge router** -- single-switch deployment roles (primary/gateway/workstation/voice/edge). Department-based routing via OIDC claims. See [docs/FleetArchitecture.md](docs/FleetArchitecture.md).
 - **Apache Guacamole (optional)** -- browser-based RDP/VNC/SSH gateway at `/remote/`. Enable with `guacamole_enable = true` in `terraform.tfvars`. Post-deploy seeds the `guacamole` Postgres DB, rotates the default `guacadmin` account, creates an `insidellm-admin` SYSTEM_ADMIN user (password = `LITELLM_MASTER_KEY`), and pre-populates RDP (port 3389) + SSH (port 22) connections for the local VM. When `ldap_enable_services = true`, the LDAP auth extension is installed automatically and AD users can log in with their `sAMAccountName`.
 - **Platform Versioning** -- `VERSION` file at project root (currently `3.1.0`), wired through Terraform/Docker/Governance Hub. Admin topbar shows version badge. Fleet tracks per-node versions with outdated detection.
 - **Unified SSO Across All Services** -- single IdP app registration (Azure AD or Okta) shared by Open WebUI, Grafana, LiteLLM, and the Admin Command Center. OIDC env vars auto-injected per service.
@@ -1367,6 +1368,94 @@ pwsh ./scripts/Deploy-Fleet.ps1 -TargetVM insidellm-tech -Destroy
 | `FLEET_ANTHROPIC_KEY` | `anthropic_api_key` (optional) | Shared API key (if not per-VM) |
 
 Each rendered VM gets an isolated Terraform state file (`fleet-out/<vm_name>/terraform.tfstate`), so VM lifecycles are fully independent.
+
+#### Edge + Departments (Tier-1 Fleet Modularity)
+
+For larger fleets you can declare a **front-door router topology** and a **department-to-backend map** alongside `instances:`. Render-Fleet.ps1 uses these two optional blocks to automatically assign `vm_role`, `department`, `fallback_department`, and `fleet_primary_host` to each instance, so you do not have to hand-wire the routing:
+
+```yaml
+edge:
+  vms:
+    - 10.0.0.100                       # primary edge VM (MASTER)
+    # - 10.0.0.101                     # optional secondary for keepalived HA
+  vip: 10.0.0.99                       # virtual IP owned by keepalived
+  domain: insidellm.corp.example.com
+  tls_source: self-signed              # self-signed | letsencrypt | custom
+
+departments:
+  engineering:
+    backend: insidellm-eng
+    fallback: insidellm-gen            # if eng is down, route to general pool
+  legal:
+    backend: insidellm-legal           # no fallback - legal enforces its own DLP
+  exec:
+    backend: insidellm-mgmt
+
+instances:
+  - vm_name: insidellm-gen             # auto vm_role = "primary"
+    vm_static_ip: "10.0.0.110/24"
+  - vm_name: insidellm-eng             # auto vm_role = "gateway", department = "engineering"
+    vm_static_ip: "10.0.0.120/24"
+  - vm_name: insidellm-edge            # auto vm_role = "edge" (IP matches edge.vms[0])
+    vm_static_ip: "10.0.0.100/24"
+```
+
+**Roles:**
+
+| Role | Meaning |
+|------|---------|
+| `primary` | Runs the central Gov-Hub, Grafana, Loki. Every other VM's `fleet_primary_host` points here. |
+| `gateway` | Department-specific backend (Open WebUI + LiteLLM + OPA). Sits behind the edge; not reachable directly from clients. |
+| `workstation` | Per-user desktop-class VM (lighter footprint, no central services). |
+| `voice` | Voice / agent inference node. |
+| `storage` | Central data-plane node (shared object storage). |
+| `edge` | Front-door router. Terminates TLS for `edge.domain`, owns the keepalived VIP, and proxies to the correct backend based on OIDC claim / LDAP group. Deployed **last**. |
+
+**Role inference rules:** explicit `vm_role` on an instance always wins. Otherwise the renderer picks the first non-edge/non-workstation VM as `primary`, stamps `gateway` on any VM named as a `departments.*.backend`, and stamps `edge` on any VM whose IP matches `edge.vms`.
+
+**Deploy order (-Stage flag):** stages always run **primary -> backends -> edge** so that backend IPs exist before the router boots.
+
+```powershell
+# Deploy everything in the right order
+pwsh ./scripts/Deploy-Fleet.ps1 -Stage all      # default
+
+# Or phase it out
+pwsh ./scripts/Deploy-Fleet.ps1 -Stage primary  # just the Gov-Hub node
+pwsh ./scripts/Deploy-Fleet.ps1 -Stage backends # everything except edge VMs
+pwsh ./scripts/Deploy-Fleet.ps1 -Stage edge     # only the edge VMs
+
+# Destroy order: edge first so clients get a clean failure, then backends
+pwsh ./scripts/Deploy-Fleet.ps1 -Stage edge -Destroy
+pwsh ./scripts/Deploy-Fleet.ps1 -Stage backends -Destroy
+```
+
+Render-Fleet.ps1 also writes `fleet-out/_edge-routes.json` (department -> backend-IP map) that the edge VM's cloud-init templates consume.
+
+#### Joining a new VM to an existing fleet
+
+Use `Join-Fleet.ps1` to bootstrap a new VM against a running fleet without hand-editing tfvars:
+
+```powershell
+# 1. On the fleet primary, mint a single-use token (valid 24h)
+curl -k -X POST https://insidellm-gen/governance/api/v1/fleet/registration-token `
+     -H "Content-Type: application/json" -d '{"hours": 24}'
+
+# 2. On the new VM (or the operator workstation):
+pwsh ./scripts/Join-Fleet.ps1 `
+    -Leader 10.0.0.110 `
+    -Token reg-xxxxxxxxxxxxxxxx `
+    -Role gateway `
+    -Department engineering `
+    -VmName insidellm-eng2 `
+    -StaticIp 10.0.0.127/24 `
+    -Insecure
+
+# 3. Apply the generated tfvars
+cd ./fleet-out/insidellm-eng2
+terraform -chdir=../../terraform apply -var-file=./terraform.tfvars -state=./terraform.tfstate
+```
+
+Join-Fleet.ps1 POSTs the token to the primary's `/governance/api/v1/fleet/register` endpoint, decrypts the returned central DB password, writes `fleet-out/<VmName>/terraform.tfvars` with `vm_role`, `department`, `fleet_primary_host`, and the fleet DB connection info, and appends an `instances:` entry to your local `fleet.yaml` for record-keeping. If the primary is running a build whose registration endpoint does not yet expose a full bootstrap payload, the script prints a clear TODO and exits without writing incomplete tfvars.
 
 ### Prerequisites
 

@@ -149,7 +149,7 @@
   <div class="meta">
     <span>Platform: <b>v3.1.0</b></span>
     <span>Generated: <b>2026-04-15</b></span>
-    <span>Variables: <b>130</b></span>
+    <span>Variables: <b>139</b></span>
   </div>
 
   <div class="intro">
@@ -210,6 +210,28 @@
       <tr><td class="name"><code>cockpit_enable</code></td><td class="val"><code>true</code></td><td class="type">bool</td><td class="desc">Install Cockpit and expose at /cockpit/</td></tr>
       <tr><td class="name"><code>ssh_public_key_path</code></td><td class="val"><code>"~/.ssh/id_rsa.pub"</code></td><td class="type">string</td><td class="desc">SSH public key file on the Windows host</td></tr>
       <tr><td class="name"><code>ssh_admin_user</code></td><td class="val"><code>"insidellm-admin"</code></td><td class="type">string</td><td class="desc">Admin username for the Ubuntu VM</td></tr>
+    </tbody>
+  </table>
+
+  <h3 style="font-family:var(--font-mono);font-size:14px;color:var(--cyan);margin:28px 0 4px">Fleet / Edge</h3>
+  <p style="color:var(--text-muted);font-size:13px;margin:0 0 6px">
+    Role-aware fleet modularity (see
+    <a href="../docs/FleetArchitecture.md">FleetArchitecture.md</a>). Leave all of
+    these empty for a standalone single-VM deployment &mdash; that is the
+    historical default and nothing in the platform changes.
+  </p>
+  <table>
+    <thead><tr><th>Name</th><th>Default</th><th>Type</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td class="name"><code>vm_role</code></td><td class="val"><code>""</code></td><td class="type">string</td><td class="desc">Role of this VM in the fleet: primary / gateway / workstation / voice / edge / storage, or empty for standalone</td></tr>
+      <tr><td class="name"><code>fleet_primary_host</code></td><td class="val"><code>""</code></td><td class="type">string</td><td class="desc">Hostname/IP of the fleet primary (Gov-Hub, Grafana, Loki)</td></tr>
+      <tr><td class="name"><code>fleet_virtual_ip</code></td><td class="val"><code>""</code></td><td class="type">string</td><td class="desc">VIP owned by keepalived on the active edge VM</td></tr>
+      <tr><td class="name"><code>edge_tls_source</code></td><td class="val"><code>"self-signed"</code></td><td class="type">string</td><td class="desc">self-signed / letsencrypt / custom</td></tr>
+      <tr><td class="name"><code>edge_tls_cert_path</code></td><td class="val"><code>""</code></td><td class="type">string</td><td class="desc">Edge cert path when tls_source=custom</td></tr>
+      <tr><td class="name"><code>edge_tls_key_path</code></td><td class="val"><code>""</code></td><td class="type">string</td><td class="desc">Edge key path when tls_source=custom</td></tr>
+      <tr><td class="name"><code>edge_domain</code></td><td class="val"><code>""</code></td><td class="type">string</td><td class="desc">FQDN served by the edge (TLS CN, OIDC redirect URI)</td></tr>
+      <tr><td class="name"><code>department</code></td><td class="val"><code>""</code></td><td class="type">string</td><td class="desc">Department label routed to by the edge based on OIDC claim</td></tr>
+      <tr><td class="name"><code>fallback_department</code></td><td class="val"><code>""</code></td><td class="type">string</td><td class="desc">Sibling backend for edge failover; empty = fail fast</td></tr>
     </tbody>
   </table>
 

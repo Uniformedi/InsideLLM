@@ -8,6 +8,21 @@
 #     pwsh ./scripts/Deploy-Fleet.ps1
 #
 # ----------------------------------------------------------------------------
+# Top-level sections
+# ----------------------------------------------------------------------------
+#   shared:        settings common to every VM
+#   edge:          (optional) front-door router topology (VIP + domain + TLS)
+#   departments:   (optional) dept -> backend vm_name mapping, with fallback
+#   instances:     per-VM overrides (vm_name is required)
+#
+# When `edge:` and `departments:` are present, Render-Fleet.ps1 auto-assigns
+# `vm_role` and `department` to each instance based on references:
+#   - a vm_name listed in departments.<dept>.backend  -> vm_role = "gateway"
+#   - an IP listed in edge.vms                         -> vm_role = "edge"
+#   - otherwise the first non-edge/non-workstation VM  -> vm_role = "primary"
+# An explicit `vm_role` on an instance always wins over inference.
+#
+# ----------------------------------------------------------------------------
 # Precedence
 # ----------------------------------------------------------------------------
 # Keys under `shared:` apply to every VM. Keys under an `instances:` block
@@ -31,7 +46,7 @@
 # Every key here maps 1:1 to a variable in terraform/variables.tf.
 # Any variable from terraform/variables.tf may appear under `shared` or
 # inside an `instances` block. See docs/DefaultDeployment.md or
-# html/DefaultDeployment.html for the full list of 129 variables and defaults.
+# html/DefaultDeployment.html for the full list of variables and defaults.
 # ============================================================================
 
 shared:
@@ -130,57 +145,136 @@ shared:
   owner:       "Uniformedi"
 
 # ============================================================================
+# Edge — front-door router (optional)
+# ----------------------------------------------------------------------------
+# The edge VM terminates TLS for `edge.domain`, owns the keepalived VIP, and
+# routes incoming requests to the correct department backend based on the
+# authenticated user's OIDC claim (or LDAP group). It is the *only* VM that
+# sees public / LAN client traffic — backends are reachable only from the
+# edge subnet.
+#
+# HA: list two IPs under `edge.vms` to get a keepalived active/passive pair
+# that share the `vip`. The first entry is the initial MASTER.
+# ============================================================================
+
+edge:
+  vms:
+    - 10.0.0.100                             # primary edge VM IP (MASTER)
+    # - 10.0.0.101                           # optional secondary for keepalived HA
+  vip: 10.0.0.99                             # virtual IP owned by keepalived on the active edge
+  domain: insidellm.corp.example.com         # FQDN served by the edge (TLS CN, OIDC redirect_uri)
+  tls_source: self-signed                    # self-signed | letsencrypt | custom
+  # tls_cert_path: /etc/ssl/corp.crt         # only when tls_source = custom
+  # tls_key_path:  /etc/ssl/corp.key         # only when tls_source = custom
+
+# ============================================================================
+# Departments — OIDC-claim / LDAP-group to backend routing
+# ----------------------------------------------------------------------------
+# Each key is a department identifier (must match the claim value set in your
+# IdP). `backend` is a vm_name from `instances:` below — the edge proxies
+# matching users to that VM. `fallback` is an optional sibling department
+# whose backend the edge uses if the primary backend is down; omit for
+# fail-fast behavior (recommended for regulated departments like legal).
+# ============================================================================
+
+departments:
+  engineering:
+    backend: insidellm-eng                   # eng users -> insidellm-eng
+    fallback: insidellm-gen                  # if eng is down, route to general pool
+
+  legal:
+    backend: insidellm-legal                 # legal users -> insidellm-legal
+    # no fallback — legal enforces its own DLP overlay; do not cross-route
+
+  client-service:
+    backend: insidellm-clientsrvc
+    fallback: insidellm-gen
+
+  exec:
+    backend: insidellm-mgmt
+
+# ============================================================================
 # Instances — one entry per VM to deploy.
 # Every terraform/variables.tf key can appear here to override the shared value.
 # At minimum, provide: vm_name, vm_static_ip (or leave blank for DHCP).
 #
+# Role inference (when edge: / departments: are present):
+#   - vm_role, department, fallback_department are set automatically from
+#     the references above unless explicitly overridden on the instance.
+#
 # Budget strategy:
-#   - Shared instances (many teams, broad access)  → higher global budget, moderate per-user
-#   - Department-specific instances                 → tighter global cap, team-appropriate rates
-#   - Management / exec instances                   → low request volume, higher per-request token budget
-#   - Dev / sandbox instances                       → generous limits for experimentation
+#   - Shared instances (many teams, broad access)  -> higher global budget, moderate per-user
+#   - Department-specific instances                 -> tighter global cap, team-appropriate rates
+#   - Management / exec instances                   -> low request volume, higher per-request token budget
+#   - Dev / sandbox instances                       -> generous limits for experimentation
 # ============================================================================
 
 instances:
-  # --- Shared engineering instance (heavy usage) ------------------------------
-  - vm_name:      "insidellm-engineer"
-    vm_hostname:  "insidellm-engineer"
+  # --- Fleet primary (Gov-Hub, Grafana, Loki, central sync target) -----------
+  # vm_role is auto-set to "primary" for the first non-edge / non-gateway VM
+  # that does not declare its own role. All other VMs in the fleet get their
+  # `fleet_primary_host` pointed at this VM's static IP.
+  - vm_name:      "insidellm-gen"
+    vm_hostname:  "insidellm-gen"
+    vm_static_ip: "10.0.0.110/24"
+    vm_role:      "primary"                  # explicit — wins over inference
+    litellm_global_max_budget:   300
+    litellm_default_user_budget: 5.0
+    litellm_default_user_rpm:    30
+    litellm_default_user_tpm:    120000
+
+  # --- Engineering gateway backend -------------------------------------------
+  # Referenced by departments.engineering.backend -> auto vm_role = "gateway"
+  # auto department = "engineering", auto fallback_department = "general"
+  - vm_name:      "insidellm-eng"
+    vm_hostname:  "insidellm-eng"
     vm_static_ip: "10.0.0.120/24"
-    litellm_global_max_budget:   500         # $500/mo — engineering burns tokens fast
-    litellm_default_user_budget: 10.0        # $10/day per engineer
-    litellm_default_user_rpm:    60          # double the default — code assistants are chatty
-    litellm_default_user_tpm:    200000      # 200k TPM for long context windows
-    # anthropic_api_key: "sk-ant-..."       # override if per-VM key needed
+    litellm_global_max_budget:   500         # eng burns tokens fast
+    litellm_default_user_budget: 10.0
+    litellm_default_user_rpm:    60
+    litellm_default_user_tpm:    200000
 
-  # --- Management / exec instance (light usage, high-value queries) ----------
-  - vm_name:      "insidellm-exec"
-    vm_hostname:  "insidellm-exec"
-    vm_static_ip: "10.0.0.122/24"
-    litellm_global_max_budget:   50          # $50/mo — small user base
-    litellm_default_user_budget: 3.0         # $3/day — execs ask fewer but longer questions
-    litellm_default_user_rpm:    15          # lower RPM — no automation expected
-    litellm_default_user_tpm:    150000      # generous token budget for deep analysis
+  # --- Legal gateway backend (tier2, no fallback) ----------------------------
+  # Referenced by departments.legal.backend -> auto vm_role = "gateway"
+  - vm_name:      "insidellm-legal"
+    vm_hostname:  "insidellm-legal"
+    vm_static_ip: "10.0.0.121/24"
+    industry:        "legal"
+    governance_tier: "tier2"
+    litellm_global_max_budget:   150
+    litellm_default_user_budget: 4.0
+    litellm_default_user_rpm:    20
+    litellm_default_user_tpm:    150000
 
-  # --- Client services instance (customer-facing, tightly controlled) --------
+  # --- Client-service gateway backend (collections industry overlay) ---------
   - vm_name:      "insidellm-clientsrvc"
     vm_hostname:  "insidellm-clientsrvc"
     vm_static_ip: "10.0.0.124/24"
-    litellm_global_max_budget:   200       # $200/mo — moderate customer volume
-    litellm_default_user_budget: 2.0       # $2/day per agent — prevent runaway automation
-    litellm_default_user_rpm:    20        # controlled pace
-    litellm_default_user_tpm:    80000     # smaller context — structured queries
-    industry:     "collections"            # industry-specific DLP/OPA rules
-    governance_tier: "tier2"               # stricter governance
+    industry:        "collections"
+    governance_tier: "tier2"
+    litellm_global_max_budget:   200
+    litellm_default_user_budget: 2.0
+    litellm_default_user_rpm:    20
+    litellm_default_user_tpm:    80000
 
-  # --- Dev / sandbox instance (generous for experimentation) -----------------
-  - vm_name:      "insidellm-dev"
-    vm_hostname:  "insidellm-dev"
-    vm_static_ip: "10.0.0.126/24"
-    vm_processor_count: 4                  # lighter VM — fewer CPUs
-    vm_memory_startup_bytes: 8589934592    # 8 GB
-    litellm_global_max_budget:   25        # $25/mo — sandbox cap
-    litellm_default_user_budget: 8.0       # $8/day — devs experiment freely
-    litellm_default_user_rpm:    100       # high RPM for automated testing
-    litellm_default_user_tpm:    300000    # big context for RAG experiments
-    ollama_enable: true                    # local models for offline dev
-    environment: "development"
+  # --- Exec / management gateway backend -------------------------------------
+  - vm_name:      "insidellm-mgmt"
+    vm_hostname:  "insidellm-mgmt"
+    vm_static_ip: "10.0.0.122/24"
+    litellm_global_max_budget:   50
+    litellm_default_user_budget: 3.0
+    litellm_default_user_rpm:    15
+    litellm_default_user_tpm:    150000
+
+  # --- Edge front-door router ------------------------------------------------
+  # IP matches edge.vms[0] above -> auto vm_role = "edge". The renderer
+  # propagates edge.domain / edge.vip / edge.tls_source from the top-level
+  # edge: block into this instance's tfvars.
+  - vm_name:      "insidellm-edge"
+    vm_hostname:  "insidellm-edge"
+    vm_static_ip: "10.0.0.100/24"
+    vm_processor_count:      4               # edge is a thin router; no Ollama
+    vm_memory_startup_bytes: 8589934592      # 8 GB
+    governance_hub_enable: false             # no local governance; points at primary
+    docforge_enable:       false
+    ollama_enable:         false

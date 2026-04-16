@@ -80,6 +80,135 @@ async def list_capabilities(capability: str | None = None, instance_id: str | No
         }
 
 
+# Heartbeat freshness threshold — anything older than this is "stale".
+# capability_service re-publishes every 60s, so 180s gives 3 missed beats.
+_TOPOLOGY_STALE_SECONDS = 180
+
+
+@router.get("/topology")
+async def fleet_topology():
+    """Fleet-wide capability topology view.
+
+    Aggregates rows from governance_fleet_capabilities into a per-instance
+    document plus a reverse index (capability -> [instance_id, ...]).
+
+    Response shape:
+        {
+          "primary_id": "insidellm-mgmt" | null,
+          "instances": [
+            {
+              "instance_id": "...",
+              "role": "primary" | "gateway" | ...,
+              "capabilities": [{"name":"...", "endpoint":"...", "status":"live",
+                                "metadata": {...}, "updated_at":"..."}],
+              "last_seen": ISO-8601 UTC | null,
+              "health": "healthy" | "stale"
+            }
+          ],
+          "capabilities_index": {"litellm": ["a","b"], ...}
+        }
+    """
+    from datetime import datetime, timezone
+
+    from sqlalchemy import select
+
+    from ..db.local_db import AsyncSessionLocal
+    from ..db.models import FleetCapability
+
+    async with AsyncSessionLocal() as db:
+        stmt = select(FleetCapability).order_by(
+            FleetCapability.instance_id, FleetCapability.capability
+        )
+        result = await db.execute(stmt)
+        rows = result.scalars().all()
+
+    now = datetime.now(timezone.utc)
+
+    # Group by instance_id
+    grouped: dict[str, list] = {}
+    for r in rows:
+        grouped.setdefault(r.instance_id, []).append(r)
+
+    instances = []
+    capabilities_index: dict[str, list[str]] = {}
+    primary_candidate_by_role: str | None = None
+    primary_candidate_by_govhub: str | None = None
+
+    for instance_id, inst_rows in grouped.items():
+        # Role — pick first non-empty role column (they should all agree).
+        role = ""
+        for r in inst_rows:
+            if r.role:
+                role = r.role
+                break
+
+        # Last seen = max(updated_at)
+        updated_times = [r.updated_at for r in inst_rows if r.updated_at is not None]
+        last_seen_dt = max(updated_times) if updated_times else None
+
+        # Health based on freshness of the most recent heartbeat
+        if last_seen_dt is None:
+            health = "stale"
+        else:
+            # Normalize to aware UTC for arithmetic
+            if last_seen_dt.tzinfo is None:
+                last_seen_aware = last_seen_dt.replace(tzinfo=timezone.utc)
+            else:
+                last_seen_aware = last_seen_dt
+            age = (now - last_seen_aware).total_seconds()
+            health = "healthy" if age < _TOPOLOGY_STALE_SECONDS else "stale"
+
+        cap_list = []
+        for r in inst_rows:
+            cap_list.append(
+                {
+                    "name": r.capability,
+                    "endpoint": r.endpoint,
+                    "status": r.status,
+                    "metadata": r.capability_metadata or {},
+                    "updated_at": r.updated_at.isoformat() if r.updated_at else None,
+                }
+            )
+            capabilities_index.setdefault(r.capability, []).append(instance_id)
+
+        # Primary detection: any row with role="primary"
+        if role == "primary" and primary_candidate_by_role is None:
+            primary_candidate_by_role = instance_id
+        # Fallback: provides governance-hub
+        if primary_candidate_by_govhub is None and any(
+            r.capability == "governance-hub" for r in inst_rows
+        ):
+            primary_candidate_by_govhub = instance_id
+
+        instances.append(
+            {
+                "instance_id": instance_id,
+                "role": role,
+                "capabilities": cap_list,
+                "last_seen": last_seen_dt.isoformat() if last_seen_dt else None,
+                "health": health,
+            }
+        )
+
+    primary_id = primary_candidate_by_role or primary_candidate_by_govhub
+
+    # Sort instances: primary first, then alphabetical by instance_id
+    def _sort_key(i: dict) -> tuple[int, str]:
+        return (0 if i["instance_id"] == primary_id else 1, i["instance_id"])
+
+    instances.sort(key=_sort_key)
+
+    # Dedupe capabilities_index entries (shouldn't happen but defensive)
+    for cap, ids in capabilities_index.items():
+        capabilities_index[cap] = sorted(set(ids))
+
+    return {
+        "primary_id": primary_id,
+        "instances": instances,
+        "capabilities_index": capabilities_index,
+    }
+
+
 @router.get("/instances/{instance_id}")
 async def get_instance(instance_id: str):
     """Get detailed info for a specific instance including telemetry history."""

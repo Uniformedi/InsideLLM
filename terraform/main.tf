@@ -62,13 +62,27 @@ resource "random_password" "fleet_edge_secret" {
   special = false
 }
 
+# Edge-only secrets. Only generated when vm_role == "edge" so single-VM
+# deploys don't carry around state they never use.
+resource "random_password" "oauth2_cookie_secret" {
+  count   = var.vm_role == "edge" ? 1 : 0
+  length  = 32
+  special = false
+}
+
+resource "random_password" "keepalived_password" {
+  count   = var.vm_role == "edge" ? 1 : 0
+  length  = 16
+  special = false
+}
+
 locals {
-  litellm_master_key = var.litellm_master_key != "" ? var.litellm_master_key : "sk-${random_password.litellm_master_key[0].result}"
-  litellm_salt_key   = var.litellm_salt_key != "" ? var.litellm_salt_key : random_password.litellm_salt_key[0].result
-  postgres_password  = var.postgres_password != "" ? var.postgres_password : random_password.postgres_password[0].result
-  webui_secret       = random_password.webui_secret.result
-  xrdp_password      = random_password.xrdp_password.result
-  grafana_password   = local.effective_ops_grafana_enable ? random_password.grafana_password[0].result : ""
+  litellm_master_key    = var.litellm_master_key != "" ? var.litellm_master_key : "sk-${random_password.litellm_master_key[0].result}"
+  litellm_salt_key      = var.litellm_salt_key != "" ? var.litellm_salt_key : random_password.litellm_salt_key[0].result
+  postgres_password     = var.postgres_password != "" ? var.postgres_password : random_password.postgres_password[0].result
+  webui_secret          = random_password.webui_secret.result
+  xrdp_password         = random_password.xrdp_password.result
+  grafana_password      = local.effective_ops_grafana_enable ? random_password.grafana_password[0].result : ""
   governance_hub_secret = local.effective_governance_hub_enable ? random_password.governance_hub_secret[0].result : ""
   guacamole_db_password = local.effective_guacamole_enable ? random_password.guacamole_db_password[0].result : ""
 
@@ -76,7 +90,7 @@ locals {
 
   # Sanitized deployment tfvars — stored on the VM for snapshot/clone.
   # Secrets are replaced with REDACTED placeholders.
-  platform_version = trimspace(file("${path.module}/../VERSION"))
+  platform_version  = trimspace(file("${path.module}/../VERSION"))
   deployment_tfvars = <<-TFVARS
 # InsideLLM Deployment Configuration (sanitized — secrets redacted)
 # Deployed: ${timestamp()}
@@ -186,14 +200,14 @@ TFVARS
     MICROSOFT_CLIENT_ID     = var.azure_ad_client_id
     MICROSOFT_CLIENT_SECRET = var.azure_ad_client_secret
     MICROSOFT_TENANT        = var.azure_ad_tenant_id
-  } : var.sso_provider == "okta" ? {
-    GENERIC_CLIENT_ID              = var.okta_client_id
-    GENERIC_CLIENT_SECRET          = var.okta_client_secret
-    GENERIC_AUTHORIZATION_ENDPOINT = "https://${var.okta_domain}/oauth2/v1/authorize"
-    GENERIC_TOKEN_ENDPOINT         = "https://${var.okta_domain}/oauth2/v1/token"
-    GENERIC_USERINFO_ENDPOINT      = "https://${var.okta_domain}/oauth2/v1/userinfo"
-    GENERIC_USER_ID_ATTRIBUTE      = "sub"
-    GENERIC_USER_EMAIL_ATTRIBUTE   = "email"
+    } : var.sso_provider == "okta" ? {
+    GENERIC_CLIENT_ID                   = var.okta_client_id
+    GENERIC_CLIENT_SECRET               = var.okta_client_secret
+    GENERIC_AUTHORIZATION_ENDPOINT      = "https://${var.okta_domain}/oauth2/v1/authorize"
+    GENERIC_TOKEN_ENDPOINT              = "https://${var.okta_domain}/oauth2/v1/token"
+    GENERIC_USERINFO_ENDPOINT           = "https://${var.okta_domain}/oauth2/v1/userinfo"
+    GENERIC_USER_ID_ATTRIBUTE           = "sub"
+    GENERIC_USER_EMAIL_ATTRIBUTE        = "email"
     GENERIC_USER_DISPLAY_NAME_ATTRIBUTE = "name"
   } : {}
 }
@@ -240,6 +254,74 @@ resource "tls_self_signed_cert" "self_signed" {
 locals {
   tls_cert = var.tls_cert_path != "" ? file(var.tls_cert_path) : tls_self_signed_cert.self_signed[0].cert_pem
   tls_key  = var.tls_key_path != "" ? file(var.tls_key_path) : tls_private_key.self_signed[0].private_key_pem
+}
+
+# ---------------------------------------------------------------------------
+# Edge TLS (Stream C) — self-signed default, custom PEM paths supported.
+# Letsencrypt issuance happens on-box post-boot and is not handled here.
+# ---------------------------------------------------------------------------
+resource "tls_private_key" "edge_self_signed" {
+  count     = var.vm_role == "edge" && var.edge_tls_source == "self-signed" ? 1 : 0
+  algorithm = "RSA"
+  rsa_bits  = 2048
+}
+
+resource "tls_self_signed_cert" "edge_self_signed" {
+  count           = var.vm_role == "edge" && var.edge_tls_source == "self-signed" ? 1 : 0
+  private_key_pem = tls_private_key.edge_self_signed[0].private_key_pem
+
+  subject {
+    common_name  = var.edge_domain
+    organization = var.owner
+  }
+
+  dns_names = compact([
+    var.edge_domain,
+    var.vm_hostname,
+  ])
+
+  ip_addresses = compact([
+    var.fleet_virtual_ip,
+    var.vm_static_ip != "" ? split("/", var.vm_static_ip)[0] : "",
+  ])
+
+  validity_period_hours = 87600 # 10 years — operator rotates manually
+
+  allowed_uses = [
+    "key_encipherment",
+    "digital_signature",
+    "server_auth",
+  ]
+}
+
+locals {
+  # Edge cert + key resolved to the PEM text that will be written on-box.
+  # For "custom" source, the paths live on the operator's workstation (we
+  # read them at plan/apply time, same pattern as the main TLS flow).
+  # For "letsencrypt", leave empty — the edge cloud-init / post-deploy flow
+  # will provision certs on first boot; a placeholder self-signed keeps
+  # openresty bootable until then.
+  edge_cert_pem = (
+    var.vm_role == "edge" && var.edge_tls_source == "custom" && var.edge_tls_cert_path != ""
+    ? file(var.edge_tls_cert_path)
+    : var.vm_role == "edge" && var.edge_tls_source == "self-signed"
+    ? tls_self_signed_cert.edge_self_signed[0].cert_pem
+    : var.vm_role == "edge" && var.edge_tls_source == "letsencrypt" && length(tls_self_signed_cert.edge_self_signed) > 0
+    ? tls_self_signed_cert.edge_self_signed[0].cert_pem
+    : ""
+  )
+  edge_key_pem = (
+    var.vm_role == "edge" && var.edge_tls_source == "custom" && var.edge_tls_key_path != ""
+    ? file(var.edge_tls_key_path)
+    : var.vm_role == "edge" && var.edge_tls_source == "self-signed"
+    ? tls_private_key.edge_self_signed[0].private_key_pem
+    : var.vm_role == "edge" && var.edge_tls_source == "letsencrypt" && length(tls_private_key.edge_self_signed) > 0
+    ? tls_private_key.edge_self_signed[0].private_key_pem
+    : ""
+  )
+
+  # Stream C — edge enablement flag for readable conditions downstream.
+  edge_enable = var.vm_role == "edge"
 }
 
 # ---------------------------------------------------------------------------
@@ -296,18 +378,18 @@ locals {
 
   _has_role = var.vm_role != ""
 
-  effective_governance_hub_enable  = local._has_role ? local._role_defaults[var.vm_role].governance_hub_enable  : var.governance_hub_enable
-  effective_ops_grafana_enable     = local._has_role ? local._role_defaults[var.vm_role].ops_grafana_enable     : var.ops_grafana_enable
+  effective_governance_hub_enable  = local._has_role ? local._role_defaults[var.vm_role].governance_hub_enable : var.governance_hub_enable
+  effective_ops_grafana_enable     = local._has_role ? local._role_defaults[var.vm_role].ops_grafana_enable : var.ops_grafana_enable
   effective_ops_uptime_kuma_enable = local._has_role ? local._role_defaults[var.vm_role].ops_uptime_kuma_enable : var.ops_uptime_kuma_enable
-  effective_docforge_enable        = local._has_role ? local._role_defaults[var.vm_role].docforge_enable        : var.docforge_enable
-  effective_guacamole_enable       = local._has_role ? local._role_defaults[var.vm_role].guacamole_enable       : var.guacamole_enable
+  effective_docforge_enable        = local._has_role ? local._role_defaults[var.vm_role].docforge_enable : var.docforge_enable
+  effective_guacamole_enable       = local._has_role ? local._role_defaults[var.vm_role].guacamole_enable : var.guacamole_enable
 
   # Stream B — role-aware remote logging.
   # Promtail ships logs either to a local Loki (primary) or across the fleet to
   # the primary's Loki (gateway/workstation/voice). On "edge" or any role with
   # neither local Loki nor a configured primary, Promtail is skipped entirely.
   effective_promtail_enable = local.effective_ops_grafana_enable || var.fleet_primary_host != ""
-  promtail_loki_url = local.effective_ops_grafana_enable ? "http://loki:3100/loki/api/v1/push" : (var.fleet_primary_host != "" ? "http://${var.fleet_primary_host}:3100/loki/api/v1/push" : "")
+  promtail_loki_url         = local.effective_ops_grafana_enable ? "http://loki:3100/loki/api/v1/push" : (var.fleet_primary_host != "" ? "http://${var.fleet_primary_host}:3100/loki/api/v1/push" : "")
 }
 
 # ---------------------------------------------------------------------------
@@ -342,30 +424,30 @@ data "archive_file" "governance_hub" {
 # --- LiteLLM config ---
 locals {
   litellm_config = templatefile("${path.module}/../configs/litellm/config.yaml.tpl", {
-    anthropic_api_key       = var.anthropic_api_key
-    enable_haiku            = var.litellm_enable_haiku
-    enable_opus             = var.litellm_enable_opus
-    openai_enable           = var.openai_api_key != ""
-    gemini_enable           = var.gemini_api_key != ""
-    mistral_enable          = var.mistral_api_key != ""
-    cohere_enable           = var.cohere_api_key != ""
-    azure_openai_enable     = var.azure_openai_api_key != "" && var.azure_openai_endpoint != "" && var.azure_openai_deployment != ""
-    azure_openai_endpoint   = var.azure_openai_endpoint
-    azure_openai_api_version = var.azure_openai_api_version
-    azure_openai_deployment = var.azure_openai_deployment
-    bedrock_enable          = var.aws_bedrock_access_key_id != "" && var.aws_bedrock_secret_access_key != ""
-    bedrock_region          = var.aws_bedrock_region
-    bedrock_model           = var.aws_bedrock_model
-    default_user_budget     = var.litellm_default_user_budget
-    default_user_rpm        = var.litellm_default_user_rpm
-    default_user_tpm        = var.litellm_default_user_tpm
-    global_max_budget       = var.litellm_global_max_budget
-    ollama_enable               = var.ollama_enable
-    ollama_models               = var.ollama_models
-    ollama_api_base             = var.ollama_separate_vm ? "http://${split("/", var.ollama_vm_static_ip)[0]}:11434" : "http://ollama:11434"
-    sso_enabled                 = var.sso_provider != "none"
-    sso_group_mapping_enabled   = var.sso_provider != "none" && length(var.sso_group_mapping) > 0
-    sso_group_field             = var.sso_group_field
+    anthropic_api_key         = var.anthropic_api_key
+    enable_haiku              = var.litellm_enable_haiku
+    enable_opus               = var.litellm_enable_opus
+    openai_enable             = var.openai_api_key != ""
+    gemini_enable             = var.gemini_api_key != ""
+    mistral_enable            = var.mistral_api_key != ""
+    cohere_enable             = var.cohere_api_key != ""
+    azure_openai_enable       = var.azure_openai_api_key != "" && var.azure_openai_endpoint != "" && var.azure_openai_deployment != ""
+    azure_openai_endpoint     = var.azure_openai_endpoint
+    azure_openai_api_version  = var.azure_openai_api_version
+    azure_openai_deployment   = var.azure_openai_deployment
+    bedrock_enable            = var.aws_bedrock_access_key_id != "" && var.aws_bedrock_secret_access_key != ""
+    bedrock_region            = var.aws_bedrock_region
+    bedrock_model             = var.aws_bedrock_model
+    default_user_budget       = var.litellm_default_user_budget
+    default_user_rpm          = var.litellm_default_user_rpm
+    default_user_tpm          = var.litellm_default_user_tpm
+    global_max_budget         = var.litellm_global_max_budget
+    ollama_enable             = var.ollama_enable
+    ollama_models             = var.ollama_models
+    ollama_api_base           = var.ollama_separate_vm ? "http://${split("/", var.ollama_vm_static_ip)[0]}:11434" : "http://ollama:11434"
+    sso_enabled               = var.sso_provider != "none"
+    sso_group_mapping_enabled = var.sso_provider != "none" && length(var.sso_group_mapping) > 0
+    sso_group_field           = var.sso_group_field
   })
 }
 
@@ -394,95 +476,95 @@ locals {
 # --- Docker Compose ---
 locals {
   docker_compose = templatefile("${path.module}/../templates/docker-compose.yml.tpl", {
-    postgres_password  = local.postgres_password
-    litellm_master_key = local.litellm_master_key
-    anthropic_api_key  = var.anthropic_api_key
-    openai_api_key                = var.openai_api_key
-    gemini_api_key                = var.gemini_api_key
-    mistral_api_key               = var.mistral_api_key
-    cohere_api_key                = var.cohere_api_key
-    azure_openai_api_key          = var.azure_openai_api_key
-    azure_openai_endpoint         = var.azure_openai_endpoint
-    azure_openai_api_version      = var.azure_openai_api_version
-    aws_bedrock_access_key_id     = var.aws_bedrock_access_key_id
-    aws_bedrock_secret_access_key = var.aws_bedrock_secret_access_key
-    aws_bedrock_region            = var.aws_bedrock_region
-    webui_secret       = local.webui_secret
-    sso_provider       = var.sso_provider
-    sso_env            = local.sso_env
-    sso_client_id      = var.sso_provider == "azure_ad" ? var.azure_ad_client_id : var.sso_provider == "okta" ? var.okta_client_id : ""
-    sso_client_secret  = var.sso_provider == "azure_ad" ? var.azure_ad_client_secret : var.sso_provider == "okta" ? var.okta_client_secret : ""
-    sso_tenant_id      = var.sso_provider == "azure_ad" ? var.azure_ad_tenant_id : ""
-    sso_okta_domain    = var.sso_provider == "okta" ? var.okta_domain : ""
-    admin_auth_mode    = var.sso_provider != "none" ? "oidc" : var.ad_domain_join ? "ldap" : "none"
-    ad_domain          = var.vm_domain
-    ad_admin_groups    = var.ad_admin_groups
-    ad_view_groups     = var.ad_view_groups
-    ad_approver_groups = var.ad_approver_groups
-    oidc_view_group_ids     = join(",", var.oidc_view_group_ids)
-    oidc_admin_group_ids    = join(",", var.oidc_admin_group_ids)
-    oidc_approver_group_ids = join(",", var.oidc_approver_group_ids)
-    dc_dns_servers     = var.dc_dns_servers
-    ldap_enable_services  = var.ldap_enable_services
-    ldap_bind_dn          = var.ldap_bind_dn
-    ldap_bind_password    = var.ldap_bind_password
-    ldap_user_search_base = var.ldap_user_search_base != "" ? var.ldap_user_search_base : join(",", [for p in split(".", var.vm_domain) : "DC=${p}"])
-    hyperv_host        = var.hyperv_host
-    hyperv_user        = var.hyperv_user
-    hyperv_password    = var.hyperv_password
-    hyperv_port        = var.hyperv_port
-    hyperv_https       = var.hyperv_https
-    hyperv_insecure    = var.hyperv_insecure
-    cockpit_enable     = var.cockpit_enable
-    oidc_issuer_url    = var.sso_provider == "azure_ad" ? "https://login.microsoftonline.com/${var.azure_ad_tenant_id}/v2.0" : var.sso_provider == "okta" ? "https://${var.okta_domain}" : ""
-    ollama_enable      = var.ollama_enable && !var.ollama_separate_vm
-    ollama_models      = var.ollama_models
-    ollama_gpu               = var.ollama_gpu
-    docforge_enable          = local.effective_docforge_enable
-    ops_watchtower_enable    = var.ops_watchtower_enable
-    ops_grafana_enable       = local.effective_ops_grafana_enable
-    effective_promtail_enable = local.effective_promtail_enable
-    ops_uptime_kuma_enable   = local.effective_ops_uptime_kuma_enable
-    ops_alert_webhook        = var.ops_alert_webhook
-    guacamole_enable         = local.effective_guacamole_enable
-    server_name                     = local.vm_fqdn
-    grafana_admin_password          = local.grafana_password
-    postgres_password_plain         = local.postgres_password
-    policy_engine_enable            = var.policy_engine_enable
-    policy_engine_fail_mode         = var.policy_engine_fail_mode
-    governance_hub_enable           = local.effective_governance_hub_enable
-    governance_hub_central_db_type  = var.governance_hub_central_db_type
-    governance_hub_central_db_host  = var.governance_hub_central_db_host
-    governance_hub_central_db_port  = var.governance_hub_central_db_port
-    governance_hub_central_db_name  = var.governance_hub_central_db_name
-    governance_hub_central_db_user  = var.governance_hub_central_db_user
+    postgres_password                  = local.postgres_password
+    litellm_master_key                 = local.litellm_master_key
+    anthropic_api_key                  = var.anthropic_api_key
+    openai_api_key                     = var.openai_api_key
+    gemini_api_key                     = var.gemini_api_key
+    mistral_api_key                    = var.mistral_api_key
+    cohere_api_key                     = var.cohere_api_key
+    azure_openai_api_key               = var.azure_openai_api_key
+    azure_openai_endpoint              = var.azure_openai_endpoint
+    azure_openai_api_version           = var.azure_openai_api_version
+    aws_bedrock_access_key_id          = var.aws_bedrock_access_key_id
+    aws_bedrock_secret_access_key      = var.aws_bedrock_secret_access_key
+    aws_bedrock_region                 = var.aws_bedrock_region
+    webui_secret                       = local.webui_secret
+    sso_provider                       = var.sso_provider
+    sso_env                            = local.sso_env
+    sso_client_id                      = var.sso_provider == "azure_ad" ? var.azure_ad_client_id : var.sso_provider == "okta" ? var.okta_client_id : ""
+    sso_client_secret                  = var.sso_provider == "azure_ad" ? var.azure_ad_client_secret : var.sso_provider == "okta" ? var.okta_client_secret : ""
+    sso_tenant_id                      = var.sso_provider == "azure_ad" ? var.azure_ad_tenant_id : ""
+    sso_okta_domain                    = var.sso_provider == "okta" ? var.okta_domain : ""
+    admin_auth_mode                    = var.sso_provider != "none" ? "oidc" : var.ad_domain_join ? "ldap" : "none"
+    ad_domain                          = var.vm_domain
+    ad_admin_groups                    = var.ad_admin_groups
+    ad_view_groups                     = var.ad_view_groups
+    ad_approver_groups                 = var.ad_approver_groups
+    oidc_view_group_ids                = join(",", var.oidc_view_group_ids)
+    oidc_admin_group_ids               = join(",", var.oidc_admin_group_ids)
+    oidc_approver_group_ids            = join(",", var.oidc_approver_group_ids)
+    dc_dns_servers                     = var.dc_dns_servers
+    ldap_enable_services               = var.ldap_enable_services
+    ldap_bind_dn                       = var.ldap_bind_dn
+    ldap_bind_password                 = var.ldap_bind_password
+    ldap_user_search_base              = var.ldap_user_search_base != "" ? var.ldap_user_search_base : join(",", [for p in split(".", var.vm_domain) : "DC=${p}"])
+    hyperv_host                        = var.hyperv_host
+    hyperv_user                        = var.hyperv_user
+    hyperv_password                    = var.hyperv_password
+    hyperv_port                        = var.hyperv_port
+    hyperv_https                       = var.hyperv_https
+    hyperv_insecure                    = var.hyperv_insecure
+    cockpit_enable                     = var.cockpit_enable
+    oidc_issuer_url                    = var.sso_provider == "azure_ad" ? "https://login.microsoftonline.com/${var.azure_ad_tenant_id}/v2.0" : var.sso_provider == "okta" ? "https://${var.okta_domain}" : ""
+    ollama_enable                      = var.ollama_enable && !var.ollama_separate_vm
+    ollama_models                      = var.ollama_models
+    ollama_gpu                         = var.ollama_gpu
+    docforge_enable                    = local.effective_docforge_enable
+    ops_watchtower_enable              = var.ops_watchtower_enable
+    ops_grafana_enable                 = local.effective_ops_grafana_enable
+    effective_promtail_enable          = local.effective_promtail_enable
+    ops_uptime_kuma_enable             = local.effective_ops_uptime_kuma_enable
+    ops_alert_webhook                  = var.ops_alert_webhook
+    guacamole_enable                   = local.effective_guacamole_enable
+    server_name                        = local.vm_fqdn
+    grafana_admin_password             = local.grafana_password
+    postgres_password_plain            = local.postgres_password
+    policy_engine_enable               = var.policy_engine_enable
+    policy_engine_fail_mode            = var.policy_engine_fail_mode
+    governance_hub_enable              = local.effective_governance_hub_enable
+    governance_hub_central_db_type     = var.governance_hub_central_db_type
+    governance_hub_central_db_host     = var.governance_hub_central_db_host
+    governance_hub_central_db_port     = var.governance_hub_central_db_port
+    governance_hub_central_db_name     = var.governance_hub_central_db_name
+    governance_hub_central_db_user     = var.governance_hub_central_db_user
     governance_hub_central_db_password = var.governance_hub_central_db_password
-    platform_version               = trimspace(file("${path.module}/../VERSION"))
-    governance_hub_instance_id      = var.vm_name
-    governance_hub_instance_name    = var.governance_hub_instance_name != "" ? var.governance_hub_instance_name : var.vm_name
-    governance_hub_sync_schedule    = var.governance_hub_sync_schedule
-    governance_hub_supervisor_emails = var.governance_hub_supervisor_emails
-    governance_hub_advisor_model    = var.governance_hub_advisor_model
-    governance_hub_registration_token = var.governance_hub_registration_token
-    governance_hub_secret           = local.governance_hub_secret
-    governance_hub_industry         = var.industry
-    governance_hub_tier             = var.governance_tier
-    governance_hub_classification   = var.data_classification
+    platform_version                   = trimspace(file("${path.module}/../VERSION"))
+    governance_hub_instance_id         = var.vm_name
+    governance_hub_instance_name       = var.governance_hub_instance_name != "" ? var.governance_hub_instance_name : var.vm_name
+    governance_hub_sync_schedule       = var.governance_hub_sync_schedule
+    governance_hub_supervisor_emails   = var.governance_hub_supervisor_emails
+    governance_hub_advisor_model       = var.governance_hub_advisor_model
+    governance_hub_registration_token  = var.governance_hub_registration_token
+    governance_hub_secret              = local.governance_hub_secret
+    governance_hub_industry            = var.industry
+    governance_hub_tier                = var.governance_tier
+    governance_hub_classification      = var.data_classification
     # --- DLP guardrail (LiteLLM-level) ---
-    dlp_enabled                  = var.dlp_enable
-    dlp_mode                     = var.dlp_mode
-    dlp_block_ssn                = var.dlp_block_ssn
-    dlp_block_credit_cards       = var.dlp_block_credit_cards
-    dlp_block_phi                = var.dlp_block_phi
-    dlp_block_credentials        = var.dlp_block_credentials
-    dlp_block_bank_accounts      = var.dlp_block_bank_accounts
-    dlp_block_standalone_dates   = var.dlp_block_standalone_dates
-    dlp_scan_responses           = var.dlp_scan_responses
-    dlp_custom_patterns          = jsonencode(var.dlp_custom_patterns)
-    chat_enable                  = var.chat_enable
-    chat_team_name               = var.chat_team_name
-    chat_default_channel         = var.chat_default_channel
-    chat_site_url                = "https://${local.vm_fqdn}/chat"
+    dlp_enabled                = var.dlp_enable
+    dlp_mode                   = var.dlp_mode
+    dlp_block_ssn              = var.dlp_block_ssn
+    dlp_block_credit_cards     = var.dlp_block_credit_cards
+    dlp_block_phi              = var.dlp_block_phi
+    dlp_block_credentials      = var.dlp_block_credentials
+    dlp_block_bank_accounts    = var.dlp_block_bank_accounts
+    dlp_block_standalone_dates = var.dlp_block_standalone_dates
+    dlp_scan_responses         = var.dlp_scan_responses
+    dlp_custom_patterns        = jsonencode(var.dlp_custom_patterns)
+    chat_enable                = var.chat_enable
+    chat_team_name             = var.chat_team_name
+    chat_default_channel       = var.chat_default_channel
+    chat_site_url              = "https://${local.vm_fqdn}/chat"
     # Fleet role + capability advertisement (Stream A)
     vm_role                          = var.vm_role
     effective_litellm_capability     = true
@@ -501,109 +583,115 @@ locals {
     vm_hostname            = var.vm_hostname
     docforge_enable        = local.effective_docforge_enable
     docforge_max_body_size = var.docforge_max_file_size_mb
-    ops_grafana_enable      = local.effective_ops_grafana_enable
-    ops_uptime_kuma_enable  = local.effective_ops_uptime_kuma_enable
-    governance_hub_enable   = local.effective_governance_hub_enable
+    ops_grafana_enable     = local.effective_ops_grafana_enable
+    ops_uptime_kuma_enable = local.effective_ops_uptime_kuma_enable
+    governance_hub_enable  = local.effective_governance_hub_enable
     admin_auth_mode        = var.sso_provider != "none" ? "oidc" : var.ad_domain_join ? "ldap" : "none"
-    chat_enable             = var.chat_enable
+    chat_enable            = var.chat_enable
     ldap_enable_services   = var.ldap_enable_services
-    cockpit_enable          = var.cockpit_enable
-    guacamole_enable        = local.effective_guacamole_enable
+    cockpit_enable         = var.cockpit_enable
+    guacamole_enable       = local.effective_guacamole_enable
+    # Stream C — edge trust. When an incoming request carries X-User-Email
+    # (claims edge-forwarded identity), backends require X-Edge-Secret to
+    # match this value before honouring the claim.
+    fleet_edge_secret = random_password.fleet_edge_secret.result
   })
 }
 
-# --- Cloud-init user-data ---
+# --- Cloud-init user-data (main stack: primary, gateway, workstation, voice, storage) ---
+# For vm_role="edge" we render configs/cloud-init/edge-user-data.yaml.tpl
+# instead. See local.cloud_init_userdata below for the selector.
 locals {
-  cloud_init_userdata = templatefile("${path.module}/../configs/cloud-init/user-data.yaml.tpl", {
-    hostname           = var.vm_hostname
-    vm_hostname        = var.vm_hostname
-    fqdn               = local.vm_fqdn
-    ssh_admin_user     = var.ssh_admin_user
-    ssh_public_key     = local.ssh_public_key
-    docker_compose_yml = local.docker_compose
-    env_file_contents  = local.env_file
-    litellm_config     = local.litellm_config
-    nginx_conf         = local.nginx_conf
-    tls_cert           = local.tls_cert
-    tls_key            = local.tls_key
-    dlp_pipeline_py    = file("${path.module}/../configs/open-webui/dlp-pipeline.py")
+  main_cloud_init_userdata = templatefile("${path.module}/../configs/cloud-init/user-data.yaml.tpl", {
+    hostname              = var.vm_hostname
+    vm_hostname           = var.vm_hostname
+    fqdn                  = local.vm_fqdn
+    ssh_admin_user        = var.ssh_admin_user
+    ssh_public_key        = local.ssh_public_key
+    docker_compose_yml    = local.docker_compose
+    env_file_contents     = local.env_file
+    litellm_config        = local.litellm_config
+    nginx_conf            = local.nginx_conf
+    tls_cert              = local.tls_cert
+    tls_key               = local.tls_key
+    dlp_pipeline_py       = file("${path.module}/../configs/open-webui/dlp-pipeline.py")
     provision_owui_svc_sh = file("${path.module}/../scripts/provision-owui-service-account.sh")
     ad_join_runner_sh     = file("${path.module}/../scripts/ad-join-runner.sh")
-    admin_html         = file("${path.module}/../html/admin.html")
+    admin_html            = file("${path.module}/../html/admin.html")
     # framework markdown is no longer bundled — uploaded via /governance
     # admin UI and stored in the central Fleet DB. See commit log.
-    humility_callback_py    = file("${path.module}/../configs/litellm/callbacks/humility_prompt.py")
-    humility_guardrail_py   = file("${path.module}/../configs/litellm/callbacks/humility_guardrail.py")
-    dlp_guardrail_py        = file("${path.module}/../configs/litellm/callbacks/dlp_guardrail.py")
-    setup_html         = file("${path.module}/../html/Setup.html")
-    deployment_tfvars_b64 = base64encode(local.deployment_tfvars)
-    xrdp_password      = local.xrdp_password
-    docforge_enable          = local.effective_docforge_enable
-    docforge_zip_b64         = local.effective_docforge_enable ? filebase64(data.archive_file.docforge[0].output_path) : ""
-    docforge_tool_py         = local.effective_docforge_enable ? file("${path.module}/../configs/open-webui/docforge-tool.py") : ""
-    ops_grafana_enable       = local.effective_ops_grafana_enable
-    effective_promtail_enable = local.effective_promtail_enable
-    ops_uptime_kuma_enable   = local.effective_ops_uptime_kuma_enable
-    ops_trivy_enable         = var.ops_trivy_enable
-    ops_backup_schedule      = var.ops_backup_schedule
-    guacamole_enable         = local.effective_guacamole_enable
-    grafana_datasources_yml  = local.effective_ops_grafana_enable ? templatefile("${path.module}/../configs/grafana/provisioning/datasources/datasources.yml", { postgres_password = local.postgres_password }) : ""
-    grafana_dashboards_yml   = local.effective_ops_grafana_enable ? file("${path.module}/../configs/grafana/provisioning/dashboards/dashboards.yml") : ""
-    grafana_compliance_json  = local.effective_ops_grafana_enable ? file("${path.module}/../configs/grafana/dashboards/compliance.json") : ""
-    grafana_fleet_json       = local.effective_ops_grafana_enable && local.effective_governance_hub_enable ? file("${path.module}/../configs/grafana/dashboards/fleet.json") : ""
-    loki_config              = local.effective_ops_grafana_enable ? file("${path.module}/../configs/loki/loki-config.yml") : ""
-    promtail_config          = local.effective_promtail_enable ? templatefile("${path.module}/../configs/promtail/promtail-config.yml.tpl", { loki_url = local.promtail_loki_url }) : ""
-    trivy_scan_sh            = var.ops_trivy_enable ? file("${path.module}/../configs/trivy/scan.sh") : ""
-    governance_tier              = var.governance_tier
-    data_classification          = var.data_classification
-    ai_ethics_officer            = var.ai_ethics_officer
-    ai_ethics_officer_email      = var.ai_ethics_officer_email
-    governance_hub_enable        = local.effective_governance_hub_enable
-    governance_hub_zip_b64       = local.effective_governance_hub_enable ? filebase64(data.archive_file.governance_hub[0].output_path) : ""
-    governance_advisor_tool_py   = local.effective_governance_hub_enable ? file("${path.module}/../configs/open-webui/governance-advisor-tool.py") : ""
-    fleet_management_tool_py     = local.effective_governance_hub_enable ? file("${path.module}/../configs/open-webui/fleet-management-tool.py") : ""
-    system_designer_tool_py      = local.effective_governance_hub_enable ? file("${path.module}/../configs/open-webui/system-designer-tool.py") : ""
-    data_connector_tool_py       = local.effective_governance_hub_enable ? file("${path.module}/../configs/open-webui/data-connector-tool.py") : ""
-    policy_engine_enable         = var.policy_engine_enable
-    policy_engine_fail_mode      = var.policy_engine_fail_mode
-    opa_zip_b64                  = var.policy_engine_enable ? filebase64(data.archive_file.opa_policies[0].output_path) : ""
-    opa_policy_pipeline_py       = var.policy_engine_enable ? file("${path.module}/../configs/open-webui/opa-policy-pipeline.py") : ""
-    ollama_enable                = var.ollama_enable && !var.ollama_separate_vm
-    ad_domain_join               = var.ad_domain_join
-    ad_join_user                 = var.ad_join_user
-    ad_join_password             = var.ad_join_password
-    ad_join_ou                   = var.ad_join_ou
-    ad_dns_register              = var.ad_dns_register
-    vm_domain                    = var.vm_domain
-    cockpit_enable               = var.cockpit_enable
-    dc_dns_servers               = var.dc_dns_servers
-    ad_domain                    = var.vm_domain
-    ad_admin_groups              = var.ad_admin_groups
-    ad_view_groups               = var.ad_view_groups
-    ad_approver_groups           = var.ad_approver_groups
-    oidc_view_group_ids          = join(",", var.oidc_view_group_ids)
-    oidc_admin_group_ids         = join(",", var.oidc_admin_group_ids)
-    oidc_approver_group_ids      = join(",", var.oidc_approver_group_ids)
-    ldap_enable_services         = var.ldap_enable_services
-    ldap_bind_dn                 = var.ldap_bind_dn
-    ldap_bind_password           = var.ldap_bind_password
-    ldap_user_search_base        = var.ldap_user_search_base != "" ? var.ldap_user_search_base : join(",", [for p in split(".", var.vm_domain) : "DC=${p}"])
-    post_deploy_sh               = templatefile("${path.module}/../templates/post-deploy.sh.tpl", {
-      litellm_master_key  = local.litellm_master_key
-      default_user_budget = var.litellm_default_user_budget
-      vm_fqdn             = local.vm_fqdn
-      instance_id         = var.vm_name
-      ollama_enable       = var.ollama_enable && !var.ollama_separate_vm
-      ollama_models       = var.ollama_models
+    humility_callback_py       = file("${path.module}/../configs/litellm/callbacks/humility_prompt.py")
+    humility_guardrail_py      = file("${path.module}/../configs/litellm/callbacks/humility_guardrail.py")
+    dlp_guardrail_py           = file("${path.module}/../configs/litellm/callbacks/dlp_guardrail.py")
+    setup_html                 = file("${path.module}/../html/Setup.html")
+    deployment_tfvars_b64      = base64encode(local.deployment_tfvars)
+    xrdp_password              = local.xrdp_password
+    docforge_enable            = local.effective_docforge_enable
+    docforge_zip_b64           = local.effective_docforge_enable ? filebase64(data.archive_file.docforge[0].output_path) : ""
+    docforge_tool_py           = local.effective_docforge_enable ? file("${path.module}/../configs/open-webui/docforge-tool.py") : ""
+    ops_grafana_enable         = local.effective_ops_grafana_enable
+    effective_promtail_enable  = local.effective_promtail_enable
+    ops_uptime_kuma_enable     = local.effective_ops_uptime_kuma_enable
+    ops_trivy_enable           = var.ops_trivy_enable
+    ops_backup_schedule        = var.ops_backup_schedule
+    guacamole_enable           = local.effective_guacamole_enable
+    grafana_datasources_yml    = local.effective_ops_grafana_enable ? templatefile("${path.module}/../configs/grafana/provisioning/datasources/datasources.yml", { postgres_password = local.postgres_password }) : ""
+    grafana_dashboards_yml     = local.effective_ops_grafana_enable ? file("${path.module}/../configs/grafana/provisioning/dashboards/dashboards.yml") : ""
+    grafana_compliance_json    = local.effective_ops_grafana_enable ? file("${path.module}/../configs/grafana/dashboards/compliance.json") : ""
+    grafana_fleet_json         = local.effective_ops_grafana_enable && local.effective_governance_hub_enable ? file("${path.module}/../configs/grafana/dashboards/fleet.json") : ""
+    loki_config                = local.effective_ops_grafana_enable ? file("${path.module}/../configs/loki/loki-config.yml") : ""
+    promtail_config            = local.effective_promtail_enable ? templatefile("${path.module}/../configs/promtail/promtail-config.yml.tpl", { loki_url = local.promtail_loki_url }) : ""
+    trivy_scan_sh              = var.ops_trivy_enable ? file("${path.module}/../configs/trivy/scan.sh") : ""
+    governance_tier            = var.governance_tier
+    data_classification        = var.data_classification
+    ai_ethics_officer          = var.ai_ethics_officer
+    ai_ethics_officer_email    = var.ai_ethics_officer_email
+    governance_hub_enable      = local.effective_governance_hub_enable
+    governance_hub_zip_b64     = local.effective_governance_hub_enable ? filebase64(data.archive_file.governance_hub[0].output_path) : ""
+    governance_advisor_tool_py = local.effective_governance_hub_enable ? file("${path.module}/../configs/open-webui/governance-advisor-tool.py") : ""
+    fleet_management_tool_py   = local.effective_governance_hub_enable ? file("${path.module}/../configs/open-webui/fleet-management-tool.py") : ""
+    system_designer_tool_py    = local.effective_governance_hub_enable ? file("${path.module}/../configs/open-webui/system-designer-tool.py") : ""
+    data_connector_tool_py     = local.effective_governance_hub_enable ? file("${path.module}/../configs/open-webui/data-connector-tool.py") : ""
+    policy_engine_enable       = var.policy_engine_enable
+    policy_engine_fail_mode    = var.policy_engine_fail_mode
+    opa_zip_b64                = var.policy_engine_enable ? filebase64(data.archive_file.opa_policies[0].output_path) : ""
+    opa_policy_pipeline_py     = var.policy_engine_enable ? file("${path.module}/../configs/open-webui/opa-policy-pipeline.py") : ""
+    ollama_enable              = var.ollama_enable && !var.ollama_separate_vm
+    ad_domain_join             = var.ad_domain_join
+    ad_join_user               = var.ad_join_user
+    ad_join_password           = var.ad_join_password
+    ad_join_ou                 = var.ad_join_ou
+    ad_dns_register            = var.ad_dns_register
+    vm_domain                  = var.vm_domain
+    cockpit_enable             = var.cockpit_enable
+    dc_dns_servers             = var.dc_dns_servers
+    ad_domain                  = var.vm_domain
+    ad_admin_groups            = var.ad_admin_groups
+    ad_view_groups             = var.ad_view_groups
+    ad_approver_groups         = var.ad_approver_groups
+    oidc_view_group_ids        = join(",", var.oidc_view_group_ids)
+    oidc_admin_group_ids       = join(",", var.oidc_admin_group_ids)
+    oidc_approver_group_ids    = join(",", var.oidc_approver_group_ids)
+    ldap_enable_services       = var.ldap_enable_services
+    ldap_bind_dn               = var.ldap_bind_dn
+    ldap_bind_password         = var.ldap_bind_password
+    ldap_user_search_base      = var.ldap_user_search_base != "" ? var.ldap_user_search_base : join(",", [for p in split(".", var.vm_domain) : "DC=${p}"])
+    post_deploy_sh = templatefile("${path.module}/../templates/post-deploy.sh.tpl", {
+      litellm_master_key     = local.litellm_master_key
+      default_user_budget    = var.litellm_default_user_budget
+      vm_fqdn                = local.vm_fqdn
+      instance_id            = var.vm_name
+      ollama_enable          = var.ollama_enable && !var.ollama_separate_vm
+      ollama_models          = var.ollama_models
       docforge_enable        = local.effective_docforge_enable
       sso_group_mapping      = var.sso_group_mapping
       ops_grafana_enable     = local.effective_ops_grafana_enable
       ops_uptime_kuma_enable = local.effective_ops_uptime_kuma_enable
-      keyword_categories       = var.keyword_categories
-      governance_hub_enable    = local.effective_governance_hub_enable
-      policy_engine_enable     = var.policy_engine_enable
-      chat_enable              = var.chat_enable
-      guacamole_enable         = local.effective_guacamole_enable
+      keyword_categories     = var.keyword_categories
+      governance_hub_enable  = local.effective_governance_hub_enable
+      policy_engine_enable   = var.policy_engine_enable
+      chat_enable            = var.chat_enable
+      guacamole_enable       = local.effective_guacamole_enable
     })
   })
 
@@ -617,6 +705,64 @@ locals {
     gateway     = var.vm_gateway
     dns_servers = var.vm_dns_servers
   }) : ""
+}
+
+# ---------------------------------------------------------------------------
+# Edge cloud-init (Stream C) — rendered only when vm_role == "edge".
+# Kept in a separate locals{} block from the main stack to keep dependency
+# graphs clean; the selector local below picks one userdata blob for the
+# local_file.cloud_init_userdata write.
+# ---------------------------------------------------------------------------
+locals {
+  # MVP: empty department -> default routing to the fleet primary. Stream D
+  # will overwrite routes.json at runtime from the Render-Fleet pipeline.
+  edge_routes_map = {
+    "_default" = var.fleet_primary_host
+  }
+
+  edge_routes_json = jsonencode(local.edge_routes_map)
+
+  edge_nginx_conf = local.edge_enable ? templatefile("${path.module}/../configs/edge/nginx.conf.tpl", {
+    edge_domain       = var.edge_domain
+    fleet_edge_secret = random_password.fleet_edge_secret.result
+  }) : ""
+
+  edge_routing_lua = local.edge_enable ? templatefile("${path.module}/../configs/edge/routing.lua.tpl", {}) : ""
+
+  edge_routes_rendered = local.edge_enable ? templatefile("${path.module}/../configs/edge/routes.json.tpl", {
+    routes_json = local.edge_routes_json
+  }) : ""
+
+  edge_cloud_init_userdata = local.edge_enable ? templatefile("${path.module}/../configs/cloud-init/edge-user-data.yaml.tpl", {
+    hostname             = var.vm_hostname
+    fqdn                 = local.vm_fqdn
+    ssh_admin_user       = var.ssh_admin_user
+    ssh_public_key       = local.ssh_public_key
+    fleet_edge_secret    = random_password.fleet_edge_secret.result
+    oidc_client_id       = var.sso_provider == "azure_ad" ? var.azure_ad_client_id : var.sso_provider == "okta" ? var.okta_client_id : ""
+    oidc_client_secret   = var.sso_provider == "azure_ad" ? var.azure_ad_client_secret : var.sso_provider == "okta" ? var.okta_client_secret : ""
+    oidc_issuer_url      = var.sso_provider == "azure_ad" ? "https://login.microsoftonline.com/${var.azure_ad_tenant_id}/v2.0" : var.sso_provider == "okta" ? "https://${var.okta_domain}" : ""
+    # oauth2-proxy requires a 16, 24, or 32-byte cookie secret. random_password
+    # with length=32 and special=false produces 32 printable ASCII bytes,
+    # which satisfies the "32 bytes" constraint directly (no base64 wrapping
+    # needed). Stable across apply cycles thanks to the resource's count gate.
+    oauth2_cookie_secret = length(random_password.oauth2_cookie_secret) > 0 ? random_password.oauth2_cookie_secret[0].result : ""
+    fleet_virtual_ip     = var.fleet_virtual_ip
+    peer_edge_ips        = ""
+    keepalived_password  = length(random_password.keepalived_password) > 0 ? random_password.keepalived_password[0].result : ""
+    edge_domain          = var.edge_domain
+    fleet_primary_host   = var.fleet_primary_host
+    edge_tls_cert_b64    = base64encode(local.edge_cert_pem)
+    edge_tls_key_b64     = base64encode(local.edge_key_pem)
+    edge_nginx_conf      = local.edge_nginx_conf
+    edge_routing_lua     = local.edge_routing_lua
+    edge_routes_json     = local.edge_routes_rendered
+  }) : ""
+
+  # Selector: edge VMs get the thin edge cloud-init, everyone else gets the
+  # full stack cloud-init. Single-VM deploys (vm_role="") take the main path
+  # unchanged — backwards compatibility guaranteed.
+  cloud_init_userdata = local.edge_enable ? local.edge_cloud_init_userdata : local.main_cloud_init_userdata
 }
 
 # ---------------------------------------------------------------------------
@@ -699,8 +845,8 @@ resource "null_resource" "prepare_vm_disk" {
   # artifacts on the host, causing the "fresh deploy isn't actually fresh"
   # bug we hit during the dry-run.
   provisioner "local-exec" {
-    when       = destroy
-    command    = <<-EOT
+    when        = destroy
+    command     = <<-EOT
       $vhd = Join-Path "${self.triggers.vhd_path}" "${self.triggers.vm_name}-boot.vhdx"
       if (Test-Path $vhd) {
         Write-Host "Destroy: removing boot VHDX $vhd"
@@ -800,8 +946,8 @@ resource "hyperv_machine_instance" "insidellm" {
   automatic_stop_action  = "ShutDown"
   automatic_start_delay  = 0
 
-  checkpoint_type     = "Disabled"
-  notes               = "Inside LLM - ${var.environment} - Managed by Terraform"
+  checkpoint_type = "Disabled"
+  notes           = "Inside LLM - ${var.environment} - Managed by Terraform"
 
   vm_firmware {
     enable_secure_boot   = "On"
@@ -839,7 +985,7 @@ resource "hyperv_machine_instance" "insidellm" {
   integration_services = {
     "Guest Service Interface" = true
     "Heartbeat"               = true
-    "Key-Value Pair Exchange"  = true
+    "Key-Value Pair Exchange" = true
     "Shutdown"                = true
     "Time Synchronization"    = true
     "VSS"                     = true
@@ -944,7 +1090,7 @@ resource "hyperv_machine_instance" "ollama" {
   state                = "Running"
 
   vm_firmware {
-    enable_secure_boot = "On"
+    enable_secure_boot   = "On"
     secure_boot_template = "MicrosoftUEFICertificateAuthority"
   }
 
@@ -969,7 +1115,7 @@ resource "hyperv_machine_instance" "ollama" {
   integration_services = {
     "Guest Service Interface" = true
     "Heartbeat"               = true
-    "Key-Value Pair Exchange"  = true
+    "Key-Value Pair Exchange" = true
     "Shutdown"                = true
     "Time Synchronization"    = true
     "VSS"                     = true
