@@ -45,32 +45,117 @@ def _last_user_message(messages: list[dict]) -> str:
     return ""
 
 
+def _build_opa_input(messages: list[dict], user_info: dict,
+                     agent_meta: dict | None = None) -> dict:
+    """Assemble the OPA input document per the v1.1 contract.
+
+    Fields are sourced from:
+      - messages, user_info — passed in
+      - agent_meta — populated by the manifest-to-runtime translator on
+        every LiteLLM request issued on behalf of a declarative agent.
+        Keys: agent_id, agent_version_hash, tenant_id, guardrail_profile,
+        allowed_models, baa_models, data_classes_in_context,
+        max_actions_per_session, token_budget_per_session, action_id,
+        action_scope, trigger_type, notification_targets.
+      - env — fallback for tenant_id (GOVERNANCE_HUB_INSTANCE_ID),
+        time_of_day, consumer_timezone.
+    """
+    agent_meta = agent_meta or {}
+    last_msg = _last_user_message(messages)
+
+    # Session counters (best-effort; the translator overrides these when
+    # managing a declarative-agent session).
+    session_token_count = agent_meta.get("session_token_count", 0)
+    session_action_count = agent_meta.get("session_action_count", 0)
+
+    # Time-of-day in consumer timezone; FDCPA hours rule consumes this.
+    import datetime as _dt
+    import zoneinfo as _zi
+    tz_name = agent_meta.get("consumer_timezone") or os.environ.get("DEFAULT_TIMEZONE", "UTC")
+    try:
+        tz = _zi.ZoneInfo(tz_name)
+        now_local = _dt.datetime.now(tz)
+        time_of_day = now_local.strftime("%H:%M")
+    except Exception:
+        time_of_day = _dt.datetime.utcnow().strftime("%H:%M")
+        tz_name = "UTC"
+
+    # Guardrail profile. Manifest translator sets this; fallback by
+    # tenant/env to keep legacy (non-agent) traffic working.
+    guardrail_profile = agent_meta.get("guardrail_profile") or os.environ.get(
+        "DEFAULT_GUARDRAIL_PROFILE", "tier_general_business"
+    )
+
+    opa_input = {
+        # --- Tenant + session identity -------------------------------------
+        "tenant_id": agent_meta.get("tenant_id") or os.environ.get("GOVERNANCE_HUB_INSTANCE_ID", ""),
+        "agent_id": agent_meta.get("agent_id", ""),
+        "agent_version_hash": agent_meta.get("agent_version_hash", ""),
+        "user_id": user_info.get("user_id", ""),
+        "user_name": user_info.get("user", ""),
+        "user_role": user_info.get("user_role", ""),
+        "execution_id": agent_meta.get("execution_id", ""),
+        "session_id": agent_meta.get("session_id", ""),
+
+        # --- Invocation context --------------------------------------------
+        "trigger_type": agent_meta.get("trigger_type", "human_chat"),
+        "action_id": agent_meta.get("action_id", ""),
+        "action_scope": agent_meta.get("action_scope", "read"),
+        "iteration_count": agent_meta.get("iteration_count", 0),
+        "session_token_count": session_token_count,
+        "session_action_count": session_action_count,
+        "max_actions_per_session": agent_meta.get("max_actions_per_session", 10),
+        "token_budget_per_session": agent_meta.get("token_budget_per_session", 50000),
+
+        # --- Classification ------------------------------------------------
+        "guardrail_profile": guardrail_profile,
+        "data_classes_in_context": agent_meta.get("data_classes_in_context", []),
+        "data_classification": agent_meta.get("data_classification", "internal"),
+
+        # --- Model selection -----------------------------------------------
+        "model_requested": agent_meta.get("model_requested", ""),
+        "allowed_models": agent_meta.get("allowed_models", []),
+        "baa_models": agent_meta.get("baa_models", []),
+
+        # --- Notification --------------------------------------------------
+        "notification_targets": agent_meta.get("notification_targets", []),
+
+        # --- Time / locale (FDCPA hours rule) -----------------------------
+        "time_of_day": time_of_day,
+        "consumer_timezone": tz_name,
+
+        # --- Authorization witnesses (industry policies) -------------------
+        # hipaa_authorized is implicit when the profile is tier_hipaa_regulated;
+        # the translator sets it explicitly so the industry policy has its
+        # witness. Same pattern for the other industry flags.
+        "hipaa_authorized": agent_meta.get("hipaa_authorized", guardrail_profile == "tier_hipaa_regulated"),
+        "fdcpa_compliant_template": agent_meta.get("fdcpa_compliant_template", False),
+        "sox_authorized": agent_meta.get("sox_authorized", False),
+        "ferpa_authorized": agent_meta.get("ferpa_authorized", False),
+        "glba_authorized": agent_meta.get("glba_authorized", False),
+        "break_glass": agent_meta.get("break_glass", False),
+
+        # --- Legacy fields retained for back-compat with pre-v1.1 policies -
+        "request_type": "standard",
+        "has_human_consensus": False,
+        "uncertainty_declared": True,
+        "within_validated_domain": True,
+
+        # --- Message history + integrity hash ------------------------------
+        "messages": messages,
+        "message_hash": hashlib.sha256(last_msg.encode()).hexdigest()[:16],
+    }
+    return opa_input
+
+
 def _query_opa_sync(opa_url: str, messages: list[dict], user_info: dict,
-                    timeout: int = 5) -> dict | None:
+                    timeout: int = 5, agent_meta: dict | None = None) -> dict | None:
     try:
         import requests
     except ImportError:
         return None
 
-    last_msg = _last_user_message(messages)
-    opa_input = {
-        "messages": messages,
-        "user_id": user_info.get("user_id", ""),
-        "user_name": user_info.get("user", ""),
-        "user_role": user_info.get("user_role", ""),
-        "data_classification": "internal",
-        "request_type": "standard",
-        "has_human_consensus": False,
-        "uncertainty_declared": True,
-        "within_validated_domain": True,
-        "hipaa_authorized": False,
-        "fdcpa_compliant_template": False,
-        "sox_authorized": False,
-        "ferpa_authorized": False,
-        "glba_authorized": False,
-        "break_glass": False,
-        "message_hash": hashlib.sha256(last_msg.encode()).hexdigest()[:16],
-    }
+    opa_input = _build_opa_input(messages, user_info, agent_meta)
 
     try:
         resp = requests.post(
