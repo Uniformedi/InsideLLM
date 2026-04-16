@@ -1,11 +1,17 @@
-# InsideLLM Declarative Agents — Implementation Plan
+# InsideLLM Declarative Agents — Implementation Plan (v1 — superseded)
 
-**Status:** Design / not implemented. This document is the canonical plan
-for delivering M365-style declarative agents authored by end users and
-governed by the InsideLLM platform.
+> **Superseded by** [Platform-Ultraplan-v3.md](Platform-Ultraplan-v3.md).
+> v3 reframes from "M365-like agents for Organization" to "portfolio-wide platform
+> deployed across 32 Parent Organization companies, Organization as reference tenant." The gap
+> analysis is at [Platform-Ultraplan-v3-GapAnalysis.md](Platform-Ultraplan-v3-GapAnalysis.md).
+> This v1 document is retained for its manifest-schema sketch and the
+> "first concrete step" Phase 1 kickoff pseudocode, which remain valid.
 
-**Audience:** platform maintainers, design-partner product owners, and
-anyone evaluating scope before kicking off Phase 1.
+**Status:** Superseded 2026-04-16. Kept as reference for the single-VM
+manifest schema and first-PR scaffolding.
+
+**Audience:** platform maintainers evaluating the initial storage +
+router surface before layering the broader v3 plan on top.
 
 **Last updated:** 2026-04-16
 
