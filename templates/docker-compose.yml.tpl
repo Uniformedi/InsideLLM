@@ -663,8 +663,12 @@ services:
     networks:
       - insidellm-internal
 
+%{ endif ~}
+%{ if effective_promtail_enable ~}
   # -------------------------------------------------------------------------
   # Promtail — Log Collector (ships Docker logs to Loki)
+  # On primary nodes: ships to local loki:3100.
+  # On non-primary nodes: ships to fleet primary's Loki over the network.
   # -------------------------------------------------------------------------
   promtail:
     image: grafana/promtail:latest
@@ -675,9 +679,11 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
     command: -config.file=/etc/promtail/config.yml
+%{ if ops_grafana_enable ~}
     depends_on:
       loki:
         condition: service_started
+%{ endif ~}
     logging:
       driver: json-file
       options:
@@ -686,6 +692,8 @@ services:
     networks:
       - insidellm-internal
 
+%{ endif ~}
+%{ if ops_grafana_enable ~}
   # -------------------------------------------------------------------------
   # Grafana — Compliance Dashboards & Visualization
   # -------------------------------------------------------------------------

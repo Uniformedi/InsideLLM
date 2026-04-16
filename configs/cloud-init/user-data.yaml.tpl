@@ -384,13 +384,19 @@ write_files:
     content: |
       ${indent(6, loki_config)}
 
+%{ endif ~}
+%{ if effective_promtail_enable ~}
   # --- Promtail config ---
+  # Written on any node that forwards logs (primary = local loki,
+  # gateway/workstation/voice = fleet primary's loki).
   - path: /opt/InsideLLM/promtail/promtail-config.yml
     permissions: "0644"
     owner: root:root
     content: |
       ${indent(6, promtail_config)}
 
+%{ endif ~}
+%{ if ops_grafana_enable ~}
   # --- Grafana datasources ---
   # Grafana scans /etc/grafana/provisioning/{datasources,dashboards,...}/
   # for *.yaml. The yaml files MUST live inside their typed subdirectory;

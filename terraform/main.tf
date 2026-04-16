@@ -301,6 +301,13 @@ locals {
   effective_ops_uptime_kuma_enable = local._has_role ? local._role_defaults[var.vm_role].ops_uptime_kuma_enable : var.ops_uptime_kuma_enable
   effective_docforge_enable        = local._has_role ? local._role_defaults[var.vm_role].docforge_enable        : var.docforge_enable
   effective_guacamole_enable       = local._has_role ? local._role_defaults[var.vm_role].guacamole_enable       : var.guacamole_enable
+
+  # Stream B — role-aware remote logging.
+  # Promtail ships logs either to a local Loki (primary) or across the fleet to
+  # the primary's Loki (gateway/workstation/voice). On "edge" or any role with
+  # neither local Loki nor a configured primary, Promtail is skipped entirely.
+  effective_promtail_enable = local.effective_ops_grafana_enable || var.fleet_primary_host != ""
+  promtail_loki_url = local.effective_ops_grafana_enable ? "http://loki:3100/loki/api/v1/push" : (var.fleet_primary_host != "" ? "http://${var.fleet_primary_host}:3100/loki/api/v1/push" : "")
 }
 
 # ---------------------------------------------------------------------------
@@ -434,6 +441,7 @@ locals {
     docforge_enable          = local.effective_docforge_enable
     ops_watchtower_enable    = var.ops_watchtower_enable
     ops_grafana_enable       = local.effective_ops_grafana_enable
+    effective_promtail_enable = local.effective_promtail_enable
     ops_uptime_kuma_enable   = local.effective_ops_uptime_kuma_enable
     ops_alert_webhook        = var.ops_alert_webhook
     guacamole_enable         = local.effective_guacamole_enable
@@ -534,6 +542,7 @@ locals {
     docforge_zip_b64         = local.effective_docforge_enable ? filebase64(data.archive_file.docforge[0].output_path) : ""
     docforge_tool_py         = local.effective_docforge_enable ? file("${path.module}/../configs/open-webui/docforge-tool.py") : ""
     ops_grafana_enable       = local.effective_ops_grafana_enable
+    effective_promtail_enable = local.effective_promtail_enable
     ops_uptime_kuma_enable   = local.effective_ops_uptime_kuma_enable
     ops_trivy_enable         = var.ops_trivy_enable
     ops_backup_schedule      = var.ops_backup_schedule
@@ -543,7 +552,7 @@ locals {
     grafana_compliance_json  = local.effective_ops_grafana_enable ? file("${path.module}/../configs/grafana/dashboards/compliance.json") : ""
     grafana_fleet_json       = local.effective_ops_grafana_enable && local.effective_governance_hub_enable ? file("${path.module}/../configs/grafana/dashboards/fleet.json") : ""
     loki_config              = local.effective_ops_grafana_enable ? file("${path.module}/../configs/loki/loki-config.yml") : ""
-    promtail_config          = local.effective_ops_grafana_enable ? file("${path.module}/../configs/promtail/promtail-config.yml") : ""
+    promtail_config          = local.effective_promtail_enable ? templatefile("${path.module}/../configs/promtail/promtail-config.yml.tpl", { loki_url = local.promtail_loki_url }) : ""
     trivy_scan_sh            = var.ops_trivy_enable ? file("${path.module}/../configs/trivy/scan.sh") : ""
     governance_tier              = var.governance_tier
     data_classification          = var.data_classification
