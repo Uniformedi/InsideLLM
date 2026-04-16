@@ -1,0 +1,250 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://insidellm.uniformedi.com/schemas/agent_manifest/v1.1",
+  "title": "InsideLLM Declarative Agent Manifest",
+  "description": "Canonical manifest schema for InsideLLM declarative agents. v1.1 reconciles the v1 draft (docs/Agents-Plan.md) with Ultraplan v3 (docs/Platform-Ultraplan-v3.md §2.2). JSON is the wire format; YAML is supported for authoring and is round-trippable.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "agent_id",
+    "tenant_id",
+    "display",
+    "instructions",
+    "guardrails"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.1",
+      "description": "Manifest schema version. Pinned; translators refuse unknown versions."
+    },
+    "agent_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$",
+      "description": "Immutable identifier, kebab-case, unique per tenant. Forking creates a new agent_id."
+    },
+    "tenant_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$",
+      "description": "Which tenant / company this agent belongs to (e.g. 'organization-collections', 'parent-organization-acme')."
+    },
+    "created_by": {
+      "type": "string",
+      "format": "email",
+      "description": "Authoring user. Set at create time, retained on update for audit."
+    },
+    "team": {
+      "type": "string",
+      "description": "Owning team or department label. Used for default visibility."
+    },
+
+    "display": {
+      "type": "object",
+      "description": "User-facing presentation fields.",
+      "additionalProperties": false,
+      "required": ["name", "description"],
+      "properties": {
+        "name":        { "type": "string", "minLength": 1, "maxLength": 120 },
+        "icon":        { "type": "string", "description": "Icon name or URL. Small standard set preferred (e.g. 'shield-check', 'scale', 'gavel')." },
+        "description": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "conversation_starters": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "maxItems": 6,
+          "description": "Short example prompts shown to users to kick off a session."
+        }
+      }
+    },
+
+    "instructions": {
+      "type": "string",
+      "minLength": 20,
+      "maxLength": 8000,
+      "description": "System prompt / persona. Natural language. Treated as immutable at runtime — user prompts cannot override. Humility guardrail still layered on top."
+    },
+
+    "knowledge": {
+      "type": "object",
+      "description": "Scoped knowledge sources available to this agent.",
+      "additionalProperties": false,
+      "properties": {
+        "collections": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "RAG collection names bound to this agent. Retrieval is server-side restricted to this list.",
+          "default": []
+        },
+        "scope": {
+          "type": "string",
+          "enum": ["strict", "loose"],
+          "default": "strict",
+          "description": "strict = retrieve only from declared collections (recommended). loose = fall back to tenant-global collections on miss."
+        },
+        "connectors": {
+          "type": "array",
+          "description": "Live data connectors queried at retrieval time (not pre-embedded). Each entry references a governance_data_connector by name.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["connector", "purpose"],
+            "properties": {
+              "connector": { "type": "string" },
+              "purpose":   { "type": "string", "description": "Short description of what this connector is for; shown in audit." }
+            }
+          },
+          "default": []
+        },
+        "urls": {
+          "type": "array",
+          "items": { "type": "string", "format": "uri" },
+          "description": "Allowlisted URLs the agent may fetch (DLP-scanned on retrieval).",
+          "default": []
+        }
+      }
+    },
+
+    "actions": {
+      "type": "array",
+      "description": "Catalog actions the agent may invoke. Registration records live in governance_actions and declare their backend (FastAPI / Celery / n8n / Activepieces / MCP).",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["action_id"],
+        "properties": {
+          "action_id": {
+            "type": "string",
+            "description": "References an entry in the action catalog."
+          },
+          "approval_required": {
+            "type": "boolean",
+            "default": false,
+            "description": "When true, the action invocation is gated on an HITL approval before execution."
+          },
+          "approval_target": {
+            "type": "string",
+            "description": "Who approves: role name ('manager'), user email, or team. Ignored when approval_required=false.",
+            "default": ""
+          },
+          "approval_channel": {
+            "type": "string",
+            "enum": ["teams", "slack", "email", "none"],
+            "default": "none",
+            "description": "Channel the approval request is dispatched on."
+          },
+          "scope": {
+            "type": "string",
+            "enum": ["read", "write", "admin"],
+            "default": "read",
+            "description": "Per-action privilege hint. Catalog-action registration has the authoritative scope; this is a manifest-level downgrade option only."
+          }
+        }
+      },
+      "default": []
+    },
+
+    "guardrails": {
+      "type": "object",
+      "description": "Runtime safety and model constraints. All fields flow into OPA input.",
+      "additionalProperties": false,
+      "required": ["profile"],
+      "properties": {
+        "profile": {
+          "type": "string",
+          "enum": [
+            "tier_unrestricted",
+            "tier_general_business",
+            "tier_financial_regulated",
+            "tier_fdcpa_regulated",
+            "tier_hipaa_regulated",
+            "tier_custom"
+          ],
+          "description": "Named OPA policy bundle. Portfolio → company → agent inheritance applies: an agent profile can only tighten its parent policies, never loosen."
+        },
+        "max_actions_per_session": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200,
+          "default": 10
+        },
+        "token_budget_per_session": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 2000000,
+          "default": 50000,
+          "description": "Cumulative token cap across all LLM calls in one session."
+        },
+        "daily_usd_budget": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Per-user daily spend cap on this agent. Enforced via the agent's LiteLLM virtual key."
+        },
+        "rpm_limit": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 20
+        },
+        "allowed_models": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1,
+          "description": "Model IDs (LiteLLM's naming) this agent may invoke. Intersected with the tenant's global allowlist.",
+          "default": ["claude-sonnet-4-6"]
+        },
+        "temperature_cap": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "default": 0.7
+        },
+        "pii_handling": {
+          "type": "string",
+          "enum": ["redact_in_logs", "block_on_detect", "passthrough_strict_audit"],
+          "default": "redact_in_logs"
+        },
+        "dlp_overrides": {
+          "type": "object",
+          "description": "Narrow, audited exceptions to tenant DLP policy. Each key defaults false. Setting true requires the agent's guardrail profile to explicitly permit it.",
+          "additionalProperties": false,
+          "properties": {
+            "allow_pii":        { "type": "boolean", "default": false },
+            "allow_phi":        { "type": "boolean", "default": false },
+            "allow_financials": { "type": "boolean", "default": false },
+            "allow_credentials":{ "type": "boolean", "default": false }
+          },
+          "default": {}
+        }
+      }
+    },
+
+    "visibility": {
+      "type": "object",
+      "description": "Who can see and invoke this agent.",
+      "additionalProperties": false,
+      "properties": {
+        "scope": {
+          "type": "string",
+          "enum": ["private", "team", "org", "fleet"],
+          "default": "private",
+          "description": "private = author only. team = members of `team` above. org = all users in tenant. fleet = all users across all tenants (Parent Organization portfolio-wide). scope=org requires tier-2+ approval via governance_changes. scope=fleet requires tier-3 approval."
+        },
+        "available_to": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Groups or user emails that can invoke (union with scope-based reach)."
+        },
+        "published": {
+          "type": "boolean",
+          "default": false,
+          "description": "Draft (false) vs live (true)."
+        }
+      }
+    },
+
+    "meta": {
+      "type": "object",
+      "description": "Free-form operator metadata. Not interpreted by the runtime.",
+      "additionalProperties": true
+    }
+  }
+}
