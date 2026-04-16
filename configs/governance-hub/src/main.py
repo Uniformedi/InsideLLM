@@ -253,6 +253,15 @@ async def startup():
     except Exception as e:
         logger.warning(f"Vendor seed failed (non-fatal): {e}")
 
+    # Fleet capability registry — publish once + launch 60s heartbeat
+    try:
+        from .services.capability_service import publish_once, heartbeat_loop
+        written = await publish_once()
+        asyncio.create_task(heartbeat_loop())
+        logger.info(f"Capability registry: published {written} local capabilities; heartbeat started")
+    except Exception as e:
+        logger.warning(f"Capability publish failed (non-fatal): {e}")
+
     # Load settings overrides from DB (replaces .env file approach)
     try:
         from .services.fleet_service import load_settings_overrides

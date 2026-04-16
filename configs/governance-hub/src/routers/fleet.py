@@ -42,6 +42,44 @@ async def get_instances():
     return {"instances": instances, "total": len(instances)}
 
 
+@router.get("/capabilities")
+async def list_capabilities(capability: str | None = None, instance_id: str | None = None):
+    """List fleet-wide capabilities. Used for smart module deferral (gateway
+    nodes point Promtail at primary's Loki) and edge routing.
+
+    Optional filters: ?capability=litellm, ?instance_id=insidellm-01
+    """
+    from sqlalchemy import select
+
+    from ..db.local_db import AsyncSessionLocal
+    from ..db.models import FleetCapability
+
+    async with AsyncSessionLocal() as db:
+        stmt = select(FleetCapability)
+        if capability:
+            stmt = stmt.where(FleetCapability.capability == capability)
+        if instance_id:
+            stmt = stmt.where(FleetCapability.instance_id == instance_id)
+        stmt = stmt.order_by(FleetCapability.instance_id, FleetCapability.capability)
+        result = await db.execute(stmt)
+        rows = result.scalars().all()
+        return {
+            "capabilities": [
+                {
+                    "instance_id": r.instance_id,
+                    "capability": r.capability,
+                    "endpoint": r.endpoint,
+                    "role": r.role,
+                    "status": r.status,
+                    "metadata": r.capability_metadata or {},
+                    "updated_at": r.updated_at.isoformat() if r.updated_at else None,
+                }
+                for r in rows
+            ],
+            "total": len(rows),
+        }
+
+
 @router.get("/instances/{instance_id}")
 async def get_instance(instance_id: str):
     """Get detailed info for a specific instance including telemetry history."""

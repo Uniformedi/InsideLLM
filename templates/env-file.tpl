@@ -39,3 +39,8 @@ HYPERV_PASSWORD=${hyperv_password}
 
 # --- Guacamole (remote access gateway) auth backend in Postgres -------------
 GUACAMOLE_DB_PASSWORD=${guacamole_db_password}
+
+# --- Fleet edge shared secret ----------------------------------------------
+# Backends require X-Edge-Secret header match from the edge router before
+# trusting forwarded X-User-* claims. Rotate with coordinated restart.
+FLEET_EDGE_SECRET=${fleet_edge_secret}

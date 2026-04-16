@@ -977,3 +977,70 @@ variable "chat_default_channel" {
   type        = string
   default     = "general"
 }
+
+# =============================================================================
+# FLEET / EDGE (Tier 1 modularity + front-door router)
+# =============================================================================
+# vm_role selects role-derived defaults; explicit *_enable flags above always win.
+
+variable "vm_role" {
+  description = "Role of this VM in the fleet. Empty = standalone (default, backwards-compatible). Valid: primary | gateway | workstation | voice | edge | storage"
+  type        = string
+  default     = ""
+  validation {
+    condition     = contains(["", "primary", "gateway", "workstation", "voice", "edge", "storage"], var.vm_role)
+    error_message = "vm_role must be one of: primary, gateway, workstation, voice, edge, storage, or empty string."
+  }
+}
+
+variable "fleet_primary_host" {
+  description = "Hostname or IP of the fleet primary (Gov-Hub, Grafana, Loki). Non-primary roles point at this for remote logging and capability registry."
+  type        = string
+  default     = ""
+}
+
+variable "fleet_virtual_ip" {
+  description = "Virtual IP owned by keepalived on the active edge VM. Clients hit this address via the configured FQDN."
+  type        = string
+  default     = ""
+}
+
+variable "edge_tls_source" {
+  description = "How the edge VM obtains its TLS cert: self-signed | letsencrypt | custom"
+  type        = string
+  default     = "self-signed"
+  validation {
+    condition     = contains(["self-signed", "letsencrypt", "custom"], var.edge_tls_source)
+    error_message = "edge_tls_source must be one of: self-signed, letsencrypt, custom."
+  }
+}
+
+variable "edge_tls_cert_path" {
+  description = "Path on the edge VM to the PEM-encoded certificate (when edge_tls_source = custom)"
+  type        = string
+  default     = ""
+}
+
+variable "edge_tls_key_path" {
+  description = "Path on the edge VM to the PEM-encoded private key (when edge_tls_source = custom)"
+  type        = string
+  default     = ""
+}
+
+variable "edge_domain" {
+  description = "FQDN served by the edge (e.g., insidellm.corp.example.com). Used for TLS cert CN and OIDC redirect URIs."
+  type        = string
+  default     = ""
+}
+
+variable "department" {
+  description = "Department label for this backend gateway (routed to by the edge based on OIDC claim). Empty for non-gateway roles."
+  type        = string
+  default     = ""
+}
+
+variable "fallback_department" {
+  description = "If this department backend is down, the edge routes to this sibling's backend. Empty = fail fast (no fallback)."
+  type        = string
+  default     = ""
+}

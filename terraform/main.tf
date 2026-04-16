@@ -40,20 +40,25 @@ resource "random_password" "xrdp_password" {
 }
 
 resource "random_password" "grafana_password" {
-  count   = var.ops_grafana_enable ? 1 : 0
+  count   = local.effective_ops_grafana_enable ? 1 : 0
   length  = 20
   special = false
 }
 
 resource "random_password" "governance_hub_secret" {
-  count   = var.governance_hub_enable ? 1 : 0
+  count   = local.effective_governance_hub_enable ? 1 : 0
   length  = 32
   special = false
 }
 
 resource "random_password" "guacamole_db_password" {
-  count   = var.guacamole_enable ? 1 : 0
+  count   = local.effective_guacamole_enable ? 1 : 0
   length  = 24
+  special = false
+}
+
+resource "random_password" "fleet_edge_secret" {
+  length  = 48
   special = false
 }
 
@@ -63,9 +68,9 @@ locals {
   postgres_password  = var.postgres_password != "" ? var.postgres_password : random_password.postgres_password[0].result
   webui_secret       = random_password.webui_secret.result
   xrdp_password      = random_password.xrdp_password.result
-  grafana_password   = var.ops_grafana_enable ? random_password.grafana_password[0].result : ""
-  governance_hub_secret = var.governance_hub_enable ? random_password.governance_hub_secret[0].result : ""
-  guacamole_db_password = var.guacamole_enable ? random_password.guacamole_db_password[0].result : ""
+  grafana_password   = local.effective_ops_grafana_enable ? random_password.grafana_password[0].result : ""
+  governance_hub_secret = local.effective_governance_hub_enable ? random_password.governance_hub_secret[0].result : ""
+  guacamole_db_password = local.effective_guacamole_enable ? random_password.guacamole_db_password[0].result : ""
 
   vm_fqdn = "${var.vm_hostname}.${var.vm_domain}"
 
@@ -141,7 +146,7 @@ dlp_block_phi        = ${var.dlp_block_phi}
 dlp_block_credentials = ${var.dlp_block_credentials}
 
 # Optional Services
-docforge_enable = ${var.docforge_enable}
+docforge_enable = ${local.effective_docforge_enable}
 
 # AI Governance
 industry                 = "${var.industry}"
@@ -154,12 +159,12 @@ log_retention_days       = ${var.log_retention_days}
 # Operations
 ops_watchtower_enable    = ${var.ops_watchtower_enable}
 ops_trivy_enable         = ${var.ops_trivy_enable}
-ops_grafana_enable       = ${var.ops_grafana_enable}
-ops_uptime_kuma_enable   = ${var.ops_uptime_kuma_enable}
+ops_grafana_enable       = ${local.effective_ops_grafana_enable}
+ops_uptime_kuma_enable   = ${local.effective_ops_uptime_kuma_enable}
 ops_backup_schedule      = "${var.ops_backup_schedule}"
 
 # Governance Hub
-governance_hub_enable              = ${var.governance_hub_enable}
+governance_hub_enable              = ${local.effective_governance_hub_enable}
 governance_hub_instance_name       = "${var.governance_hub_instance_name != "" ? var.governance_hub_instance_name : var.vm_name}"
 governance_hub_sync_schedule       = "${var.governance_hub_sync_schedule}"
 governance_hub_supervisor_emails   = "${var.governance_hub_supervisor_emails}"
@@ -238,11 +243,72 @@ locals {
 }
 
 # ---------------------------------------------------------------------------
+# Role-derived module defaults — vm_role single-switch picks the enablement
+# profile; explicit *_enable variables in tfvars always win when set.
+# vm_role="" preserves legacy behaviour (backwards-compatible default).
+# ---------------------------------------------------------------------------
+
+locals {
+  _role_defaults = {
+    primary = {
+      governance_hub_enable  = true
+      ops_grafana_enable     = true
+      ops_uptime_kuma_enable = true
+      docforge_enable        = true
+      guacamole_enable       = false
+    }
+    gateway = {
+      governance_hub_enable  = true
+      ops_grafana_enable     = false
+      ops_uptime_kuma_enable = false
+      docforge_enable        = true
+      guacamole_enable       = false
+    }
+    workstation = {
+      governance_hub_enable  = false
+      ops_grafana_enable     = false
+      ops_uptime_kuma_enable = false
+      docforge_enable        = false
+      guacamole_enable       = true
+    }
+    voice = {
+      governance_hub_enable  = false
+      ops_grafana_enable     = false
+      ops_uptime_kuma_enable = false
+      docforge_enable        = false
+      guacamole_enable       = false
+    }
+    edge = {
+      governance_hub_enable  = false
+      ops_grafana_enable     = false
+      ops_uptime_kuma_enable = false
+      docforge_enable        = false
+      guacamole_enable       = false
+    }
+    storage = {
+      governance_hub_enable  = false
+      ops_grafana_enable     = false
+      ops_uptime_kuma_enable = false
+      docforge_enable        = false
+      guacamole_enable       = false
+    }
+  }
+
+  _has_role = var.vm_role != ""
+
+  effective_governance_hub_enable  = local._has_role ? local._role_defaults[var.vm_role].governance_hub_enable  : var.governance_hub_enable
+  effective_ops_grafana_enable     = local._has_role ? local._role_defaults[var.vm_role].ops_grafana_enable     : var.ops_grafana_enable
+  effective_ops_uptime_kuma_enable = local._has_role ? local._role_defaults[var.vm_role].ops_uptime_kuma_enable : var.ops_uptime_kuma_enable
+  effective_docforge_enable        = local._has_role ? local._role_defaults[var.vm_role].docforge_enable        : var.docforge_enable
+  effective_guacamole_enable       = local._has_role ? local._role_defaults[var.vm_role].guacamole_enable       : var.guacamole_enable
+}
+
+# ---------------------------------------------------------------------------
 # Archive DocForge source for cloud-init deployment
 # ---------------------------------------------------------------------------
 
 data "archive_file" "docforge" {
-  count       = var.docforge_enable ? 1 : 0
+  count       = local.effective_docforge_enable ? 1 : 0
   type        = "zip"
   source_dir  = "${path.module}/../configs/docforge"
   output_path = "${path.module}/.terraform/tmp/docforge.zip"
@@ -256,7 +322,7 @@ data "archive_file" "opa_policies" {
 }
 
 data "archive_file" "governance_hub" {
-  count       = var.governance_hub_enable ? 1 : 0
+  count       = local.effective_governance_hub_enable ? 1 : 0
   type        = "zip"
   source_dir  = "${path.module}/../configs/governance-hub"
   output_path = "${path.module}/.terraform/tmp/governance-hub.zip"
@@ -314,6 +380,7 @@ locals {
     ldap_bind_password     = var.ldap_bind_password
     hyperv_password        = var.hyperv_password
     guacamole_db_password  = local.guacamole_db_password
+    fleet_edge_secret      = random_password.fleet_edge_secret.result
   })
 }
 
@@ -364,18 +431,18 @@ locals {
     ollama_enable      = var.ollama_enable && !var.ollama_separate_vm
     ollama_models      = var.ollama_models
     ollama_gpu               = var.ollama_gpu
-    docforge_enable          = var.docforge_enable
+    docforge_enable          = local.effective_docforge_enable
     ops_watchtower_enable    = var.ops_watchtower_enable
-    ops_grafana_enable       = var.ops_grafana_enable
-    ops_uptime_kuma_enable   = var.ops_uptime_kuma_enable
+    ops_grafana_enable       = local.effective_ops_grafana_enable
+    ops_uptime_kuma_enable   = local.effective_ops_uptime_kuma_enable
     ops_alert_webhook        = var.ops_alert_webhook
-    guacamole_enable         = var.guacamole_enable
+    guacamole_enable         = local.effective_guacamole_enable
     server_name                     = local.vm_fqdn
     grafana_admin_password          = local.grafana_password
     postgres_password_plain         = local.postgres_password
     policy_engine_enable            = var.policy_engine_enable
     policy_engine_fail_mode         = var.policy_engine_fail_mode
-    governance_hub_enable           = var.governance_hub_enable
+    governance_hub_enable           = local.effective_governance_hub_enable
     governance_hub_central_db_type  = var.governance_hub_central_db_type
     governance_hub_central_db_host  = var.governance_hub_central_db_host
     governance_hub_central_db_port  = var.governance_hub_central_db_port
@@ -408,6 +475,14 @@ locals {
     chat_team_name               = var.chat_team_name
     chat_default_channel         = var.chat_default_channel
     chat_site_url                = "https://${local.vm_fqdn}/chat"
+    # Fleet role + capability advertisement (Stream A)
+    vm_role                          = var.vm_role
+    effective_litellm_capability     = true
+    effective_open_webui_capability  = local.effective_governance_hub_enable
+    effective_ops_grafana_enable     = local.effective_ops_grafana_enable
+    effective_guacamole_enable       = local.effective_guacamole_enable
+    effective_ops_uptime_kuma_enable = local.effective_ops_uptime_kuma_enable
+    effective_docforge_enable        = local.effective_docforge_enable
   })
 }
 
@@ -416,16 +491,16 @@ locals {
   nginx_conf = templatefile("${path.module}/../configs/nginx/nginx.conf.tpl", {
     server_name            = local.vm_fqdn
     vm_hostname            = var.vm_hostname
-    docforge_enable        = var.docforge_enable
+    docforge_enable        = local.effective_docforge_enable
     docforge_max_body_size = var.docforge_max_file_size_mb
-    ops_grafana_enable      = var.ops_grafana_enable
-    ops_uptime_kuma_enable  = var.ops_uptime_kuma_enable
-    governance_hub_enable   = var.governance_hub_enable
+    ops_grafana_enable      = local.effective_ops_grafana_enable
+    ops_uptime_kuma_enable  = local.effective_ops_uptime_kuma_enable
+    governance_hub_enable   = local.effective_governance_hub_enable
     admin_auth_mode        = var.sso_provider != "none" ? "oidc" : var.ad_domain_join ? "ldap" : "none"
     chat_enable             = var.chat_enable
     ldap_enable_services   = var.ldap_enable_services
     cockpit_enable          = var.cockpit_enable
-    guacamole_enable        = var.guacamole_enable
+    guacamole_enable        = local.effective_guacamole_enable
   })
 }
 
@@ -455,31 +530,31 @@ locals {
     setup_html         = file("${path.module}/../html/Setup.html")
     deployment_tfvars_b64 = base64encode(local.deployment_tfvars)
     xrdp_password      = local.xrdp_password
-    docforge_enable          = var.docforge_enable
-    docforge_zip_b64         = var.docforge_enable ? filebase64(data.archive_file.docforge[0].output_path) : ""
-    docforge_tool_py         = var.docforge_enable ? file("${path.module}/../configs/open-webui/docforge-tool.py") : ""
-    ops_grafana_enable       = var.ops_grafana_enable
-    ops_uptime_kuma_enable   = var.ops_uptime_kuma_enable
+    docforge_enable          = local.effective_docforge_enable
+    docforge_zip_b64         = local.effective_docforge_enable ? filebase64(data.archive_file.docforge[0].output_path) : ""
+    docforge_tool_py         = local.effective_docforge_enable ? file("${path.module}/../configs/open-webui/docforge-tool.py") : ""
+    ops_grafana_enable       = local.effective_ops_grafana_enable
+    ops_uptime_kuma_enable   = local.effective_ops_uptime_kuma_enable
     ops_trivy_enable         = var.ops_trivy_enable
     ops_backup_schedule      = var.ops_backup_schedule
-    guacamole_enable         = var.guacamole_enable
-    grafana_datasources_yml  = var.ops_grafana_enable ? templatefile("${path.module}/../configs/grafana/provisioning/datasources/datasources.yml", { postgres_password = local.postgres_password }) : ""
-    grafana_dashboards_yml   = var.ops_grafana_enable ? file("${path.module}/../configs/grafana/provisioning/dashboards/dashboards.yml") : ""
-    grafana_compliance_json  = var.ops_grafana_enable ? file("${path.module}/../configs/grafana/dashboards/compliance.json") : ""
-    grafana_fleet_json       = var.ops_grafana_enable && var.governance_hub_enable ? file("${path.module}/../configs/grafana/dashboards/fleet.json") : ""
-    loki_config              = var.ops_grafana_enable ? file("${path.module}/../configs/loki/loki-config.yml") : ""
-    promtail_config          = var.ops_grafana_enable ? file("${path.module}/../configs/promtail/promtail-config.yml") : ""
+    guacamole_enable         = local.effective_guacamole_enable
+    grafana_datasources_yml  = local.effective_ops_grafana_enable ? templatefile("${path.module}/../configs/grafana/provisioning/datasources/datasources.yml", { postgres_password = local.postgres_password }) : ""
+    grafana_dashboards_yml   = local.effective_ops_grafana_enable ? file("${path.module}/../configs/grafana/provisioning/dashboards/dashboards.yml") : ""
+    grafana_compliance_json  = local.effective_ops_grafana_enable ? file("${path.module}/../configs/grafana/dashboards/compliance.json") : ""
+    grafana_fleet_json       = local.effective_ops_grafana_enable && local.effective_governance_hub_enable ? file("${path.module}/../configs/grafana/dashboards/fleet.json") : ""
+    loki_config              = local.effective_ops_grafana_enable ? file("${path.module}/../configs/loki/loki-config.yml") : ""
+    promtail_config          = local.effective_ops_grafana_enable ? file("${path.module}/../configs/promtail/promtail-config.yml") : ""
     trivy_scan_sh            = var.ops_trivy_enable ? file("${path.module}/../configs/trivy/scan.sh") : ""
     governance_tier              = var.governance_tier
     data_classification          = var.data_classification
     ai_ethics_officer            = var.ai_ethics_officer
     ai_ethics_officer_email      = var.ai_ethics_officer_email
-    governance_hub_enable        = var.governance_hub_enable
-    governance_hub_zip_b64       = var.governance_hub_enable ? filebase64(data.archive_file.governance_hub[0].output_path) : ""
-    governance_advisor_tool_py   = var.governance_hub_enable ? file("${path.module}/../configs/open-webui/governance-advisor-tool.py") : ""
-    fleet_management_tool_py     = var.governance_hub_enable ? file("${path.module}/../configs/open-webui/fleet-management-tool.py") : ""
-    system_designer_tool_py      = var.governance_hub_enable ? file("${path.module}/../configs/open-webui/system-designer-tool.py") : ""
-    data_connector_tool_py       = var.governance_hub_enable ? file("${path.module}/../configs/open-webui/data-connector-tool.py") : ""
+    governance_hub_enable        = local.effective_governance_hub_enable
+    governance_hub_zip_b64       = local.effective_governance_hub_enable ? filebase64(data.archive_file.governance_hub[0].output_path) : ""
+    governance_advisor_tool_py   = local.effective_governance_hub_enable ? file("${path.module}/../configs/open-webui/governance-advisor-tool.py") : ""
+    fleet_management_tool_py     = local.effective_governance_hub_enable ? file("${path.module}/../configs/open-webui/fleet-management-tool.py") : ""
+    system_designer_tool_py      = local.effective_governance_hub_enable ? file("${path.module}/../configs/open-webui/system-designer-tool.py") : ""
+    data_connector_tool_py       = local.effective_governance_hub_enable ? file("${path.module}/../configs/open-webui/data-connector-tool.py") : ""
     policy_engine_enable         = var.policy_engine_enable
     policy_engine_fail_mode      = var.policy_engine_fail_mode
     opa_zip_b64                  = var.policy_engine_enable ? filebase64(data.archive_file.opa_policies[0].output_path) : ""
@@ -511,15 +586,15 @@ locals {
       instance_id         = var.vm_name
       ollama_enable       = var.ollama_enable && !var.ollama_separate_vm
       ollama_models       = var.ollama_models
-      docforge_enable        = var.docforge_enable
+      docforge_enable        = local.effective_docforge_enable
       sso_group_mapping      = var.sso_group_mapping
-      ops_grafana_enable     = var.ops_grafana_enable
-      ops_uptime_kuma_enable = var.ops_uptime_kuma_enable
+      ops_grafana_enable     = local.effective_ops_grafana_enable
+      ops_uptime_kuma_enable = local.effective_ops_uptime_kuma_enable
       keyword_categories       = var.keyword_categories
-      governance_hub_enable    = var.governance_hub_enable
+      governance_hub_enable    = local.effective_governance_hub_enable
       policy_engine_enable     = var.policy_engine_enable
       chat_enable              = var.chat_enable
-      guacamole_enable         = var.guacamole_enable
+      guacamole_enable         = local.effective_guacamole_enable
     })
   })
 

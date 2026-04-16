@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, Column, DateTime, Integer, Numeric, String, Text
+from sqlalchemy import Boolean, Column, DateTime, Float, Index, Integer, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase
 
@@ -424,3 +424,25 @@ class VendorFavorite(Base):
     vendor_id = Column(Integer, nullable=False, index=True)
     tag = Column(String(100), default="")  # optional user-applied tag
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+
+
+class FleetCapability(Base):
+    """Fleet capability registry. Each Gov-Hub publishes its own capabilities
+    on startup and every 60s. Peers read via /api/v1/fleet/capabilities to
+    discover which instance provides which service (used for smart module
+    deferral and edge routing)."""
+    __tablename__ = "governance_fleet_capabilities"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    instance_id = Column(String(255), nullable=False, index=True)
+    capability = Column(String(100), nullable=False)          # litellm | open-webui | grafana | loki | guacamole | governance-hub
+    endpoint = Column(String(500), nullable=False)            # http://insidellm-01:4000
+    role = Column(String(50), default="")                     # vm_role
+    status = Column(String(20), default="live")               # live | degraded | down
+    capability_metadata = Column("metadata", JSONB, default=dict)
+    updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("instance_id", "capability", name="uq_instance_capability"),
+        Index("ix_fleet_capability_status", "status"),
+    )

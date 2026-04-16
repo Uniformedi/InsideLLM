@@ -1169,7 +1169,7 @@ fi
 # Wait for the Guacamole webapp to answer on /remote/ via nginx.
 log "  [guacamole] waiting for web UI to come up..."
 for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
-  if curl -sk -o /dev/null -w '%{http_code}' "$GUAC_API/languages" 2>/dev/null | grep -qE '^(200|401|403)$'; then
+  if curl -sk -o /dev/null -w '%%{http_code}' "$GUAC_API/languages" 2>/dev/null | grep -qE '^(200|401|403)$'; then
     break
   fi
   sleep 5

@@ -560,6 +560,29 @@ services:
 %{ endif }
       # Break-glass: local insidellm-admin account uses this as the password.
       LITELLM_MASTER_KEY: "$${LITELLM_MASTER_KEY}"
+      # Fleet role + capability advertisement. The capability_service reads
+      # CAP_* to decide which services to publish to the registry.
+      VM_ROLE: "${vm_role}"
+      FLEET_EDGE_SECRET: "$${FLEET_EDGE_SECRET}"
+%{ if effective_litellm_capability ~}
+      CAP_LITELLM_ENDPOINT: "http://litellm:4000/v1"
+%{ endif ~}
+%{ if effective_open_webui_capability ~}
+      CAP_OPEN_WEBUI_ENDPOINT: "http://open-webui:8080"
+%{ endif ~}
+%{ if effective_ops_grafana_enable ~}
+      CAP_GRAFANA_ENDPOINT: "http://grafana:3000"
+      CAP_LOKI_ENDPOINT: "http://loki:3100"
+%{ endif ~}
+%{ if effective_guacamole_enable ~}
+      CAP_GUACAMOLE_ENDPOINT: "http://guacamole:8080"
+%{ endif ~}
+%{ if effective_ops_uptime_kuma_enable ~}
+      CAP_UPTIME_KUMA_ENDPOINT: "http://uptime-kuma:3001"
+%{ endif ~}
+%{ if effective_docforge_enable ~}
+      CAP_DOCFORGE_ENDPOINT: "http://docforge:3000"
+%{ endif ~}
     volumes:
       - /opt/InsideLLM/data/governance-hub:/app/data
       - /opt/InsideLLM/governance-hub/framework:/app/framework:ro
