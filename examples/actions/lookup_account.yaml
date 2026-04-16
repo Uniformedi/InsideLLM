@@ -1,0 +1,50 @@
+# Action catalog entry — lookup_account
+# Demo action invoked by the Dispute Handler agent. Real implementation
+# stubs out a canned account row; Phase 1 ships a FastAPI-backed version.
+
+schema_version: "1.0"
+action_id: lookup_account
+tenant_id: organization-collections
+
+display_name: "Look Up Consumer Account"
+description: "Retrieves account summary, balance, validation-notice date, and payment history for a given account number."
+category: lookup
+
+backend:
+  type: fastapi_http
+  url: "http://insidellm-workers:8000/actions/lookup_account"
+  method: POST
+  timeout_ms: 5000
+
+inputs:
+  account_number:
+    type: string
+    required: true
+    pattern: "^[A-Z0-9]{6,20}$"
+    description: "Organization internal account identifier."
+
+outputs:
+  account_summary:
+    type: object
+    description: "Full account state including §1692g validation-notice date and payment history."
+
+guardrail_requirements:
+  minimum_guardrail_tier: tier_fdcpa_regulated
+  data_classes:
+    - pii
+    - financial
+  requires_approval: false
+
+audit:
+  log_inputs: true
+  log_outputs: true
+  redact_fields:
+    - account_summary.ssn
+    - account_summary.full_name
+
+rate_limit:
+  per_minute: 30
+  per_day: 500
+
+maintainer: uniformedi
+version: "1.0.0"

@@ -1,0 +1,86 @@
+# InsideLLM Declarative Agent — Dispute Handler (Organization showcase)
+#
+# Schema: ../../configs/governance-hub/src/schemas/agent_manifest.schema.json
+# Lifecycle: authored as YAML → POSTed to /api/v1/agents as JSON (one-to-one).
+#
+# This is the anchor agent for the Parent Organization demo on 2026-05-12. It demonstrates
+# every pillar of the platform: manifest-driven instructions + knowledge + actions,
+# approval-gated writes, FDCPA-regulated guardrail profile, hash-chained audit.
+
+schema_version: "1.1"
+agent_id: dispute-handler
+tenant_id: organization-collections
+created_by: dan.medina@uniformedi.com
+team: compliance
+
+display:
+  name: "Dispute Handler"
+  icon: shield-check
+  description: "Handles consumer balance disputes per FDCPA §1692g."
+  conversation_starters:
+    - "I need to process a dispute for account #…"
+    - "What's the validation window for this dispute?"
+    - "Draft a dispute acknowledgment letter"
+
+instructions: |
+  You are a dispute resolution specialist at Organization. When a consumer
+  disputes a balance, first call lookup_account to confirm the account is active
+  and fetch the §1692g validation-window start date. Then check whether the
+  dispute is within 30 days of the initial validation notice.
+
+  If IN window: draft a dispute acknowledgment letter using draft_fdcpa_letter,
+  cite §1692g(b), and queue send_letter for manager approval before mailing.
+  If OUT of window: explain the consumer's remaining remedies (credit reporting
+  dispute, UDAAP complaint, litigation) without drafting a letter.
+
+  Never make guarantees about outcomes. Never discuss settlement amounts unless
+  the consumer is the account holder (verified via lookup_account). If uncertain,
+  escalate to a human manager.
+
+knowledge:
+  collections:
+    - organization-dispute-policies-v3
+    - fdcpa-regulatory-reference
+  scope: strict
+
+actions:
+  - action_id: lookup_account
+    approval_required: false
+    scope: read
+  - action_id: draft_fdcpa_letter
+    approval_required: false
+    scope: read
+  - action_id: send_letter
+    approval_required: true
+    approval_target: compliance_manager
+    approval_channel: teams
+    scope: write
+  - action_id: schedule_callback
+    approval_required: false
+    scope: write
+
+guardrails:
+  profile: tier_fdcpa_regulated
+  max_actions_per_session: 10
+  token_budget_per_session: 50000
+  daily_usd_budget: 5.00
+  rpm_limit: 20
+  allowed_models:
+    - claude-sonnet-4-6
+    - claude-opus-4-6
+  temperature_cap: 0.2
+  pii_handling: redact_in_logs
+  dlp_overrides:
+    allow_pii: false
+    allow_financials: false
+
+visibility:
+  scope: team
+  available_to:
+    - disputes_team
+    - compliance_team
+  published: true
+
+meta:
+  showcase: parent-organization-may-12-demo
+  demo_order: 1

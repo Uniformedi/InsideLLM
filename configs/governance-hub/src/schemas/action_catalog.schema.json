@@ -1,0 +1,226 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://insidellm.uniformedi.com/schemas/action_catalog/v1.0",
+  "title": "InsideLLM Action Catalog Registration",
+  "description": "Registration record for an action in the InsideLLM catalog. An agent manifest names an action_id; this record tells the runtime how to actually invoke it. Backends are deliberately polyglot (FastAPI, Celery, n8n, Activepieces, MCP) — see docs/Platform-Ultraplan-v3-GapAnalysis.md § Layer 3.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "action_id",
+    "display_name",
+    "description",
+    "backend",
+    "inputs",
+    "outputs",
+    "guardrail_requirements"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0"
+    },
+    "action_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{2,63}$",
+      "description": "Stable, unique per tenant. snake_case. Referenced by agent manifests."
+    },
+    "tenant_id": {
+      "type": "string",
+      "description": "Tenant that owns this action. 'core' is a reserved tenant for actions shared across all tenants (Uniformedi-maintained)."
+    },
+    "display_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120,
+      "description": "Human-readable name shown in the agent builder's action picker."
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500,
+      "description": "What the action does, in plain language. Shown in the builder."
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "lookup",
+        "draft",
+        "send",
+        "schedule",
+        "classify",
+        "transform",
+        "retrieve",
+        "notify",
+        "workflow",
+        "other"
+      ],
+      "default": "other",
+      "description": "Coarse grouping for the builder's picker UI."
+    },
+    "backend": {
+      "type": "object",
+      "description": "Polyglot backend discriminated by type. Picked at action-registration time; agents do not see the backend.",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "url"],
+          "properties": {
+            "type":   { "const": "fastapi_http" },
+            "url":    { "type": "string", "format": "uri", "description": "HTTP endpoint invoked with the action's inputs as a JSON body." },
+            "method": { "type": "string", "enum": ["GET", "POST", "PUT", "DELETE"], "default": "POST" },
+            "timeout_ms": { "type": "integer", "minimum": 100, "maximum": 30000, "default": 10000 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "task"],
+          "properties": {
+            "type":            { "const": "celery_task" },
+            "task":            { "type": "string", "description": "Celery task name registered on insidellm-workers (e.g. 'actions.lookup_account')." },
+            "queue":           { "type": "string", "default": "default" },
+            "timeout_seconds": { "type": "integer", "minimum": 1, "maximum": 3600, "default": 60 },
+            "retries":         { "type": "integer", "minimum": 0, "maximum": 5, "default": 0 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "webhook_url"],
+          "properties": {
+            "type":        { "const": "n8n_webhook" },
+            "webhook_url": { "type": "string", "format": "uri" },
+            "hmac_secret_env": { "type": "string", "description": "Env var name holding the shared secret for HMAC signing." }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "trigger_url"],
+          "properties": {
+            "type":        { "const": "activepieces_trigger" },
+            "trigger_url": { "type": "string", "format": "uri" },
+            "hmac_secret_env": { "type": "string" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "server", "tool_name"],
+          "properties": {
+            "type":      { "const": "mcp_tool" },
+            "server":    { "type": "string", "description": "MCP server name registered in governance_mcp_servers." },
+            "tool_name": { "type": "string", "description": "Tool name exported by that MCP server." }
+          }
+        }
+      ]
+    },
+    "inputs": {
+      "type": "object",
+      "description": "Input parameter map. Each key is the param name; value is a simple JSON-Schema subset. The runtime validates before invoking the backend and before OPA evaluation.",
+      "patternProperties": {
+        "^[a-z_][a-z0-9_]*$": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type"],
+          "properties": {
+            "type":        { "type": "string", "enum": ["string", "integer", "number", "boolean", "object", "array"] },
+            "required":    { "type": "boolean", "default": false },
+            "description": { "type": "string" },
+            "enum":        { "type": "array", "items": { "type": ["string", "integer", "number"] } },
+            "pattern":     { "type": "string", "description": "Regex for string types." },
+            "default":     {}
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "outputs": {
+      "type": "object",
+      "description": "Output parameter map (same JSON-Schema subset as inputs). Used by the manifest → tool-call bridge to tell the agent the shape of the return value.",
+      "patternProperties": {
+        "^[a-z_][a-z0-9_]*$": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type"],
+          "properties": {
+            "type":        { "type": "string", "enum": ["string", "integer", "number", "boolean", "object", "array"] },
+            "description": { "type": "string" }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "guardrail_requirements": {
+      "type": "object",
+      "description": "Minimum guardrail posture required for any agent that lists this action. OPA evaluates: is the agent's profile ≥ minimum_guardrail_tier? Does the agent's dlp_overrides authorize touching data_classes?",
+      "additionalProperties": false,
+      "required": ["minimum_guardrail_tier"],
+      "properties": {
+        "data_classes": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["pii", "phi", "financial", "credentials", "public"] },
+          "default": [],
+          "description": "What classes of data this action touches. Drives DLP path + OPA eval."
+        },
+        "minimum_guardrail_tier": {
+          "type": "string",
+          "enum": [
+            "tier_unrestricted",
+            "tier_general_business",
+            "tier_financial_regulated",
+            "tier_fdcpa_regulated",
+            "tier_hipaa_regulated"
+          ],
+          "description": "Agents with a weaker profile cannot list this action (OPA rejects at manifest-publish time)."
+        },
+        "requires_approval": {
+          "type": "boolean",
+          "default": false,
+          "description": "Forces approval_required=true regardless of what the agent manifest specifies. Use for write actions touching regulated data."
+        }
+      }
+    },
+    "audit": {
+      "type": "object",
+      "description": "Per-action audit policy. Overlays the platform default (log_inputs=true, log_outputs=true).",
+      "additionalProperties": false,
+      "properties": {
+        "log_inputs":    { "type": "boolean", "default": true },
+        "log_outputs":   { "type": "boolean", "default": true },
+        "redact_fields": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Dotted paths in inputs/outputs to redact before emitting to the audit chain.",
+          "default": []
+        }
+      }
+    },
+    "rate_limit": {
+      "type": "object",
+      "description": "Per-action invocation rate limit. Separate from the agent's overall rpm_limit.",
+      "additionalProperties": false,
+      "properties": {
+        "per_minute": { "type": "integer", "minimum": 1 },
+        "per_day":    { "type": "integer", "minimum": 1 }
+      }
+    },
+    "maintainer": {
+      "type": "string",
+      "description": "Who owns this action. 'uniformedi' for core catalog; company IT owner email for tenant-specific actions."
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "default": "1.0.0",
+      "description": "Semver. Breaking input/output change bumps major."
+    },
+    "deprecated": {
+      "type": "boolean",
+      "default": false,
+      "description": "Hidden from the builder picker but still invokable by already-published agents."
+    }
+  }
+}
