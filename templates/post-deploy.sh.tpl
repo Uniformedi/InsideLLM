@@ -905,37 +905,48 @@ else
   if docker ps --format '{{.Names}}' | grep -q '^insidellm-open-webui$'; then
     log "  [open-webui] seeding break-glass admin..."
     docker exec -e BG_USER="$BG_USER" -e BG_PASS="$BG_PASS" insidellm-open-webui python3 <<'PYEOF' >> "$LOG" 2>&1 || log "  [warn] break-glass seed for Open WebUI failed (non-fatal)"
-import os, sys, time, uuid
+import os, sys, traceback, uuid
 sys.path.insert(0, "/app/backend")
-from open_webui.models.users import Users
-from open_webui.models.auths import Auths
-from open_webui.utils.auth import get_password_hash
+try:
+    from open_webui.models.users import Users
+    from open_webui.models.auths import Auths
+    from open_webui.utils.auth import get_password_hash
 
-u = os.environ["BG_USER"]
-p = os.environ["BG_PASS"]
-email = f"{u}@local"
-pw_hash = get_password_hash(p)
+    u = os.environ["BG_USER"]
+    p = os.environ["BG_PASS"]
+    # OWUI validates emails against a standard regex; "@local" is rejected.
+    email = f"{u}@insidellm.local"
+    pw_hash = get_password_hash(p)
 
-existing = Users.get_user_by_email(email)
-if existing:
-    # Update role to admin and reset password via Auths table.
-    Users.update_user_role_by_id(existing.id, "admin")
-    try:
-        Auths.update_user_password_by_id(existing.id, pw_hash)
-    except Exception:
-        # Older API
-        Auths.update_password_by_id(existing.id, pw_hash)
-    print("open-webui: updated break-glass admin")
-else:
-    uid = str(uuid.uuid4())
-    Auths.insert_new_auth(
-        email=email,
-        password=pw_hash,
-        name="InsideLLM Break-Glass",
-        profile_image_url="/user.png",
-        role="admin",
-    )
-    print("open-webui: created break-glass admin")
+    existing = Users.get_user_by_email(email)
+    if existing:
+        Users.update_user_role_by_id(existing.id, "admin")
+        try:
+            Auths.update_user_password_by_id(existing.id, pw_hash)
+        except Exception:
+            Auths.update_password_by_id(existing.id, pw_hash)
+        print("open-webui: updated break-glass admin")
+    else:
+        uid = str(uuid.uuid4())
+        # insert_new_auth requires an explicit id in recent OWUI versions.
+        try:
+            Auths.insert_new_auth(
+                id=uid, email=email, password=pw_hash,
+                name="InsideLLM Break-Glass",
+                profile_image_url="/user.png", role="admin",
+            )
+        except TypeError:
+            # Older signature (no id kwarg)
+            Auths.insert_new_auth(
+                email=email, password=pw_hash,
+                name="InsideLLM Break-Glass",
+                profile_image_url="/user.png", role="admin",
+            )
+        print("open-webui: created break-glass admin")
+except Exception as e:
+    print(f"open-webui seed ERROR: {e}")
+    traceback.print_exc()
+    sys.exit(1)
 PYEOF
   fi
 
@@ -998,18 +1009,51 @@ PYEOF
     log "  [pgadmin] seeding break-glass admin..."
     (
       set -e
-      PGA_EMAIL="insidellm-admin@local"
-      # Recent pgAdmin images ship /pgadmin4/setup.py with subcommands
-      # `add-user` / `update-user`. Try update first (idempotent-friendly),
-      # fall back to add on "not found".
+      PGA_EMAIL="insidellm-admin@insidellm.local"
+      # pgAdmin 8.x+ ships /pgadmin4/setup.py using typer subcommands.
+      # Older/minor images may lack typer or use argparse — both stderr paths
+      # swallowed to keep the log clean; we fall back to a direct SQLAlchemy
+      # seed if the CLI path fails entirely.
       if docker exec insidellm-pgadmin sh -c "test -f /pgadmin4/setup.py" 2>/dev/null; then
         if docker exec -e E="$PGA_EMAIL" -e P="$BG_PASS" insidellm-pgadmin \
-             sh -c 'python /pgadmin4/setup.py update-user "$E" --password "$P" 2>/dev/null'; then
+             sh -c 'python /pgadmin4/setup.py update-user "$E" --password "$P"' >/dev/null 2>&1; then
           log "    [pgadmin] updated break-glass admin password"
-        else
-          docker exec -e E="$PGA_EMAIL" -e P="$BG_PASS" insidellm-pgadmin \
-            sh -c 'python /pgadmin4/setup.py add-user "$E" "$P" --admin' >/dev/null
+        elif docker exec -e E="$PGA_EMAIL" -e P="$BG_PASS" insidellm-pgadmin \
+             sh -c 'python /pgadmin4/setup.py add-user "$E" "$P" --admin' >/dev/null 2>&1; then
           log "    [pgadmin] created break-glass admin"
+        else
+          log "    [pgadmin] setup.py CLI unavailable; attempting direct DB seed..."
+          docker exec -e E="$PGA_EMAIL" -e P="$BG_PASS" insidellm-pgadmin python <<'PGAEOF' >> "$LOG" 2>&1 \
+            && log "    [pgadmin] seeded via direct DB insert" \
+            || log "    [warn] pgAdmin direct DB seed failed (non-fatal)"
+import os, sys
+sys.path.insert(0, "/pgadmin4")
+os.environ.setdefault("SERVER_MODE", "True")
+try:
+    from pgadmin.model import db, User, Role
+    from pgadmin import create_app
+    from werkzeug.security import generate_password_hash
+    app = create_app()
+    with app.app_context():
+        email = os.environ["E"]
+        pw = os.environ["P"]
+        u = User.query.filter_by(email=email).first()
+        admin_role = Role.query.filter_by(name="Administrator").first()
+        if u:
+            u.password = generate_password_hash(pw)
+            if admin_role and admin_role not in u.roles:
+                u.roles.append(admin_role)
+        else:
+            u = User(email=email, password=generate_password_hash(pw), active=True)
+            if admin_role:
+                u.roles.append(admin_role)
+            db.session.add(u)
+        db.session.commit()
+        print("pgadmin direct seed ok")
+except Exception as e:
+    import traceback; traceback.print_exc()
+    sys.exit(1)
+PGAEOF
         fi
       else
         log "  [warn] /pgadmin4/setup.py not found; skipping pgAdmin break-glass seed (non-fatal)"
