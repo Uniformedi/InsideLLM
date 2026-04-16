@@ -1310,6 +1310,63 @@ It walks you through all deployment options and generates the config file
 (`terraform.tfvars` or PowerShell command) ready to download. No command-line
 knowledge needed to configure -- just fill in the form and click Download.
 
+> **Single-VM users:** the Setup Wizard above is all you need. The fleet workflow below is for multi-VM deployments only.
+
+### Multi-VM Fleet Deployment
+
+When deploying two or more InsideLLM VMs (e.g., per-department instances sharing a central MSSQL database), use the YAML-driven fleet manifest instead of generating individual tfvars files by hand.
+
+**Structure:** `fleet.yaml` at the repository root contains a `shared:` block (settings common to every VM) and an `instances:` list (per-VM overrides). Instance keys override shared keys. Any variable from `terraform/variables.tf` may appear in either block.
+
+```yaml
+shared:
+  hyperv_user:  "uniformedi\\dmedina"
+  vm_gateway:   "10.0.0.1"
+  governance_hub_central_db_host: "10.0.0.6"
+  ad_join_password: "env:FLEET_AD_PASSWORD"   # resolved from env at render time
+
+instances:
+  - vm_name: insidellm-tech
+    vm_static_ip: "10.0.0.120/24"
+    anthropic_api_key: "sk-ant-api03-..."
+  - vm_name: insidellm-mgmt
+    vm_static_ip: "10.0.0.122/24"
+    anthropic_api_key: "sk-ant-api03-..."
+```
+
+**Workflow:**
+
+```powershell
+# 1. Set secret environment variables (not stored in fleet.yaml)
+$env:FLEET_AD_PASSWORD    = Read-Host -AsSecureString | ConvertFrom-SecureString -AsPlainText
+$env:FLEET_MSSQL_PASSWORD = Read-Host -AsSecureString | ConvertFrom-SecureString -AsPlainText
+
+# 2. Render per-VM tfvars from the manifest
+pwsh ./scripts/Render-Fleet.ps1 -ManifestPath ./fleet.yaml
+
+# 3. Deploy all VMs (sequential by default)
+pwsh ./scripts/Deploy-Fleet.ps1
+
+# Or deploy a single VM
+pwsh ./scripts/Deploy-Fleet.ps1 -TargetVM insidellm-tech
+
+# Dry-run: plan only, no changes
+pwsh ./scripts/Deploy-Fleet.ps1 -DryRun
+
+# Destroy a specific VM
+pwsh ./scripts/Deploy-Fleet.ps1 -TargetVM insidellm-tech -Destroy
+```
+
+**Environment variables for secrets:**
+
+| Variable | Maps to | Purpose |
+|----------|---------|---------|
+| `FLEET_AD_PASSWORD` | `ad_join_password` | AD domain join credential |
+| `FLEET_MSSQL_PASSWORD` | `governance_hub_central_db_password` | Central fleet DB credential |
+| `FLEET_ANTHROPIC_KEY` | `anthropic_api_key` (optional) | Shared API key (if not per-VM) |
+
+Each rendered VM gets an isolated Terraform state file (`fleet-out/<vm_name>/terraform.tfstate`), so VM lifecycles are fully independent.
+
 ### Prerequisites
 
 | Requirement | Details |

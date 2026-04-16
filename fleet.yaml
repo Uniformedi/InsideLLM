@@ -1,0 +1,186 @@
+# ============================================================================
+# InsideLLM Fleet Manifest
+# ============================================================================
+# Render to per-VM terraform.tfvars files via:
+#     pwsh ./scripts/Render-Fleet.ps1 -ManifestPath ./fleet.yaml
+#
+# Then deploy the whole fleet via:
+#     pwsh ./scripts/Deploy-Fleet.ps1
+#
+# ----------------------------------------------------------------------------
+# Precedence
+# ----------------------------------------------------------------------------
+# Keys under `shared:` apply to every VM. Keys under an `instances:` block
+# override `shared` for that single VM. Instance wins on conflict.
+#
+# ----------------------------------------------------------------------------
+# Secrets via environment variables
+# ----------------------------------------------------------------------------
+# Any value of the form  env:VAR_NAME  is resolved from the process
+# environment at render time. The renderer fails hard if the env var is unset.
+# Recommended env vars:
+#     FLEET_AD_PASSWORD       - AD join password (maps to ad_join_password)
+#     FLEET_MSSQL_PASSWORD    - Central fleet MSSQL password
+#                               (maps to governance_hub_central_db_password)
+#     FLEET_ANTHROPIC_KEY     - Shared Anthropic key (if all VMs share one key,
+#                               set this in shared; omit per-instance overrides)
+#
+# ----------------------------------------------------------------------------
+# Terraform variable mapping
+# ----------------------------------------------------------------------------
+# Every key here maps 1:1 to a variable in terraform/variables.tf.
+# Any variable from terraform/variables.tf may appear under `shared` or
+# inside an `instances` block. See docs/DefaultDeployment.md or
+# html/DefaultDeployment.html for the full list of 129 variables and defaults.
+# ============================================================================
+
+shared:
+  # --- Hyper-V host -----------------------------------------------------------
+  # WinRM connection to the Windows host running Hyper-V.
+  hyperv_user:     "DOMAIN\\Administrator"   # e.g. "uniformedi\\dmedina"
+  hyperv_password: "env:FLEET_HYPERV_PASSWORD"
+  hyperv_host:     "127.0.0.1"               # localhost if running on the Hyper-V host
+  hyperv_port:     5985
+  hyperv_https:    false
+  hyperv_insecure: true
+
+  # --- VM hardware defaults ---------------------------------------------------
+  # Override per-instance for VMs that need more/less resources.
+  vm_processor_count:      8
+  vm_memory_startup_bytes: 34359738368       # 32 GB (reduce to 8589934592 without Ollama)
+  vm_disk_size_bytes:      85899345920       # 80 GB
+  vm_path:          "C:\\HyperV\\VMs"
+  vm_vhd_path:      "C:\\HyperV\\VHDs"
+  ubuntu_vhdx_source: "C:\\HyperV\\Images\\ubuntu-24.04-cloudimg-amd64.vhdx"
+
+  # --- VM networking ----------------------------------------------------------
+  vm_switch_name:  "InsideLLM"
+  vm_switch_type:  "External"                # "External" for LAN access; "Internal" for isolated
+  # vm_switch_adapter: "Ethernet"            # required when vm_switch_type = External
+  vm_gateway:      "10.0.0.1"
+  vm_dns_servers:  ["10.0.0.10", "8.8.8.8", "8.8.4.4"]   # replace with DC IP for AD: ["10.0.0.10"]
+  vm_domain:       "local"                   # e.g. "uniformedi.local" for AD environments
+
+  # --- SSH --------------------------------------------------------------------
+  ssh_public_key_path: "~/.ssh/id_rsa.pub"
+  ssh_admin_user:      "insidellm-admin"
+
+  # --- LLM providers ---------------------------------------------------------
+  # Set the shared key here OR override per-instance below.
+  anthropic_api_key: "env:FLEET_ANTHROPIC_KEY"
+  # openai_api_key:  ""
+  # gemini_api_key:  ""
+  # mistral_api_key: ""
+
+  # --- Active Directory (optional) --------------------------------------------
+  # Set ad_domain_join: true + provide credentials to join VMs to the domain.
+  ad_domain_join:    false
+  # ad_join_user:      "Administrator"
+  # ad_join_password:  "env:FLEET_AD_PASSWORD"
+  # dc_dns_servers:    ["10.0.0.10"]
+
+  # --- Gov-Hub RBAC -----------------------------------------------------------
+  ad_admin_groups:    "InsideLLM-Admin"
+  ad_view_groups:     "InsideLLM-View"
+  ad_approver_groups: "InsideLLM-Approve"
+
+  # --- SSO (optional) ---------------------------------------------------------
+  # sso_provider: "azure_ad"                 # "azure_ad", "okta", or "" (none)
+  # azure_ad_client_id:     ""
+  # azure_ad_client_secret: "env:FLEET_AZURE_SECRET"
+  # azure_ad_tenant_id:     ""
+
+  # --- Central Fleet DB (optional) --------------------------------------------
+  #  Enables fleet-wide governance sync. All VMs push to this central DB.
+  governance_hub_central_db_type:     "mssql"    # mssql | mariadb | postgres
+  governance_hub_central_db_host:     "10.0.0.6"
+  governance_hub_central_db_port:     1433
+  governance_hub_central_db_name:     "insidellm_central"
+  governance_hub_central_db_user:     "insidellm_sync"
+  governance_hub_central_db_password: "env:FLEET_MSSQL_PASSWORD"
+
+  # --- Optional services ------------------------------------------------------
+  governance_hub_enable:   true
+  docforge_enable:         true
+  ops_grafana_enable:      true
+  ops_uptime_kuma_enable:  true
+  # chat_enable:           false             # Mattermost team chat
+  # ollama_enable:         false             # local LLM inference
+
+  # --- Policy -----------------------------------------------------------------
+  policy_engine_enable: true
+  governance_tier:      "tier1"
+  industry:             "general"
+  data_classification:  "confidential"
+
+  # --- Budgets & rate limits (fleet-wide defaults) ----------------------------
+  # These apply to every VM unless overridden per-instance below.
+  litellm_global_max_budget:    100          # monthly cap in USD (0 = unlimited)
+  litellm_default_user_budget:  5.0          # per-user daily cap in USD
+  litellm_default_user_rpm:     30           # requests per minute per user
+  litellm_default_user_tpm:     100000       # tokens per minute per user
+
+  # --- DLP --------------------------------------------------------------------
+  dlp_enable:       true
+  dlp_action:       "block"                  # "block" or "redact"
+  # dlp_custom_patterns: ""
+
+  # --- Environment label ------------------------------------------------------
+  environment: "production"
+  owner:       "Uniformedi"
+
+# ============================================================================
+# Instances — one entry per VM to deploy.
+# Every terraform/variables.tf key can appear here to override the shared value.
+# At minimum, provide: vm_name, vm_static_ip (or leave blank for DHCP).
+#
+# Budget strategy:
+#   - Shared instances (many teams, broad access)  → higher global budget, moderate per-user
+#   - Department-specific instances                 → tighter global cap, team-appropriate rates
+#   - Management / exec instances                   → low request volume, higher per-request token budget
+#   - Dev / sandbox instances                       → generous limits for experimentation
+# ============================================================================
+
+instances:
+  # --- Shared engineering instance (heavy usage) ------------------------------
+  - vm_name:      "insidellm-engineer"
+    vm_hostname:  "insidellm-engineer"
+    vm_static_ip: "10.0.0.120/24"
+    litellm_global_max_budget:   500         # $500/mo — engineering burns tokens fast
+    litellm_default_user_budget: 10.0        # $10/day per engineer
+    litellm_default_user_rpm:    60          # double the default — code assistants are chatty
+    litellm_default_user_tpm:    200000      # 200k TPM for long context windows
+    # anthropic_api_key: "sk-ant-..."       # override if per-VM key needed
+
+  # --- Management / exec instance (light usage, high-value queries) ----------
+  - vm_name:      "insidellm-exec"
+    vm_hostname:  "insidellm-exec"
+    vm_static_ip: "10.0.0.122/24"
+    litellm_global_max_budget:   50          # $50/mo — small user base
+    litellm_default_user_budget: 3.0         # $3/day — execs ask fewer but longer questions
+    litellm_default_user_rpm:    15          # lower RPM — no automation expected
+    litellm_default_user_tpm:    150000      # generous token budget for deep analysis
+
+  # --- Client services instance (customer-facing, tightly controlled) --------
+  - vm_name:      "insidellm-clientsrvc"
+    vm_hostname:  "insidellm-clientsrvc"
+    vm_static_ip: "10.0.0.124/24"
+    litellm_global_max_budget:   200       # $200/mo — moderate customer volume
+    litellm_default_user_budget: 2.0       # $2/day per agent — prevent runaway automation
+    litellm_default_user_rpm:    20        # controlled pace
+    litellm_default_user_tpm:    80000     # smaller context — structured queries
+    industry:     "collections"            # industry-specific DLP/OPA rules
+    governance_tier: "tier2"               # stricter governance
+
+  # --- Dev / sandbox instance (generous for experimentation) -----------------
+  - vm_name:      "insidellm-dev"
+    vm_hostname:  "insidellm-dev"
+    vm_static_ip: "10.0.0.126/24"
+    vm_processor_count: 4                  # lighter VM — fewer CPUs
+    vm_memory_startup_bytes: 8589934592    # 8 GB
+    litellm_global_max_budget:   25        # $25/mo — sandbox cap
+    litellm_default_user_budget: 8.0       # $8/day — devs experiment freely
+    litellm_default_user_rpm:    100       # high RPM for automated testing
+    litellm_default_user_tpm:    300000    # big context for RAG experiments
+    ollama_enable: true                    # local models for offline dev
+    environment: "development"
