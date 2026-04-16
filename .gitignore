@@ -23,6 +23,10 @@ desktop.ini
 .claude/
 CLAUDE.md
 
+# Local session handoff — contains live break-glass curls and operational
+# detail; regenerated per session, never pushed
+docs/SESSION-RESUME.md
+
 # IDE
 .vscode/
 .idea/
