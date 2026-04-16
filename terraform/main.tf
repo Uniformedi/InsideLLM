@@ -260,14 +260,17 @@ locals {
 # Edge TLS (Stream C) — self-signed default, custom PEM paths supported.
 # Letsencrypt issuance happens on-box post-boot and is not handled here.
 # ---------------------------------------------------------------------------
+# Always generate a self-signed cert when vm_role="edge" except when the
+# operator supplied a custom PEM — that way "letsencrypt" mode also has a
+# placeholder cert so openresty can boot while acme.sh runs on-box.
 resource "tls_private_key" "edge_self_signed" {
-  count     = var.vm_role == "edge" && var.edge_tls_source == "self-signed" ? 1 : 0
+  count     = var.vm_role == "edge" && var.edge_tls_source != "custom" ? 1 : 0
   algorithm = "RSA"
   rsa_bits  = 2048
 }
 
 resource "tls_self_signed_cert" "edge_self_signed" {
-  count           = var.vm_role == "edge" && var.edge_tls_source == "self-signed" ? 1 : 0
+  count           = var.vm_role == "edge" && var.edge_tls_source != "custom" ? 1 : 0
   private_key_pem = tls_private_key.edge_self_signed[0].private_key_pem
 
   subject {
@@ -297,25 +300,23 @@ resource "tls_self_signed_cert" "edge_self_signed" {
 locals {
   # Edge cert + key resolved to the PEM text that will be written on-box.
   # For "custom" source, the paths live on the operator's workstation (we
-  # read them at plan/apply time, same pattern as the main TLS flow).
-  # For "letsencrypt", leave empty — the edge cloud-init / post-deploy flow
-  # will provision certs on first boot; a placeholder self-signed keeps
-  # openresty bootable until then.
+  # read them at plan/apply time, same pattern as the main TLS flow). We
+  # guard the file() call with `fileexists()` because Terraform's ternary
+  # evaluates both branches eagerly — an unconditional file() with an
+  # empty path would blow up non-edge plans.
+  # For "letsencrypt", we emit the self-signed PEM as a placeholder so
+  # openresty boots; certbot on first run replaces them via acme.sh.
   edge_cert_pem = (
-    var.vm_role == "edge" && var.edge_tls_source == "custom" && var.edge_tls_cert_path != ""
+    var.vm_role == "edge" && var.edge_tls_source == "custom" && var.edge_tls_cert_path != "" && fileexists(var.edge_tls_cert_path)
     ? file(var.edge_tls_cert_path)
-    : var.vm_role == "edge" && var.edge_tls_source == "self-signed"
-    ? tls_self_signed_cert.edge_self_signed[0].cert_pem
-    : var.vm_role == "edge" && var.edge_tls_source == "letsencrypt" && length(tls_self_signed_cert.edge_self_signed) > 0
+    : length(tls_self_signed_cert.edge_self_signed) > 0
     ? tls_self_signed_cert.edge_self_signed[0].cert_pem
     : ""
   )
   edge_key_pem = (
-    var.vm_role == "edge" && var.edge_tls_source == "custom" && var.edge_tls_key_path != ""
+    var.vm_role == "edge" && var.edge_tls_source == "custom" && var.edge_tls_key_path != "" && fileexists(var.edge_tls_key_path)
     ? file(var.edge_tls_key_path)
-    : var.vm_role == "edge" && var.edge_tls_source == "self-signed"
-    ? tls_private_key.edge_self_signed[0].private_key_pem
-    : var.vm_role == "edge" && var.edge_tls_source == "letsencrypt" && length(tls_private_key.edge_self_signed) > 0
+    : length(tls_private_key.edge_self_signed) > 0
     ? tls_private_key.edge_self_signed[0].private_key_pem
     : ""
   )
@@ -734,14 +735,14 @@ locals {
   }) : ""
 
   edge_cloud_init_userdata = local.edge_enable ? templatefile("${path.module}/../configs/cloud-init/edge-user-data.yaml.tpl", {
-    hostname             = var.vm_hostname
-    fqdn                 = local.vm_fqdn
-    ssh_admin_user       = var.ssh_admin_user
-    ssh_public_key       = local.ssh_public_key
-    fleet_edge_secret    = random_password.fleet_edge_secret.result
-    oidc_client_id       = var.sso_provider == "azure_ad" ? var.azure_ad_client_id : var.sso_provider == "okta" ? var.okta_client_id : ""
-    oidc_client_secret   = var.sso_provider == "azure_ad" ? var.azure_ad_client_secret : var.sso_provider == "okta" ? var.okta_client_secret : ""
-    oidc_issuer_url      = var.sso_provider == "azure_ad" ? "https://login.microsoftonline.com/${var.azure_ad_tenant_id}/v2.0" : var.sso_provider == "okta" ? "https://${var.okta_domain}" : ""
+    hostname           = var.vm_hostname
+    fqdn               = local.vm_fqdn
+    ssh_admin_user     = var.ssh_admin_user
+    ssh_public_key     = local.ssh_public_key
+    fleet_edge_secret  = random_password.fleet_edge_secret.result
+    oidc_client_id     = var.sso_provider == "azure_ad" ? var.azure_ad_client_id : var.sso_provider == "okta" ? var.okta_client_id : ""
+    oidc_client_secret = var.sso_provider == "azure_ad" ? var.azure_ad_client_secret : var.sso_provider == "okta" ? var.okta_client_secret : ""
+    oidc_issuer_url    = var.sso_provider == "azure_ad" ? "https://login.microsoftonline.com/${var.azure_ad_tenant_id}/v2.0" : var.sso_provider == "okta" ? "https://${var.okta_domain}" : ""
     # oauth2-proxy requires a 16, 24, or 32-byte cookie secret. random_password
     # with length=32 and special=false produces 32 printable ASCII bytes,
     # which satisfies the "32 bytes" constraint directly (no base64 wrapping
