@@ -170,6 +170,7 @@ set in tfvars**.
 | `ops_trivy_enable` | `true` | bool | Enable Trivy daily CVE scans |
 | `ops_grafana_enable` | `true` | bool | Enable Grafana + Loki |
 | `ops_uptime_kuma_enable` | `true` | bool | Enable Uptime Kuma |
+| `guacamole_enable` | `false` | bool | Enable Apache Guacamole &mdash; browser-based RDP/VNC/SSH gateway at /remote/ |
 | `chat_enable` | `false` | bool | Deploy Mattermost chat under /chat/ |
 | `chat_team_name` | `"insidellm"` | string | Mattermost default team URL slug |
 | `chat_default_channel` | `"general"` | string | Default Mattermost channel |
