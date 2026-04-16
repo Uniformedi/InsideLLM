@@ -8,6 +8,17 @@ fqdn: ${fqdn}
 manage_etc_hosts: true
 timezone: America/Chicago
 
+%{ if apt_mirror_host != "" ~}
+# ---------------------------------------------------------------------------
+# Local apt mirror — points the VM at the fleet primary's apt-cacher-ng so
+# second-and-subsequent VM deploys skip ~1.5 GB of upstream traffic each.
+# The proxy is applied before `package_update` runs.
+# ---------------------------------------------------------------------------
+apt:
+  http_proxy: "http://${apt_mirror_host}:3142"
+  https_proxy: "http://${apt_mirror_host}:3142"
+%{ endif ~}
+
 # ---------------------------------------------------------------------------
 # Users
 # ---------------------------------------------------------------------------
@@ -155,7 +166,7 @@ write_files:
     content: |
       ${indent(6, setup_html)}
 
-  # --- Docker daemon config (log rotation) ---
+  # --- Docker daemon config (log rotation + optional local registry mirror) ---
   - path: /etc/docker/daemon.json
     permissions: "0644"
     owner: root:root
@@ -165,7 +176,10 @@ write_files:
         "log-opts": {
           "max-size": "10m",
           "max-file": "3"
-        }
+        }%{ if docker_mirror_host != "" },
+        "registry-mirrors": ["http://${docker_mirror_host}:5000"],
+        "insecure-registries": ["${docker_mirror_host}:5000"]
+%{ endif ~}
       }
 
 %{ if ldap_enable_services ~}

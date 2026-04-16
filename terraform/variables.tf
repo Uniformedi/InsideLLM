@@ -1044,3 +1044,25 @@ variable "fallback_department" {
   type        = string
   default     = ""
 }
+
+# Local package mirrors (speeds up 2nd+ VM deploys).
+# Primary VM auto-runs apt-cacher-ng + registry mirror when vm_role=primary.
+# Every other VM's cloud-init points at the primary for packages and images.
+
+variable "pkg_mirror_enable" {
+  description = "Force-enable the local apt + Docker registry mirror on this VM. Default: auto (ON when vm_role=primary)."
+  type        = bool
+  default     = false
+}
+
+variable "apt_mirror_host" {
+  description = "Host (IP or FQDN, no scheme) of the apt-cacher-ng mirror to use. Empty = go direct to upstream. Typically equals fleet_primary_host."
+  type        = string
+  default     = ""
+}
+
+variable "docker_mirror_host" {
+  description = "Host of the Docker registry pull-through mirror. Empty = go direct to Docker Hub. Typically equals fleet_primary_host."
+  type        = string
+  default     = ""
+}

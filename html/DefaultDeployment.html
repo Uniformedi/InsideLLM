@@ -148,8 +148,8 @@
     override is provided in <code>terraform.tfvars</code>.</p>
   <div class="meta">
     <span>Platform: <b>v3.1.0</b></span>
-    <span>Generated: <b>2026-04-15</b></span>
-    <span>Variables: <b>139</b></span>
+    <span>Generated: <b>2026-04-16</b></span>
+    <span>Variables: <b>142</b></span>
   </div>
 
   <div class="intro">
@@ -232,6 +232,9 @@
       <tr><td class="name"><code>edge_domain</code></td><td class="val"><code>""</code></td><td class="type">string</td><td class="desc">FQDN served by the edge (TLS CN, OIDC redirect URI)</td></tr>
       <tr><td class="name"><code>department</code></td><td class="val"><code>""</code></td><td class="type">string</td><td class="desc">Department label routed to by the edge based on OIDC claim</td></tr>
       <tr><td class="name"><code>fallback_department</code></td><td class="val"><code>""</code></td><td class="type">string</td><td class="desc">Sibling backend for edge failover; empty = fail fast</td></tr>
+      <tr><td class="name"><code>pkg_mirror_enable</code></td><td class="val"><code>false</code></td><td class="type">bool</td><td class="desc">Force-enable apt-cacher-ng + Docker registry mirror on this VM (auto-ON for vm_role=primary)</td></tr>
+      <tr><td class="name"><code>apt_mirror_host</code></td><td class="val"><code>""</code></td><td class="type">string</td><td class="desc">Hostname/IP of the apt-cacher-ng proxy (typically = fleet_primary_host). Empty = direct to upstream</td></tr>
+      <tr><td class="name"><code>docker_mirror_host</code></td><td class="val"><code>""</code></td><td class="type">string</td><td class="desc">Hostname/IP of the Docker registry pull-through mirror. Empty = direct to Docker Hub</td></tr>
     </tbody>
   </table>
 

@@ -1287,6 +1287,24 @@ log "  Uptime Kuma:  https://$VM_IP/status/"
 log "  Team Chat:    https://$VM_IP/chat/"
 log "    (first user to sign up becomes Mattermost sysadmin)"
 %{ endif ~}
+%{ if pkg_mirror_enable ~}
+log ""
+log "  Local package mirrors (point future VMs here to skip upstream traffic):"
+log "    apt proxy:        http://$VM_IP:3142"
+log "    Docker registry:  http://$VM_IP:5000"
+log "    Set apt_mirror_host + docker_mirror_host in peer VMs' terraform.tfvars"
+log "    (cache on disk: /opt/InsideLLM/data/apt-cache + /opt/InsideLLM/data/registry)"
+%{ endif ~}
+%{ if apt_mirror_host != "" || docker_mirror_host != "" ~}
+log ""
+log "  Using upstream mirrors:"
+%{ if apt_mirror_host != "" ~}
+log "    apt proxy:        http://${apt_mirror_host}:3142"
+%{ endif ~}
+%{ if docker_mirror_host != "" ~}
+log "    Docker registry:  http://${docker_mirror_host}:5000"
+%{ endif ~}
+%{ endif ~}
 %{ if guacamole_enable ~}
 log "  Remote (Guacamole): https://$VM_IP/remote/"
 log "    (login: insidellm-admin + LITELLM_MASTER_KEY; guacadmin default rotated)"

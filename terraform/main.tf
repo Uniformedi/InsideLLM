@@ -385,6 +385,10 @@ locals {
   effective_docforge_enable        = local._has_role ? local._role_defaults[var.vm_role].docforge_enable : var.docforge_enable
   effective_guacamole_enable       = local._has_role ? local._role_defaults[var.vm_role].guacamole_enable : var.guacamole_enable
 
+  # Local package mirrors — primary auto-runs apt-cacher-ng + registry
+  # pull-through; every other VM opts in by setting apt_mirror_host / docker_mirror_host.
+  effective_pkg_mirror_enable = var.pkg_mirror_enable || var.vm_role == "primary"
+
   # Stream B — role-aware remote logging.
   # Promtail ships logs either to a local Loki (primary) or across the fleet to
   # the primary's Loki (gateway/workstation/voice). On "edge" or any role with
@@ -574,6 +578,7 @@ locals {
     effective_guacamole_enable       = local.effective_guacamole_enable
     effective_ops_uptime_kuma_enable = local.effective_ops_uptime_kuma_enable
     effective_docforge_enable        = local.effective_docforge_enable
+    effective_pkg_mirror_enable      = local.effective_pkg_mirror_enable
   })
 }
 
@@ -677,6 +682,9 @@ locals {
     ldap_bind_dn               = var.ldap_bind_dn
     ldap_bind_password         = var.ldap_bind_password
     ldap_user_search_base      = var.ldap_user_search_base != "" ? var.ldap_user_search_base : join(",", [for p in split(".", var.vm_domain) : "DC=${p}"])
+    apt_mirror_host            = var.apt_mirror_host
+    docker_mirror_host         = var.docker_mirror_host
+    pkg_mirror_enable          = local.effective_pkg_mirror_enable
     post_deploy_sh = templatefile("${path.module}/../templates/post-deploy.sh.tpl", {
       litellm_master_key     = local.litellm_master_key
       default_user_budget    = var.litellm_default_user_budget
@@ -693,6 +701,9 @@ locals {
       policy_engine_enable   = var.policy_engine_enable
       chat_enable            = var.chat_enable
       guacamole_enable       = local.effective_guacamole_enable
+      pkg_mirror_enable      = local.effective_pkg_mirror_enable
+      apt_mirror_host        = var.apt_mirror_host
+      docker_mirror_host     = var.docker_mirror_host
     })
   })
 

@@ -79,6 +79,9 @@ historical default and nothing in the platform changes.
 | `edge_domain` | `""` | string | FQDN served by the edge (TLS CN, OIDC redirect URI) |
 | `department` | `""` | string | Department label routed to by the edge based on OIDC claim |
 | `fallback_department` | `""` | string | Sibling backend for edge failover; empty = fail fast |
+| `pkg_mirror_enable` | `false` | bool | Force-enable apt-cacher-ng + Docker registry mirror on this VM (auto-ON for vm_role=primary). See [docs/LocalPackageCache.md](LocalPackageCache.md). |
+| `apt_mirror_host` | `""` | string | Hostname/IP of the apt-cacher-ng proxy (typically = fleet_primary_host). Empty = direct to upstream |
+| `docker_mirror_host` | `""` | string | Hostname/IP of the Docker registry pull-through mirror. Empty = direct to Docker Hub |
 
 ## 3. Gov-Hub RBAC
 

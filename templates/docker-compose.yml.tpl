@@ -871,6 +871,45 @@ services:
 
 %{ endif ~}
 
+%{ if effective_pkg_mirror_enable ~}
+  # -------------------------------------------------------------------------
+  # Local package mirrors — only run on the fleet primary. Every other VM's
+  # cloud-init points at apt_mirror_host / docker_mirror_host (= primary's IP)
+  # so second-and-subsequent deploys skip 1.5 GB of apt traffic and 4 GB of
+  # Docker image pulls.
+  # -------------------------------------------------------------------------
+  apt-cacher-ng:
+    image: sameersbn/apt-cacher-ng:3.7.4-20230523
+    container_name: insidellm-apt-cacher
+    restart: always
+    ports:
+      - "3142:3142"
+    volumes:
+      - /opt/InsideLLM/data/apt-cache:/var/cache/apt-cacher-ng
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3142/acng-report.html"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  docker-registry-mirror:
+    image: registry:2
+    container_name: insidellm-registry-mirror
+    restart: always
+    ports:
+      - "5000:5000"
+    environment:
+      REGISTRY_PROXY_REMOTEURL: "https://registry-1.docker.io"
+      REGISTRY_STORAGE_DELETE_ENABLED: "true"
+    volumes:
+      - /opt/InsideLLM/data/registry:/var/lib/registry
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:5000/v2/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+%{ endif ~}
+
 networks:
   insidellm-internal:
     driver: bridge
