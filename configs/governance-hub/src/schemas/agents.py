@@ -14,7 +14,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, HttpUrl, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 MANIFEST_VERSION = "1.1"
 
@@ -92,7 +92,10 @@ class AgentKnowledge(BaseModel):
     collections: list[str] = Field(default_factory=list)
     scope: KnowledgeScope = KnowledgeScope.STRICT
     connectors: list[KnowledgeConnector] = Field(default_factory=list)
-    urls: list[HttpUrl] = Field(default_factory=list)
+    # HttpUrl requires the `email-validator`/`pydantic-extra-types` extras
+    # which aren't shipped with the gov-hub image. Use plain str; format
+    # is enforced by the JSON Schema in agent_manifest.schema.json.
+    urls: list[str] = Field(default_factory=list)
 
 
 class AgentAction(BaseModel):
@@ -148,7 +151,9 @@ class AgentManifest(BaseModel):
     schema_version: str = Field(default=MANIFEST_VERSION, pattern=r"^1\.1$")
     agent_id: str = Field(pattern=_ID_PATTERN)
     tenant_id: str = Field(pattern=_ID_PATTERN)
-    created_by: EmailStr | None = None
+    # EmailStr requires pydantic[email] extras; format enforced by the JSON
+    # Schema in agent_manifest.schema.json.
+    created_by: str | None = None
     team: str | None = None
 
     display: AgentDisplay

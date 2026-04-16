@@ -446,3 +446,57 @@ class FleetCapability(Base):
         UniqueConstraint("instance_id", "capability", name="uq_instance_capability"),
         Index("ix_fleet_capability_status", "status"),
     )
+
+
+class Agent(Base):
+    """Declarative agent record. One row per (tenant_id, agent_id). Each
+    publish event bumps version + re-hashes the manifest. Audit-chain
+    entries emitted on create/update/publish/retire.
+
+    Lifecycle:
+      status = draft      — authored, not yet invocable
+      status = published  — live; is_active=True governs OWUI visibility
+      status = retired    — hidden from picker; history preserved
+    """
+    __tablename__ = "governance_agents"
+
+    # Composite identity: tenant_id + agent_id is the natural unique key.
+    # Row id is an opaque surrogate for FK convenience.
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    agent_id = Column(String(128), nullable=False, index=True)
+    tenant_id = Column(String(128), nullable=False, index=True)
+
+    # Display
+    name = Column(String(255), nullable=False)
+    description = Column(Text)
+    icon = Column(String(500))
+    team = Column(String(128), index=True)
+    created_by = Column(String(255))
+
+    # The full manifest, stored verbatim as JSONB for auditability +
+    # cheap version diffs. Pydantic validates on write.
+    manifest_json = Column("manifest", JSONB, nullable=False, default=dict)
+    manifest_schema_version = Column(String(16), default="1.1")
+
+    # Derived / indexable slices of the manifest kept in columns so
+    # filtering does not require scanning JSONB blobs.
+    guardrail_profile = Column(String(64), index=True)
+    visibility_scope = Column(String(32), default="private", index=True)  # private | team | org | fleet
+    data_classification = Column(String(32), default="internal")
+
+    # Lifecycle
+    status = Column(String(20), default="draft", index=True)  # draft | published | retired
+    is_active = Column(Boolean, default=False)
+    version = Column(Integer, default=1)
+    manifest_hash = Column(String(64))  # SHA-256 of manifest_json — pinned across versions
+
+    # Pending approval lifecycle (set when visibility ≥ org publishes).
+    pending_change_id = Column(Integer, index=True)  # FK to governance_changes
+
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "agent_id", name="uq_agent_tenant_agent_id"),
+        Index("ix_agent_tenant_status", "tenant_id", "status"),
+    )
