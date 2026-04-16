@@ -389,6 +389,9 @@ locals {
   # pull-through; every other VM opts in by setting apt_mirror_host / docker_mirror_host.
   effective_pkg_mirror_enable = var.pkg_mirror_enable || var.vm_role == "primary"
 
+  # Per-VM Claude Code CLI — skip the bare-bones roles that don't host humans.
+  effective_claude_code_enable = var.claude_code_enable && !contains(["edge", "voice", "storage"], var.vm_role)
+
   # Stream B — role-aware remote logging.
   # Promtail ships logs either to a local Loki (primary) or across the fleet to
   # the primary's Loki (gateway/workstation/voice). On "edge" or any role with
@@ -704,6 +707,11 @@ locals {
       pkg_mirror_enable      = local.effective_pkg_mirror_enable
       apt_mirror_host        = var.apt_mirror_host
       docker_mirror_host     = var.docker_mirror_host
+      claude_code_enable     = local.effective_claude_code_enable
+      ssh_admin_user         = var.ssh_admin_user
+      vm_role                = var.vm_role
+      department             = var.department
+      fleet_primary_host     = var.fleet_primary_host
     })
   })
 

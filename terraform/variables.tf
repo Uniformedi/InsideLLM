@@ -1066,3 +1066,13 @@ variable "docker_mirror_host" {
   type        = string
   default     = ""
 }
+
+# Per-VM Claude Code CLI (ops / troubleshooting). Not routed through InsideLLM
+# — operators log in with their own Anthropic account via `claude login`.
+# One installed CLI per VM lets an operator SSH into a specific instance and
+# troubleshoot with an AI assistant that has that VM's full context.
+variable "claude_code_enable" {
+  description = "Install Claude Code CLI for the admin user on this VM. Auto-skipped for vm_role=edge|voice|storage. Default true."
+  type        = bool
+  default     = true
+}

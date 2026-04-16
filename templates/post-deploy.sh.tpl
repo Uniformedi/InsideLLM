@@ -1260,6 +1260,77 @@ unset GUAC_PASS GUAC_DB_PASS
 log "Guacamole configuration complete."
 %{ endif ~}
 
+%{ if claude_code_enable ~}
+# =============================================================================
+# Claude Code CLI — installed for the admin user so operators can SSH in and
+# troubleshoot with an AI assistant scoped to this VM.
+#
+# Operators must run `claude login` once (interactive OAuth) to activate it.
+# Credentials land in ~/.claude/ under the admin account; not system-wide.
+# =============================================================================
+log ""
+log "Installing Claude Code CLI for ${ssh_admin_user}..."
+(
+  set -e
+  ADMIN_HOME=$(getent passwd "${ssh_admin_user}" | cut -d: -f6)
+  if [ -z "$ADMIN_HOME" ] || [ ! -d "$ADMIN_HOME" ]; then
+    log "  [warn] admin home for ${ssh_admin_user} not found; skipping Claude Code install"
+    exit 0
+  fi
+
+  if sudo -u "${ssh_admin_user}" bash -lc "command -v claude" >/dev/null 2>&1; then
+    log "  Claude Code already installed — skipping."
+  else
+    # Official installer; lands at ~/.local/bin/claude by default
+    sudo -u "${ssh_admin_user}" bash -lc "curl -fsSL https://claude.ai/install.sh | bash" \
+      >> "$LOG" 2>&1 || { log "  [warn] Claude Code installer failed (non-fatal)"; exit 0; }
+    log "  Claude Code installed."
+  fi
+
+  # Pre-seed a per-VM CLAUDE.md so the first session starts with real context.
+  # Lives in /opt/InsideLLM — the natural working directory for ops work.
+  CLAUDE_MD="/opt/InsideLLM/CLAUDE.md"
+  if [ ! -f "$CLAUDE_MD" ]; then
+    cat > "$CLAUDE_MD" <<'MDEOF'
+# InsideLLM — this VM
+
+This is an InsideLLM platform node. When troubleshooting, use the facts
+below first before searching. They were set at deploy time.
+
+## This VM
+- Hostname: __HOSTNAME__
+- Role:     __ROLE__
+- Dept:     __DEPT__
+- Fleet primary: __PRIMARY__
+
+## Useful paths
+- /opt/InsideLLM/docker-compose.yml — live rendered compose
+- /opt/InsideLLM/.env — secrets (chmod 600; sudo to read)
+- /var/log/InsideLLM-deploy.log — cloud-init + post-deploy log
+- /opt/InsideLLM/data/ — bind-mounted container volumes
+- /opt/InsideLLM/governance-hub/framework/ — governance MD
+
+## Routine commands
+- sudo docker ps --format '{{.Names}} {{.Status}}'
+- sudo docker logs insidellm-<service> --tail 100
+- sudo docker exec insidellm-postgres psql -U litellm -d litellm -c '<sql>'
+- Health: curl -sk https://localhost/governance/health | jq
+
+## Break-glass account
+- insidellm-admin + LITELLM_MASTER_KEY works on Gov-Hub, Grafana, OWUI,
+  LiteLLM, Uptime Kuma, pgAdmin, Guacamole (when enabled).
+
+## Scope
+Your changes stay on this VM. For cross-fleet work, use the primary's
+scripts/Deploy-Fleet.ps1 on the operator's workstation.
+MDEOF
+    sed -i "s|__HOSTNAME__|$(hostname)|g; s|__ROLE__|${vm_role}|g; s|__DEPT__|${department}|g; s|__PRIMARY__|${fleet_primary_host}|g" "$CLAUDE_MD"
+    chown "${ssh_admin_user}":"${ssh_admin_user}" "$CLAUDE_MD" 2>/dev/null || true
+    log "  Wrote per-VM context to /opt/InsideLLM/CLAUDE.md"
+  fi
+) || log "  [warn] Claude Code setup failed (non-fatal)"
+%{ endif ~}
+
 log ""
 log "=========================================="
 log "  Inside LLM — READY"
@@ -1308,6 +1379,13 @@ log "    Docker registry:  http://${docker_mirror_host}:5000"
 %{ if guacamole_enable ~}
 log "  Remote (Guacamole): https://$VM_IP/remote/"
 log "    (login: insidellm-admin + LITELLM_MASTER_KEY; guacadmin default rotated)"
+%{ endif ~}
+%{ if claude_code_enable ~}
+log ""
+log "  Claude Code CLI installed for ${ssh_admin_user}."
+log "    First run: ssh ${ssh_admin_user}@$VM_IP -- cd /opt/InsideLLM && claude login"
+log "    Then: cd /opt/InsideLLM && claude"
+log "    Per-VM context in /opt/InsideLLM/CLAUDE.md"
 %{ endif ~}
 log ""
 log "  First user to register on Open WebUI"

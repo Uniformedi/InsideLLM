@@ -82,6 +82,7 @@ historical default and nothing in the platform changes.
 | `pkg_mirror_enable` | `false` | bool | Force-enable apt-cacher-ng + Docker registry mirror on this VM (auto-ON for vm_role=primary). See [docs/LocalPackageCache.md](LocalPackageCache.md). |
 | `apt_mirror_host` | `""` | string | Hostname/IP of the apt-cacher-ng proxy (typically = fleet_primary_host). Empty = direct to upstream |
 | `docker_mirror_host` | `""` | string | Hostname/IP of the Docker registry pull-through mirror. Empty = direct to Docker Hub |
+| `claude_code_enable` | `true` | bool | Install Claude Code CLI for the admin user on this VM. Auto-skipped for vm_role=edge/voice/storage. See [docs/ClaudeCode-On-VMs.md](ClaudeCode-On-VMs.md). |
 
 ## 3. Gov-Hub RBAC
 

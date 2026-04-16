@@ -149,7 +149,7 @@
   <div class="meta">
     <span>Platform: <b>v3.1.0</b></span>
     <span>Generated: <b>2026-04-16</b></span>
-    <span>Variables: <b>142</b></span>
+    <span>Variables: <b>143</b></span>
   </div>
 
   <div class="intro">
@@ -235,6 +235,7 @@
       <tr><td class="name"><code>pkg_mirror_enable</code></td><td class="val"><code>false</code></td><td class="type">bool</td><td class="desc">Force-enable apt-cacher-ng + Docker registry mirror on this VM (auto-ON for vm_role=primary)</td></tr>
       <tr><td class="name"><code>apt_mirror_host</code></td><td class="val"><code>""</code></td><td class="type">string</td><td class="desc">Hostname/IP of the apt-cacher-ng proxy (typically = fleet_primary_host). Empty = direct to upstream</td></tr>
       <tr><td class="name"><code>docker_mirror_host</code></td><td class="val"><code>""</code></td><td class="type">string</td><td class="desc">Hostname/IP of the Docker registry pull-through mirror. Empty = direct to Docker Hub</td></tr>
+      <tr><td class="name"><code>claude_code_enable</code></td><td class="val"><code>true</code></td><td class="type">bool</td><td class="desc">Install Claude Code CLI for the admin user on this VM. Auto-skipped for vm_role=edge/voice/storage.</td></tr>
     </tbody>
   </table>
 
