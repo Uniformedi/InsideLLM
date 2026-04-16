@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>InsideLLM &mdash; Default Deployment Reference</title>
+<style>
+  :root {
+    --bg:#0a0e1a; --panel:#111827; --panel-2:#1a2234; --panel-3:#141c2e;
+    --border:#2a3650;
+    --text:#e2e8f0; --text-muted:#94a3b8; --muted-deep:#64748b;
+    --cyan:#22d3ee; --green:#6ee7b7; --amber:#fcd34d; --red:#fca5a5;
+    --blue:#60a5fa; --purple:#a78bfa;
+    --font-sans:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;
+    --font-mono:'Menlo','Consolas','Courier New',monospace;
+  }
+  * { box-sizing:border-box; }
+  html,body { margin:0; padding:0; }
+  body {
+    font-family:var(--font-sans); background:var(--bg); color:var(--text);
+    line-height:1.55; font-size:14px;
+  }
+  a { color:var(--blue); text-decoration:none; }
+  a:hover { text-decoration:underline; }
+
+  /* Layout */
+  .layout { display:flex; min-height:100vh; }
+  nav.sidenav {
+    position:sticky; top:0; align-self:flex-start;
+    width:260px; height:100vh; overflow-y:auto;
+    background:var(--panel); border-right:1px solid var(--border);
+    padding:24px 20px; flex-shrink:0;
+  }
+  nav.sidenav h3 {
+    font-family:var(--font-mono); font-size:11px; color:var(--cyan);
+    text-transform:uppercase; letter-spacing:0.08em;
+    margin:0 0 12px; padding-bottom:10px; border-bottom:1px solid var(--border);
+  }
+  nav.sidenav ol { list-style:none; padding:0; margin:0; counter-reset:s; }
+  nav.sidenav li { counter-increment:s; margin:2px 0; }
+  nav.sidenav li a {
+    display:block; padding:7px 10px; border-radius:4px;
+    color:var(--text-muted); font-size:13px;
+  }
+  nav.sidenav li a::before {
+    content:counter(s) ". ";
+    color:var(--muted-deep); font-family:var(--font-mono); font-size:11px;
+  }
+  nav.sidenav li a:hover { background:var(--panel-2); color:var(--text); text-decoration:none; }
+  nav.sidenav .foot {
+    margin-top:20px; padding-top:14px; border-top:1px solid var(--border);
+    font-size:11px; color:var(--muted-deep); font-family:var(--font-mono);
+  }
+
+  main { flex:1; padding:40px 48px 80px; max-width:1100px; }
+
+  h1 { font-size:28px; color:var(--cyan); font-family:var(--font-mono);
+       letter-spacing:-0.01em; margin:0 0 6px; }
+  .lede { color:var(--text-muted); font-size:15px; max-width:760px; margin:0 0 10px; }
+  .meta {
+    font-family:var(--font-mono); font-size:11px; color:var(--muted-deep);
+    text-transform:uppercase; letter-spacing:0.06em; margin-bottom:28px;
+    border-bottom:1px solid var(--border); padding-bottom:14px;
+  }
+  .meta span { display:inline-block; margin-right:20px; }
+  .meta b { color:var(--cyan); }
+  .intro { background:var(--panel); border:1px solid var(--border);
+    border-radius:6px; padding:14px 18px; margin:18px 0 28px; color:var(--text-muted); }
+  .intro a { color:var(--blue); }
+
+  h2 {
+    font-size:18px; color:var(--cyan); font-family:var(--font-mono);
+    margin:40px 0 10px; padding-top:14px; border-top:1px solid var(--border);
+  }
+  h2 .num { color:var(--muted-deep); margin-right:8px; }
+
+  table {
+    width:100%; border-collapse:collapse; margin:12px 0 6px;
+    background:var(--panel); border:1px solid var(--border);
+    border-radius:6px; overflow:hidden; font-size:13px;
+  }
+  thead th {
+    background:var(--panel-2); color:var(--text);
+    text-align:left; padding:9px 12px; font-weight:600;
+    border-bottom:1px solid var(--border); font-size:12px;
+    text-transform:uppercase; letter-spacing:0.04em;
+  }
+  tbody td {
+    padding:9px 12px; border-top:1px solid var(--border);
+    vertical-align:top;
+  }
+  tbody tr:nth-child(even) td { background:var(--panel-3); }
+  tbody tr:hover td { background:var(--panel-2); }
+
+  code {
+    background:var(--panel-2); border:1px solid var(--border);
+    padding:1px 6px; border-radius:3px; font-family:var(--font-mono);
+    font-size:0.88em; color:var(--cyan);
+  }
+  td.val code { color:var(--green); }
+  td.name code { color:var(--amber); }
+  td.type { color:var(--text-muted); font-family:var(--font-mono); font-size:12px; white-space:nowrap; }
+  td.desc { color:var(--text-muted); }
+
+  .badge-secret {
+    display:inline-block; background:rgba(252,165,165,0.12);
+    border:1px solid var(--red); color:var(--red);
+    font-family:var(--font-mono); font-size:10px;
+    padding:1px 6px; border-radius:3px; margin-left:4px;
+    text-transform:uppercase; letter-spacing:0.05em;
+  }
+
+  @media (max-width:900px) {
+    .layout { flex-direction:column; }
+    nav.sidenav { position:static; width:100%; height:auto; border-right:none;
+                  border-bottom:1px solid var(--border); }
+    main { padding:24px; }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+
+<nav class="sidenav">
+  <h3>Sections</h3>
+  <ol>
+    <li><a href="#s1">Hyper-V Host &amp; VM</a></li>
+    <li><a href="#s2">Networking &amp; Identity</a></li>
+    <li><a href="#s3">Gov-Hub RBAC</a></li>
+    <li><a href="#s4">SSO</a></li>
+    <li><a href="#s5">LLM Providers</a></li>
+    <li><a href="#s6">Humility / OPA Policy</a></li>
+    <li><a href="#s7">DLP</a></li>
+    <li><a href="#s8">Optional Services</a></li>
+    <li><a href="#s9">Monitoring &amp; Alerts</a></li>
+    <li><a href="#s10">Misc / Advanced</a></li>
+  </ol>
+  <div class="foot">
+    v3.1.0 &middot; 2026-04-15<br>
+    <a href="Setup.html">Setup Wizard &rarr;</a><br>
+    <a href="../terraform/variables.tf">variables.tf &rarr;</a>
+  </div>
+</nav>
+
+<main>
+  <h1>InsideLLM &mdash; Default Deployment Reference</h1>
+  <p class="lede">Every Terraform input variable and the default used when no
+    override is provided in <code>terraform.tfvars</code>.</p>
+  <div class="meta">
+    <span>Platform: <b>v3.1.0</b></span>
+    <span>Generated: <b>2026-04-15</b></span>
+    <span>Variables: <b>129</b></span>
+  </div>
+
+  <div class="intro">
+    These are the defaults baked into
+    <a href="../terraform/variables.tf"><code>terraform/variables.tf</code></a>.
+    The <a href="Setup.html">Setup Wizard</a> surfaces the most important
+    variables and emits a <code>terraform.tfvars</code> file; operators can
+    override any variable below by adding it to that file.
+    Sensitive inputs &mdash; API keys, passwords, secrets &mdash; have no safe default
+    and are flagged <span class="badge-secret">secret &mdash; set in tfvars</span>.
+  </div>
+
+  <!-- 1. Hyper-V Host & VM -->
+  <h2 id="s1"><span class="num">1.</span>Hyper-V Host &amp; VM</h2>
+  <table>
+    <thead><tr><th>Name</th><th>Default</th><th>Type</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td class="name"><code>hyperv_user</code></td><td class="val"><code>".\\Administrator"</code></td><td class="type">string</td><td class="desc">Username for Hyper-V host WinRM connection</td></tr>
+      <tr><td class="name"><code>hyperv_password</code></td><td class="val"><code>""</code><span class="badge-secret">secret &mdash; set in tfvars</span></td><td class="type">string</td><td class="desc">Password for the Hyper-V host administrator account</td></tr>
+      <tr><td class="name"><code>hyperv_host</code></td><td class="val"><code>"127.0.0.1"</code></td><td class="type">string</td><td class="desc">Hyper-V host address (127.0.0.1 for local)</td></tr>
+      <tr><td class="name"><code>hyperv_port</code></td><td class="val"><code>5985</code></td><td class="type">number</td><td class="desc">WinRM port (5985 HTTP, 5986 HTTPS)</td></tr>
+      <tr><td class="name"><code>hyperv_https</code></td><td class="val"><code>false</code></td><td class="type">bool</td><td class="desc">Use HTTPS for WinRM connection</td></tr>
+      <tr><td class="name"><code>hyperv_insecure</code></td><td class="val"><code>true</code></td><td class="type">bool</td><td class="desc">Skip TLS verification for WinRM (local/dev only)</td></tr>
+      <tr><td class="name"><code>vm_name</code></td><td class="val"><code>"InsideLLM"</code></td><td class="type">string</td><td class="desc">Name for the Hyper-V virtual machine</td></tr>
+      <tr><td class="name"><code>vm_processor_count</code></td><td class="val"><code>8</code></td><td class="type">number</td><td class="desc">Number of virtual CPUs for the VM</td></tr>
+      <tr><td class="name"><code>vm_memory_startup_bytes</code></td><td class="val"><code>34359738368</code> (32 GB)</td><td class="type">number</td><td class="desc">VM startup memory in bytes</td></tr>
+      <tr><td class="name"><code>vm_memory_dynamic</code></td><td class="val"><code>false</code></td><td class="type">bool</td><td class="desc">Enable dynamic memory for the VM</td></tr>
+      <tr><td class="name"><code>vm_disk_size_bytes</code></td><td class="val"><code>85899345920</code> (80 GB)</td><td class="type">number</td><td class="desc">VM boot disk size in bytes</td></tr>
+      <tr><td class="name"><code>vm_path</code></td><td class="val"><code>"C:\\HyperV\\VMs"</code></td><td class="type">string</td><td class="desc">Base path on Hyper-V host for VM files</td></tr>
+      <tr><td class="name"><code>vm_vhd_path</code></td><td class="val"><code>"C:\\HyperV\\VHDs"</code></td><td class="type">string</td><td class="desc">Path for virtual hard disks</td></tr>
+      <tr><td class="name"><code>vm_switch_name</code></td><td class="val"><code>"InsideLLM"</code></td><td class="type">string</td><td class="desc">Name of the Hyper-V virtual switch</td></tr>
+      <tr><td class="name"><code>vm_switch_type</code></td><td class="val"><code>"External"</code></td><td class="type">string</td><td class="desc">Switch type: Internal or External</td></tr>
+      <tr><td class="name"><code>vm_switch_adapter</code></td><td class="val"><code>""</code></td><td class="type">string</td><td class="desc">Physical NIC name for External switch</td></tr>
+      <tr><td class="name"><code>ubuntu_vhdx_source</code></td><td class="val"><code>"C:\\HyperV\\Images\\ubuntu-24.04-cloudimg-amd64.vhdx"</code></td><td class="type">string</td><td class="desc">Path to Ubuntu 24.04 cloud image VHDX</td></tr>
+    </tbody>
+  </table>
+
+  <!-- 2. Networking & Identity -->
+  <h2 id="s2"><span class="num">2.</span>Networking &amp; Identity</h2>
+  <table>
+    <thead><tr><th>Name</th><th>Default</th><th>Type</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td class="name"><code>vm_static_ip</code></td><td class="val"><code>""</code></td><td class="type">string</td><td class="desc">Static IP (CIDR). Empty = DHCP</td></tr>
+      <tr><td class="name"><code>vm_gateway</code></td><td class="val"><code>""</code></td><td class="type">string</td><td class="desc">Default gateway for static IP config</td></tr>
+      <tr><td class="name"><code>vm_dns_servers</code></td><td class="val"><code>["8.8.8.8", "8.8.4.4"]</code></td><td class="type">list(string)</td><td class="desc">DNS servers for the VM</td></tr>
+      <tr><td class="name"><code>vm_hostname</code></td><td class="val"><code>"InsideLLM"</code></td><td class="type">string</td><td class="desc">Hostname for the Ubuntu VM</td></tr>
+      <tr><td class="name"><code>vm_domain</code></td><td class="val"><code>"local"</code></td><td class="type">string</td><td class="desc">Domain name (FQDN and TLS cert)</td></tr>
+      <tr><td class="name"><code>ad_domain_join</code></td><td class="val"><code>false</code></td><td class="type">bool</td><td class="desc">Join the Ubuntu VM to the AD domain</td></tr>
+      <tr><td class="name"><code>ad_join_user</code></td><td class="val"><code>""</code></td><td class="type">string</td><td class="desc">AD username with domain-join permission</td></tr>
+      <tr><td class="name"><code>ad_join_password</code></td><td class="val"><code>""</code><span class="badge-secret">secret &mdash; set in tfvars</span></td><td class="type">string</td><td class="desc">Password for the AD join account</td></tr>
+      <tr><td class="name"><code>ad_join_ou</code></td><td class="val"><code>""</code></td><td class="type">string</td><td class="desc">OU for the computer account</td></tr>
+      <tr><td class="name"><code>ad_dns_register</code></td><td class="val"><code>true</code></td><td class="type">bool</td><td class="desc">Register VM hostname in AD DNS via dynamic update</td></tr>
+      <tr><td class="name"><code>dc_dns_servers</code></td><td class="val"><code>[]</code></td><td class="type">list(string)</td><td class="desc">DC IP(s) to use as the VM's DNS resolver</td></tr>
+      <tr><td class="name"><code>ldap_enable_services</code></td><td class="val"><code>false</code></td><td class="type">bool</td><td class="desc">Enable LDAP auth in Grafana, Open WebUI, pgAdmin</td></tr>
+      <tr><td class="name"><code>ldap_bind_dn</code></td><td class="val"><code>""</code></td><td class="type">string</td><td class="desc">DN of the read-only LDAP service account</td></tr>
+      <tr><td class="name"><code>ldap_bind_password</code></td><td class="val"><code>""</code><span class="badge-secret">secret &mdash; set in tfvars</span></td><td class="type">string</td><td class="desc">Password for the LDAP bind service account</td></tr>
+      <tr><td class="name"><code>ldap_user_search_base</code></td><td class="val"><code>""</code></td><td class="type">string</td><td class="desc">Base DN for user lookups</td></tr>
+      <tr><td class="name"><code>cockpit_enable</code></td><td class="val"><code>true</code></td><td class="type">bool</td><td class="desc">Install Cockpit and expose at /cockpit/</td></tr>
+      <tr><td class="name"><code>ssh_public_key_path</code></td><td class="val"><code>"~/.ssh/id_rsa.pub"</code></td><td class="type">string</td><td class="desc">SSH public key file on the Windows host</td></tr>
+      <tr><td class="name"><code>ssh_admin_user</code></td><td class="val"><code>"insidellm-admin"</code></td><td class="type">string</td><td class="desc">Admin username for the Ubuntu VM</td></tr>
+    </tbody>
+  </table>
+
+  <!-- 3. Gov-Hub RBAC -->
+  <h2 id="s3"><span class="num">3.</span>Gov-Hub RBAC</h2>
+  <table>
+    <thead><tr><th>Name</th><th>Default</th><th>Type</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td class="name"><code>ad_admin_groups</code></td><td class="val"><code>"InsideLLM-Admin"</code></td><td class="type">string</td><td class="desc">Comma-separated AD groups mapped to admin role</td></tr>
+      <tr><td class="name"><code>ad_view_groups</code></td><td class="val"><code>"InsideLLM-View"</code></td><td class="type">string</td><td class="desc">Comma-separated AD groups mapped to view role</td></tr>
+      <tr><td class="name"><code>ad_approver_groups</code></td><td class="val"><code>"InsideLLM-Approve"</code></td><td class="type">string</td><td class="desc">Comma-separated AD groups mapped to approver role</td></tr>
+      <tr><td class="name"><code>oidc_view_group_ids</code></td><td class="val"><code>[]</code></td><td class="type">list(string)</td><td class="desc">OIDC group object IDs mapped to view</td></tr>
+      <tr><td class="name"><code>oidc_admin_group_ids</code></td><td class="val"><code>[]</code></td><td class="type">list(string)</td><td class="desc">OIDC group object IDs mapped to admin</td></tr>
+      <tr><td class="name"><code>oidc_approver_group_ids</code></td><td class="val"><code>[]</code></td><td class="type">list(string)</td><td class="desc">OIDC group object IDs mapped to approver</td></tr>
+    </tbody>
+  </table>
+
+  <!-- 4. SSO -->
+  <h2 id="s4"><span class="num">4.</span>SSO</h2>
+  <table>
+    <thead><tr><th>Name</th><th>Default</th><th>Type</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td class="name"><code>sso_provider</code></td><td class="val"><code>"none"</code></td><td class="type">string</td><td class="desc">SSO provider: azure_ad, okta, generic, none</td></tr>
+      <tr><td class="name"><code>azure_ad_client_id</code></td><td class="val"><code>""</code></td><td class="type">string</td><td class="desc">Azure AD (Entra ID) application client ID</td></tr>
+      <tr><td class="name"><code>azure_ad_client_secret</code></td><td class="val"><code>""</code><span class="badge-secret">secret &mdash; set in tfvars</span></td><td class="type">string</td><td class="desc">Azure AD application client secret</td></tr>
+      <tr><td class="name"><code>azure_ad_tenant_id</code></td><td class="val"><code>""</code></td><td class="type">string</td><td class="desc">Azure AD tenant ID</td></tr>
+      <tr><td class="name"><code>okta_client_id</code></td><td class="val"><code>""</code></td><td class="type">string</td><td class="desc">Okta application client ID</td></tr>
+      <tr><td class="name"><code>okta_client_secret</code></td><td class="val"><code>""</code><span class="badge-secret">secret &mdash; set in tfvars</span></td><td class="type">string</td><td class="desc">Okta application client secret</td></tr>
+      <tr><td class="name"><code>okta_domain</code></td><td class="val"><code>""</code></td><td class="type">string</td><td class="desc">Okta domain (e.g. your-org.okta.com)</td></tr>
+      <tr><td class="name"><code>sso_group_field</code></td><td class="val"><code>"groups"</code></td><td class="type">string</td><td class="desc">JWT claim field containing group membership</td></tr>
+      <tr><td class="name"><code>sso_group_mapping</code></td><td class="val"><code>{}</code></td><td class="type">map(object)</td><td class="desc">Map SSO groups to LiteLLM teams/budgets/models</td></tr>
+    </tbody>
+  </table>
+
+  <!-- 5. LLM Providers -->
+  <h2 id="s5"><span class="num">5.</span>LLM Providers</h2>
+  <table>
+    <thead><tr><th>Name</th><th>Default</th><th>Type</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td class="name"><code>anthropic_api_key</code></td><td class="val"><code>""</code><span class="badge-secret">secret &mdash; set in tfvars</span></td><td class="type">string</td><td class="desc">Anthropic API key (required)</td></tr>
+      <tr><td class="name"><code>openai_api_key</code></td><td class="val"><code>""</code><span class="badge-secret">secret &mdash; set in tfvars</span></td><td class="type">string</td><td class="desc">OpenAI API key. Empty = disabled</td></tr>
+      <tr><td class="name"><code>gemini_api_key</code></td><td class="val"><code>""</code><span class="badge-secret">secret &mdash; set in tfvars</span></td><td class="type">string</td><td class="desc">Google Gemini API key. Empty = disabled</td></tr>
+      <tr><td class="name"><code>mistral_api_key</code></td><td class="val"><code>""</code><span class="badge-secret">secret &mdash; set in tfvars</span></td><td class="type">string</td><td class="desc">Mistral API key. Empty = disabled</td></tr>
+      <tr><td class="name"><code>cohere_api_key</code></td><td class="val"><code>""</code><span class="badge-secret">secret &mdash; set in tfvars</span></td><td class="type">string</td><td class="desc">Cohere API key. Empty = disabled</td></tr>
+      <tr><td class="name"><code>azure_openai_api_key</code></td><td class="val"><code>""</code><span class="badge-secret">secret &mdash; set in tfvars</span></td><td class="type">string</td><td class="desc">Azure OpenAI API key. Empty = disabled</td></tr>
+      <tr><td class="name"><code>azure_openai_endpoint</code></td><td class="val"><code>""</code></td><td class="type">string</td><td class="desc">Azure OpenAI endpoint URL</td></tr>
+      <tr><td class="name"><code>azure_openai_api_version</code></td><td class="val"><code>"2024-08-01-preview"</code></td><td class="type">string</td><td class="desc">Azure OpenAI API version</td></tr>
+      <tr><td class="name"><code>azure_openai_deployment</code></td><td class="val"><code>""</code></td><td class="type">string</td><td class="desc">Azure OpenAI deployment name</td></tr>
+      <tr><td class="name"><code>aws_bedrock_access_key_id</code></td><td class="val"><code>""</code><span class="badge-secret">secret &mdash; set in tfvars</span></td><td class="type">string</td><td class="desc">AWS access key ID for Bedrock</td></tr>
+      <tr><td class="name"><code>aws_bedrock_secret_access_key</code></td><td class="val"><code>""</code><span class="badge-secret">secret &mdash; set in tfvars</span></td><td class="type">string</td><td class="desc">AWS secret access key for Bedrock</td></tr>
+      <tr><td class="name"><code>aws_bedrock_region</code></td><td class="val"><code>"us-east-1"</code></td><td class="type">string</td><td class="desc">AWS region for Bedrock</td></tr>
+      <tr><td class="name"><code>aws_bedrock_model</code></td><td class="val"><code>"anthropic.claude-3-5-sonnet-20241022-v2:0"</code></td><td class="type">string</td><td class="desc">Bedrock model ID</td></tr>
+      <tr><td class="name"><code>litellm_master_key</code></td><td class="val"><code>""</code><span class="badge-secret">secret &mdash; set in tfvars</span></td><td class="type">string</td><td class="desc">LiteLLM proxy master API key (auto-generated if empty)</td></tr>
+      <tr><td class="name"><code>litellm_salt_key</code></td><td class="val"><code>""</code><span class="badge-secret">secret &mdash; set in tfvars</span></td><td class="type">string</td><td class="desc">LITELLM_SALT_KEY for encrypting virtual keys</td></tr>
+      <tr><td class="name"><code>litellm_default_model</code></td><td class="val"><code>"claude-sonnet"</code></td><td class="type">string</td><td class="desc">Default model alias for LiteLLM routing</td></tr>
+      <tr><td class="name"><code>litellm_enable_haiku</code></td><td class="val"><code>true</code></td><td class="type">bool</td><td class="desc">Enable Claude Haiku tier in model routing</td></tr>
+      <tr><td class="name"><code>litellm_enable_opus</code></td><td class="val"><code>true</code></td><td class="type">bool</td><td class="desc">Enable Claude Opus tier in model routing</td></tr>
+      <tr><td class="name"><code>litellm_global_max_budget</code></td><td class="val"><code>100</code></td><td class="type">number</td><td class="desc">Global monthly budget cap in USD (0 = unlimited)</td></tr>
+      <tr><td class="name"><code>litellm_default_user_budget</code></td><td class="val"><code>5.0</code></td><td class="type">number</td><td class="desc">Default per-user daily budget in USD</td></tr>
+      <tr><td class="name"><code>litellm_default_user_rpm</code></td><td class="val"><code>30</code></td><td class="type">number</td><td class="desc">Default requests per minute per user</td></tr>
+      <tr><td class="name"><code>litellm_default_user_tpm</code></td><td class="val"><code>100000</code></td><td class="type">number</td><td class="desc">Default tokens per minute per user</td></tr>
+      <tr><td class="name"><code>ollama_enable</code></td><td class="val"><code>true</code></td><td class="type">bool</td><td class="desc">Enable local Ollama instance</td></tr>
+      <tr><td class="name"><code>ollama_models</code></td><td class="val"><code>["qwen2.5-coder:14b", "qwen2.5:14b"]</code></td><td class="type">list(string)</td><td class="desc">Ollama model tags to pull on startup</td></tr>
+      <tr><td class="name"><code>ollama_gpu</code></td><td class="val"><code>false</code></td><td class="type">bool</td><td class="desc">Enable NVIDIA GPU passthrough for Ollama</td></tr>
+      <tr><td class="name"><code>ollama_separate_vm</code></td><td class="val"><code>false</code></td><td class="type">bool</td><td class="desc">Deploy Ollama in its own Hyper-V VM</td></tr>
+      <tr><td class="name"><code>ollama_vm_processor_count</code></td><td class="val"><code>8</code></td><td class="type">number</td><td class="desc">vCPUs for the Ollama VM</td></tr>
+      <tr><td class="name"><code>ollama_vm_memory_startup_bytes</code></td><td class="val"><code>34359738368</code> (32 GB)</td><td class="type">number</td><td class="desc">Startup RAM for the Ollama VM</td></tr>
+      <tr><td class="name"><code>ollama_vm_disk_size_bytes</code></td><td class="val"><code>107374182400</code> (100 GB)</td><td class="type">number</td><td class="desc">Disk size for the Ollama VM</td></tr>
+      <tr><td class="name"><code>ollama_vm_static_ip</code></td><td class="val"><code>""</code></td><td class="type">string</td><td class="desc">Static IP for the Ollama VM (CIDR)</td></tr>
+    </tbody>
+  </table>
+
+  <!-- 6. Humility / OPA -->
+  <h2 id="s6"><span class="num">6.</span>Humility / OPA Policy</h2>
+  <table>
+    <thead><tr><th>Name</th><th>Default</th><th>Type</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td class="name"><code>policy_engine_enable</code></td><td class="val"><code>false</code></td><td class="type">bool</td><td class="desc">Enable OPA policy engine (Humility + industry)</td></tr>
+      <tr><td class="name"><code>policy_engine_industry_policies</code></td><td class="val"><code>[]</code></td><td class="type">list(string)</td><td class="desc">Industry policies: hipaa, fdcpa, sox, pci_dss, ferpa, glba</td></tr>
+      <tr><td class="name"><code>policy_engine_fail_mode</code></td><td class="val"><code>"closed"</code></td><td class="type">string</td><td class="desc">Fail mode: closed (block) or log_only</td></tr>
+      <tr><td class="name"><code>industry</code></td><td class="val"><code>"general"</code></td><td class="type">string</td><td class="desc">Industry vertical for keyword templates and defaults</td></tr>
+      <tr><td class="name"><code>governance_tier</code></td><td class="val"><code>"tier3"</code></td><td class="type">string</td><td class="desc">Governance tier: tier1, tier2, or tier3</td></tr>
+      <tr><td class="name"><code>data_classification</code></td><td class="val"><code>"internal"</code></td><td class="type">string</td><td class="desc">Max data classification: public, internal, confidential, restricted</td></tr>
+    </tbody>
+  </table>
+
+  <!-- 7. DLP -->
+  <h2 id="s7"><span class="num">7.</span>DLP</h2>
+  <table>
+    <thead><tr><th>Name</th><th>Default</th><th>Type</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td class="name"><code>dlp_enable</code></td><td class="val"><code>true</code></td><td class="type">bool</td><td class="desc">Enable the DLP pipeline</td></tr>
+      <tr><td class="name"><code>dlp_mode</code></td><td class="val"><code>"block"</code></td><td class="type">string</td><td class="desc">DLP action: block or redact</td></tr>
+      <tr><td class="name"><code>dlp_block_ssn</code></td><td class="val"><code>true</code></td><td class="type">bool</td><td class="desc">Block Social Security Numbers</td></tr>
+      <tr><td class="name"><code>dlp_block_credit_cards</code></td><td class="val"><code>true</code></td><td class="type">bool</td><td class="desc">Block credit card numbers</td></tr>
+      <tr><td class="name"><code>dlp_block_phi</code></td><td class="val"><code>true</code></td><td class="type">bool</td><td class="desc">Block Protected Health Information patterns</td></tr>
+      <tr><td class="name"><code>dlp_block_credentials</code></td><td class="val"><code>true</code></td><td class="type">bool</td><td class="desc">Block API keys, passwords, connection strings</td></tr>
+      <tr><td class="name"><code>dlp_block_bank_accounts</code></td><td class="val"><code>true</code></td><td class="type">bool</td><td class="desc">Block bank account / routing numbers</td></tr>
+      <tr><td class="name"><code>dlp_block_standalone_dates</code></td><td class="val"><code>true</code></td><td class="type">bool</td><td class="desc">Block standalone dates (possible DOBs)</td></tr>
+      <tr><td class="name"><code>dlp_scan_responses</code></td><td class="val"><code>true</code></td><td class="type">bool</td><td class="desc">Also scan model responses and redact echoed data</td></tr>
+      <tr><td class="name"><code>dlp_custom_patterns</code></td><td class="val"><code>{}</code></td><td class="type">map(string)</td><td class="desc">Additional regex patterns (name =&gt; regex)</td></tr>
+    </tbody>
+  </table>
+
+  <!-- 8. Optional Services -->
+  <h2 id="s8"><span class="num">8.</span>Optional Services</h2>
+  <table>
+    <thead><tr><th>Name</th><th>Default</th><th>Type</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td class="name"><code>docforge_enable</code></td><td class="val"><code>true</code></td><td class="type">bool</td><td class="desc">Enable DocForge file generation/conversion</td></tr>
+      <tr><td class="name"><code>docforge_max_file_size_mb</code></td><td class="val"><code>50</code></td><td class="type">number</td><td class="desc">Max file upload size for DocForge (MB)</td></tr>
+      <tr><td class="name"><code>governance_hub_enable</code></td><td class="val"><code>false</code></td><td class="type">bool</td><td class="desc">Enable Governance Hub (central sync + advisor)</td></tr>
+      <tr><td class="name"><code>governance_hub_central_db_type</code></td><td class="val"><code>"postgresql"</code></td><td class="type">string</td><td class="desc">Central DB type: postgresql, mariadb, mssql</td></tr>
+      <tr><td class="name"><code>governance_hub_central_db_host</code></td><td class="val"><code>""</code></td><td class="type">string</td><td class="desc">Central DB hostname</td></tr>
+      <tr><td class="name"><code>governance_hub_central_db_port</code></td><td class="val"><code>5432</code></td><td class="type">number</td><td class="desc">Central DB port</td></tr>
+      <tr><td class="name"><code>governance_hub_central_db_name</code></td><td class="val"><code>"insidellm_central"</code></td><td class="type">string</td><td class="desc">Central DB name</td></tr>
+      <tr><td class="name"><code>governance_hub_central_db_user</code></td><td class="val"><code>""</code></td><td class="type">string</td><td class="desc">Central DB username</td></tr>
+      <tr><td class="name"><code>governance_hub_central_db_password</code></td><td class="val"><code>""</code><span class="badge-secret">secret &mdash; set in tfvars</span></td><td class="type">string</td><td class="desc">Central DB password</td></tr>
+      <tr><td class="name"><code>governance_hub_instance_name</code></td><td class="val"><code>""</code></td><td class="type">string</td><td class="desc">Human-readable name for this instance</td></tr>
+      <tr><td class="name"><code>governance_hub_sync_schedule</code></td><td class="val"><code>"0 */6 * * *"</code></td><td class="type">string</td><td class="desc">Cron schedule for central sync</td></tr>
+      <tr><td class="name"><code>governance_hub_supervisor_emails</code></td><td class="val"><code>""</code></td><td class="type">string</td><td class="desc">Comma-separated supervisor emails</td></tr>
+      <tr><td class="name"><code>governance_hub_advisor_model</code></td><td class="val"><code>"claude-sonnet"</code></td><td class="type">string</td><td class="desc">LLM model used by AI governance advisor</td></tr>
+      <tr><td class="name"><code>governance_hub_registration_token</code></td><td class="val"><code>""</code><span class="badge-secret">secret &mdash; set in tfvars</span></td><td class="type">string</td><td class="desc">Fleet registration token</td></tr>
+      <tr><td class="name"><code>ops_watchtower_enable</code></td><td class="val"><code>true</code></td><td class="type">bool</td><td class="desc">Enable Watchtower for container image updates</td></tr>
+      <tr><td class="name"><code>ops_trivy_enable</code></td><td class="val"><code>true</code></td><td class="type">bool</td><td class="desc">Enable Trivy daily CVE scans</td></tr>
+      <tr><td class="name"><code>ops_grafana_enable</code></td><td class="val"><code>true</code></td><td class="type">bool</td><td class="desc">Enable Grafana + Loki</td></tr>
+      <tr><td class="name"><code>ops_uptime_kuma_enable</code></td><td class="val"><code>true</code></td><td class="type">bool</td><td class="desc">Enable Uptime Kuma</td></tr>
+      <tr><td class="name"><code>chat_enable</code></td><td class="val"><code>false</code></td><td class="type">bool</td><td class="desc">Deploy Mattermost chat under /chat/</td></tr>
+      <tr><td class="name"><code>chat_team_name</code></td><td class="val"><code>"insidellm"</code></td><td class="type">string</td><td class="desc">Mattermost default team URL slug</td></tr>
+      <tr><td class="name"><code>chat_default_channel</code></td><td class="val"><code>"general"</code></td><td class="type">string</td><td class="desc">Default Mattermost channel</td></tr>
+    </tbody>
+  </table>
+
+  <!-- 9. Monitoring & Alerts -->
+  <h2 id="s9"><span class="num">9.</span>Monitoring &amp; Alerts</h2>
+  <table>
+    <thead><tr><th>Name</th><th>Default</th><th>Type</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td class="name"><code>ops_backup_schedule</code></td><td class="val"><code>"daily"</code></td><td class="type">string</td><td class="desc">PostgreSQL backup: daily, weekly, none</td></tr>
+      <tr><td class="name"><code>ops_alert_webhook</code></td><td class="val"><code>""</code></td><td class="type">string</td><td class="desc">Webhook URL for operational alerts (Slack/Teams)</td></tr>
+      <tr><td class="name"><code>ai_ethics_officer</code></td><td class="val"><code>""</code></td><td class="type">string</td><td class="desc">Name of the AI Ethics Officer</td></tr>
+      <tr><td class="name"><code>ai_ethics_officer_email</code></td><td class="val"><code>""</code></td><td class="type">string</td><td class="desc">Email of the AI Ethics Officer</td></tr>
+      <tr><td class="name"><code>log_retention_days</code></td><td class="val"><code>365</code></td><td class="type">number</td><td class="desc">Days to retain API logs and audit trails</td></tr>
+    </tbody>
+  </table>
+
+  <!-- 10. Misc / Advanced -->
+  <h2 id="s10"><span class="num">10.</span>Misc / Advanced</h2>
+  <table>
+    <thead><tr><th>Name</th><th>Default</th><th>Type</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td class="name"><code>postgres_password</code></td><td class="val"><code>""</code><span class="badge-secret">secret &mdash; set in tfvars</span></td><td class="type">string</td><td class="desc">PostgreSQL password (auto-generated if empty)</td></tr>
+      <tr><td class="name"><code>keyword_categories</code></td><td class="val"><code>{}</code></td><td class="type">map(list(string))</td><td class="desc">Additional keyword categories for request analysis</td></tr>
+      <tr><td class="name"><code>keyword_refresh_schedule</code></td><td class="val"><code>"*/15 * * * *"</code></td><td class="type">string</td><td class="desc">Cron schedule for keyword materialized-view refresh</td></tr>
+      <tr><td class="name"><code>tls_cert_path</code></td><td class="val"><code>""</code></td><td class="type">string</td><td class="desc">Path to TLS cert (empty = self-signed)</td></tr>
+      <tr><td class="name"><code>tls_key_path</code></td><td class="val"><code>""</code></td><td class="type">string</td><td class="desc">Path to TLS private key (empty = self-signed)</td></tr>
+      <tr><td class="name"><code>environment</code></td><td class="val"><code>"production"</code></td><td class="type">string</td><td class="desc">Deployment environment tag</td></tr>
+      <tr><td class="name"><code>owner</code></td><td class="val"><code>"Your Company Name"</code></td><td class="type">string</td><td class="desc">Owner of this deployment</td></tr>
+    </tbody>
+  </table>
+
+</main>
+</div>
+</body>
+</html>

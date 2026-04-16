@@ -4,6 +4,7 @@
 **Source:** [github.com/Uniformedi/InsideLLM](https://github.com/Uniformedi/InsideLLM) | **License:** [BSL 1.1](LICENSE) (converts to Apache 2.0 on April 11, 2030)
 
 > **Ready to deploy?** Open the [Setup Wizard](html/Setup.html) for a guided, step-by-step configuration experience.
+> Want to see the out-of-the-box defaults first? See [DefaultDeployment.html](html/DefaultDeployment.html) or the [markdown version](docs/DefaultDeployment.md) — all 129 Terraform variables with their default values.
 
 ### What's New in 3.1
 
