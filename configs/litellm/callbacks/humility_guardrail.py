@@ -38,6 +38,35 @@ def _coerce_user_info(user_info) -> dict:
     }
 
 
+def _extract_agent_meta(user_info) -> dict:
+    """Pull the manifest→runtime metadata off LiteLLM's virtual-key dict.
+
+    The agent_translator writes a `metadata` dict onto each virtual key at
+    publish time. LiteLLM surfaces that dict on `user_api_key_dict` so the
+    callback can read it per-request without a round-trip to gov-hub.
+
+    Only returns a non-empty dict when the key was provisioned by the
+    translator (source marker == 'insidellm.agent_translator'); otherwise
+    returns an empty dict so env-var defaults continue to apply.
+    """
+    if user_info is None:
+        return {}
+    # LiteLLM >=1.40 exposes .metadata (dict) on user_api_key_dict. Older
+    # versions stash it under .key_metadata. Accept either, and also
+    # accept a plain dict where the key is already coerced.
+    raw = (
+        getattr(user_info, "metadata", None)
+        or getattr(user_info, "key_metadata", None)
+        or (user_info.get("metadata") if isinstance(user_info, dict) else None)
+        or {}
+    )
+    if not isinstance(raw, dict):
+        return {}
+    if raw.get("source") != "insidellm.agent_translator":
+        return {}
+    return raw
+
+
 def _last_user_message(messages: list[dict]) -> str:
     for msg in reversed(messages):
         if msg.get("role") == "user":
@@ -155,6 +184,11 @@ def _query_opa_sync(opa_url: str, messages: list[dict], user_info: dict,
     except ImportError:
         return None
 
+    # agent_meta may be threaded in by the caller, or extracted here if the
+    # caller didn't bother. Either way, _build_opa_input sees an empty dict
+    # when no manifest-bound key is in play, and env defaults kick in.
+    if agent_meta is None:
+        agent_meta = _extract_agent_meta(user_info)
     opa_input = _build_opa_input(messages, user_info, agent_meta)
 
     try:
@@ -204,12 +238,19 @@ class HumilityGuardrailCallback(_BaseGuardrail):
         )
 
     def evaluate_decision(self, messages: list[dict], user_info) -> Decision:
+        # Extract agent_meta BEFORE coercion — the raw user_info still has
+        # the `.metadata` attribute that the translator wrote. After
+        # coercion it's reduced to a plain dict of a few user fields.
+        agent_meta = _extract_agent_meta(user_info)
         user_info = _coerce_user_info(user_info)
         if self.opa_enabled:
             try:
                 loop = asyncio.get_event_loop()
                 future = loop.run_in_executor(
-                    None, _query_opa_sync, self.opa_url, messages, user_info
+                    None,
+                    lambda: _query_opa_sync(
+                        self.opa_url, messages, user_info, agent_meta=agent_meta
+                    ),
                 )
                 opa_result = asyncio.run_coroutine_threadsafe(
                     asyncio.wrap_future(future), loop

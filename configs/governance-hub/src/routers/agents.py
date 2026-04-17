@@ -34,13 +34,16 @@ from ..services.agent_service import (
     _row_to_response,
     create_agent,
     delete_agent,
+    finalize_publish_approved,
     get_agent,
     list_agents,
     parse_manifest_from_text,
     publish_agent,
     retire_agent,
+    sync_agent_runtime,
     update_agent,
 )
+from ..services.agent_translator import build_litellm_key_payload, build_owui_model_payload
 from ..services.rbac import require_admin, require_view
 
 logger = logging.getLogger("governance-hub.agents.router")
@@ -166,10 +169,96 @@ async def publish(
         "agent": _row_to_response(row).model_dump(mode="json"),
         "pending_change_id": change_id,
         "published_immediately": change_id is None,
+        "runtime_sync_state": row.runtime_sync_state,
+        "owui_model_id": row.owui_model_id,
+        "litellm_key_alias": row.litellm_key_alias,
+        "litellm_key_last4": row.litellm_key_last4,
         "message": (
             "agent published" if change_id is None
             else f"approval required; proposal id={change_id} in governance_changes"
         ),
+    }
+
+
+@router.post("/{tenant_id}/{agent_id}/sync", dependencies=[require_admin])
+async def sync_runtime(
+    tenant_id: str,
+    agent_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_local_db),
+) -> dict:
+    """Retry / reconcile LiteLLM virtual key + OWUI model for this agent.
+
+    Useful when the initial publish returned `partial` or `failed` (e.g.
+    OWUI was temporarily down). Running `/sync` idempotently reapplies
+    the translator and records a fresh audit entry.
+    """
+    row, result = await sync_agent_runtime(
+        db, tenant_id, agent_id, actor_email=_actor(request)
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="agent not found")
+    return {
+        "agent": _row_to_response(row).model_dump(mode="json"),
+        "result": result.to_dict() if result else None,
+    }
+
+
+@router.get("/{tenant_id}/{agent_id}/runtime-preview", dependencies=[require_view])
+async def runtime_preview(
+    tenant_id: str,
+    agent_id: str,
+    db: AsyncSession = Depends(get_local_db),
+) -> dict:
+    """Dry-run: show the LiteLLM key + OWUI model payloads the translator
+    would send, without making any external calls. Admin UI uses this to
+    preview before publish."""
+    row = await get_agent(db, tenant_id, agent_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="agent not found")
+    from ..schemas.agents import AgentManifest
+    manifest = AgentManifest.model_validate(row.manifest_json)
+    key_payload = build_litellm_key_payload(
+        manifest,
+        manifest_hash=row.manifest_hash or "",
+        version=row.version or 1,
+    )
+    # Never leak the metadata that might reveal pending secrets.
+    model_payload = build_owui_model_payload(manifest)
+    return {
+        "litellm_key_payload": key_payload,
+        "owui_model_payload": model_payload,
+        "current_state": {
+            "runtime_sync_state": row.runtime_sync_state,
+            "owui_model_id": row.owui_model_id,
+            "litellm_key_alias": row.litellm_key_alias,
+            "litellm_key_last4": row.litellm_key_last4,
+            "runtime_synced_at": row.runtime_synced_at.isoformat() if row.runtime_synced_at else None,
+            "runtime_sync_error": row.runtime_sync_error,
+        },
+    }
+
+
+@router.post("/finalize-publish/{change_id}", dependencies=[require_admin])
+async def finalize_publish(
+    change_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_local_db),
+) -> dict:
+    """Call after an org/fleet publish proposal in governance_changes has
+    been approved. Flips the pending agent to published + provisions
+    runtime. Idempotent — subsequent calls re-run the translator."""
+    row, result = await finalize_publish_approved(
+        db, change_id, actor_email=_actor(request)
+    )
+    if row is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"no agent with pending_change_id={change_id}"
+        )
+    return {
+        "agent": _row_to_response(row).model_dump(mode="json"),
+        "result": result.to_dict() if result else None,
     }
 
 

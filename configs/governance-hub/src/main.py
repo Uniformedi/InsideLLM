@@ -245,6 +245,25 @@ async def startup():
         await conn.run_sync(Base.metadata.create_all)
     logger.info("Governance tables created/verified")
 
+    # Idempotent column migrations for tables that pre-existed before new
+    # columns were added in-place. SQLAlchemy's create_all doesn't ALTER.
+    try:
+        async with engine.begin() as conn:
+            # Agent runtime-binding columns (P1.2). Re-running is a no-op.
+            await conn.execute(text(
+                "ALTER TABLE governance_agents "
+                "  ADD COLUMN IF NOT EXISTS litellm_key_alias VARCHAR(255), "
+                "  ADD COLUMN IF NOT EXISTS litellm_key_last4 VARCHAR(4), "
+                "  ADD COLUMN IF NOT EXISTS owui_model_id VARCHAR(255), "
+                "  ADD COLUMN IF NOT EXISTS runtime_sync_state VARCHAR(32) DEFAULT 'unprovisioned', "
+                "  ADD COLUMN IF NOT EXISTS runtime_sync_error TEXT, "
+                "  ADD COLUMN IF NOT EXISTS runtime_synced_at TIMESTAMP WITH TIME ZONE, "
+                "  ADD COLUMN IF NOT EXISTS runtime_manifest_hash VARCHAR(64)"
+            ))
+        logger.info("Agent runtime-binding columns verified")
+    except Exception as e:
+        logger.warning(f"Agent column migration skipped: {e}")
+
     # Seed default vendor catalog + contribution types (idempotent)
     try:
         from .db.local_db import AsyncSessionLocal

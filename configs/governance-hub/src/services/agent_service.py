@@ -28,6 +28,7 @@ from ..schemas.agents import (
     AgentResponse,
     VisibilityScope,
 )
+from .agent_translator import AgentTranslator, ProvisionResult
 from .audit_chain import append_event
 
 logger = logging.getLogger("governance-hub.agents")
@@ -223,6 +224,12 @@ async def update_agent(
         f"agent_updated: {row.tenant_id}/{row.agent_id} v{row.version} "
         f"hash={new_hash[:12]} (was {old_hash[:12] if old_hash else '?'})"
     )
+
+    # If the agent is still live (private/team whose visibility didn't
+    # escalate into org/fleet), push the new manifest to LiteLLM + OWUI
+    # so the running agent reflects the edit without a republish.
+    if row.status == "published" and row.is_active:
+        await _provision_and_audit(db, row, actor_email or "system")
     return row
 
 
@@ -232,10 +239,15 @@ async def delete_agent(
     agent_id: str,
     actor_email: str | None = None,
 ) -> bool:
-    """Soft-delete: mark retired + is_active=false. History preserved."""
+    """Soft-delete: mark retired + is_active=false. History preserved.
+
+    Also tears down runtime artifacts (LiteLLM key + OWUI model) if any
+    were provisioned.
+    """
     row = await get_agent(db, tenant_id, agent_id)
     if row is None:
         return False
+    had_runtime = row.runtime_sync_state in ("provisioned", "partial", "provisioning")
     row.status = "retired"
     row.is_active = False
     await db.flush()
@@ -247,6 +259,9 @@ async def delete_agent(
         "actor": actor_email or "system",
     })
     await db.commit()
+
+    if had_runtime:
+        await _deprovision_and_audit(db, row, actor_email or "system")
     return True
 
 
@@ -315,6 +330,7 @@ async def publish_agent(
     row.status = "published"
     row.is_active = True
     row.pending_change_id = None
+    row.runtime_sync_state = "provisioning"
     await db.flush()
 
     await append_event(db, "agent_published", row.id, {
@@ -331,7 +347,158 @@ async def publish_agent(
         f"agent_published: {row.tenant_id}/{row.agent_id} v{row.version} "
         f"(visibility={row.visibility_scope})"
     )
+
+    # Provision runtime artifacts (LiteLLM virtual key + OWUI custom model).
+    # Fail-soft: the DB publish is already committed; a provisioning
+    # failure is recorded on the row and surfaced via /sync for retry.
+    await _provision_and_audit(db, row, actor_email or "system")
+
     return row, None
+
+
+# ---------------------------------------------------------------------------
+# Runtime translation — manifest → LiteLLM key + OWUI model
+# ---------------------------------------------------------------------------
+
+
+async def _provision_and_audit(
+    db: AsyncSession,
+    row: Agent,
+    actor: str,
+    translator: AgentTranslator | None = None,
+) -> ProvisionResult:
+    """Provision runtime artifacts and persist binding state + audit entry.
+
+    Separated from publish_agent so the same path is reusable from
+    /sync (retry), change-approval finalization, and reprovision-on-update.
+    """
+    t = translator or AgentTranslator()
+    try:
+        result = await t.provision(row)
+    except Exception as e:  # defensive — translator is already fail-soft internally
+        logger.exception(f"translator raised unexpectedly: {e}")
+        result = ProvisionResult(ok=False, state="failed", litellm_error=str(e))
+
+    AgentTranslator.apply_result(row, result)
+    await db.flush()
+    await append_event(db, "agent_runtime_sync", row.id, {
+        "agent_id": row.agent_id,
+        "tenant_id": row.tenant_id,
+        "version": row.version,
+        "state": result.state,
+        "litellm_key_alias": result.litellm_key_alias,
+        "litellm_key_last4": result.litellm_key_last4,
+        "owui_model_id": result.owui_model_id,
+        "error": result.error_summary,
+        "actor": actor,
+    })
+    await db.commit()
+    await db.refresh(row)
+    logger.info(
+        f"agent_runtime_sync: {row.tenant_id}/{row.agent_id} v{row.version} "
+        f"state={result.state}"
+    )
+    return result
+
+
+async def _deprovision_and_audit(
+    db: AsyncSession,
+    row: Agent,
+    actor: str,
+    translator: AgentTranslator | None = None,
+) -> ProvisionResult:
+    t = translator or AgentTranslator()
+    try:
+        result = await t.deprovision(row)
+    except Exception as e:
+        logger.exception(f"translator.deprovision raised unexpectedly: {e}")
+        result = ProvisionResult(ok=False, state="failed", litellm_error=str(e))
+
+    AgentTranslator.apply_result(row, result)
+    await db.flush()
+    await append_event(db, "agent_runtime_deprovision", row.id, {
+        "agent_id": row.agent_id,
+        "tenant_id": row.tenant_id,
+        "version": row.version,
+        "state": result.state,
+        "error": result.error_summary,
+        "actor": actor,
+    })
+    await db.commit()
+    await db.refresh(row)
+    logger.info(
+        f"agent_runtime_deprovision: {row.tenant_id}/{row.agent_id} state={result.state}"
+    )
+    return result
+
+
+async def sync_agent_runtime(
+    db: AsyncSession,
+    tenant_id: str,
+    agent_id: str,
+    actor_email: str | None = None,
+    translator: AgentTranslator | None = None,
+) -> tuple[Agent | None, ProvisionResult | None]:
+    """Retry / reconcile runtime binding for a published agent.
+
+    Use this from the admin UI `Sync runtime` button and from the
+    approval workflow after an org/fleet publish is approved.
+    """
+    row = await get_agent(db, tenant_id, agent_id)
+    if row is None:
+        return None, None
+
+    if row.status != "published" or not row.is_active:
+        # Nothing to provision for drafts/retired — idempotent deprovision
+        # to clean up any stale remote state.
+        result = await _deprovision_and_audit(
+            db, row, actor_email or "system", translator
+        )
+        return row, result
+
+    result = await _provision_and_audit(
+        db, row, actor_email or "system", translator
+    )
+    return row, result
+
+
+async def finalize_publish_approved(
+    db: AsyncSession,
+    change_id: int,
+    actor_email: str | None = None,
+    translator: AgentTranslator | None = None,
+) -> tuple[Agent | None, ProvisionResult | None]:
+    """Complete a deferred publish after the governance_changes proposal
+    that gated it has been approved.
+
+    Used for visibility ∈ {org, fleet}. Looks up the agent by
+    pending_change_id, flips it active, emits audit, and provisions.
+    """
+    stmt = select(Agent).where(Agent.pending_change_id == change_id)
+    row = (await db.execute(stmt)).scalar_one_or_none()
+    if row is None:
+        return None, None
+
+    row.status = "published"
+    row.is_active = True
+    row.pending_change_id = None
+    row.runtime_sync_state = "provisioning"
+    await db.flush()
+    await append_event(db, "agent_published", row.id, {
+        "agent_id": row.agent_id,
+        "tenant_id": row.tenant_id,
+        "version": row.version,
+        "manifest_hash": row.manifest_hash,
+        "visibility_scope": row.visibility_scope,
+        "change_id": change_id,
+        "actor": actor_email or "system",
+        "via": "change_approval",
+    })
+    await db.commit()
+    await db.refresh(row)
+
+    result = await _provision_and_audit(db, row, actor_email or "system", translator)
+    return row, result
 
 
 async def retire_agent(
@@ -340,10 +507,15 @@ async def retire_agent(
     agent_id: str,
     actor_email: str | None = None,
 ) -> Agent | None:
-    """Hide a published agent from the picker without deleting it."""
+    """Hide a published agent from the picker without deleting it.
+
+    Runtime artifacts are torn down so the model disappears from the
+    picker and the virtual key stops accepting calls immediately.
+    """
     row = await get_agent(db, tenant_id, agent_id)
     if row is None:
         return None
+    had_runtime = row.runtime_sync_state in ("provisioned", "partial", "provisioning")
     row.status = "retired"
     row.is_active = False
     await db.flush()
@@ -355,6 +527,9 @@ async def retire_agent(
     })
     await db.commit()
     await db.refresh(row)
+
+    if had_runtime:
+        await _deprovision_and_audit(db, row, actor_email or "system")
     return row
 
 

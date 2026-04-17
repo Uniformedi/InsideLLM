@@ -493,6 +493,18 @@ class Agent(Base):
     # Pending approval lifecycle (set when visibility ≥ org publishes).
     pending_change_id = Column(Integer, index=True)  # FK to governance_changes
 
+    # Runtime binding — populated by the manifest→runtime translator (P1.2)
+    # after a successful provision. Deprovision nulls these back out.
+    # We never persist the plaintext LiteLLM key; last4 is kept for display.
+    litellm_key_alias = Column(String(255))          # deterministic alias used for update/delete
+    litellm_key_last4 = Column(String(4))            # UI display only
+    owui_model_id = Column(String(255))              # "insidellm-agent-<tenant>-<agent>"
+    runtime_sync_state = Column(String(32), default="unprovisioned")
+    # unprovisioned | provisioning | provisioned | partial | failed | deprovisioned
+    runtime_sync_error = Column(Text)
+    runtime_synced_at = Column(DateTime(timezone=True))
+    runtime_manifest_hash = Column(String(64))       # hash that was provisioned — diff detector
+
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
     updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
 
