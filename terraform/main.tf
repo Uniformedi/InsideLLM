@@ -582,6 +582,12 @@ locals {
     effective_ops_uptime_kuma_enable = local.effective_ops_uptime_kuma_enable
     effective_docforge_enable        = local.effective_docforge_enable
     effective_pkg_mirror_enable      = local.effective_pkg_mirror_enable
+    # Keycloak (optional, local SSO — opt-in)
+    keycloak_enable     = var.keycloak_enable
+    keycloak_version    = var.keycloak_version
+    keycloak_realm_name = var.keycloak_realm_name
+    keycloak_db_name    = var.keycloak_db_name
+    keycloak_admin_user = var.keycloak_admin_user
   })
 }
 
@@ -600,6 +606,7 @@ locals {
     ldap_enable_services   = var.ldap_enable_services
     cockpit_enable         = var.cockpit_enable
     guacamole_enable       = local.effective_guacamole_enable
+    keycloak_enable        = var.keycloak_enable
     # Stream C — edge trust. When an incoming request carries X-User-Email
     # (claims edge-forwarded identity), backends require X-Edge-Secret to
     # match this value before honouring the claim.
@@ -688,6 +695,18 @@ locals {
     apt_mirror_host            = var.apt_mirror_host
     docker_mirror_host         = var.docker_mirror_host
     pkg_mirror_enable          = local.effective_pkg_mirror_enable
+    # Keycloak — local SSO (opt-in). Realm JSON is rendered here so the
+    # client secrets in it never leave the Terraform variable space; the
+    # file lands on the VM only when keycloak_enable is true.
+    keycloak_enable = var.keycloak_enable
+    keycloak_realm_json = var.keycloak_enable ? templatefile("${path.module}/../configs/keycloak/insidellm-realm.json.tpl", {
+      keycloak_realm_name            = var.keycloak_realm_name
+      litellm_master_key             = local.litellm_master_key
+      server_name                    = local.vm_fqdn
+      keycloak_govhub_client_secret  = var.keycloak_govhub_client_secret
+      keycloak_owui_client_secret    = var.keycloak_owui_client_secret
+      keycloak_litellm_client_secret = var.keycloak_litellm_client_secret
+    }) : ""
     post_deploy_sh = templatefile("${path.module}/../templates/post-deploy.sh.tpl", {
       litellm_master_key     = local.litellm_master_key
       default_user_budget    = var.litellm_default_user_budget
@@ -711,6 +730,8 @@ locals {
       ssh_admin_user         = var.ssh_admin_user
       vm_role                = var.vm_role
       department             = var.department
+      keycloak_enable        = var.keycloak_enable
+      keycloak_realm_name    = var.keycloak_realm_name
       fleet_primary_host     = var.fleet_primary_host
     })
   })

@@ -405,6 +405,28 @@ http {
         }
 
 %{ endif ~}
+%{ if keycloak_enable ~}
+        # --- Keycloak (local SSO provider) ---
+        # KC_HTTP_RELATIVE_PATH=/keycloak inside the container, so paths are
+        # already correct; no rewrites needed. WebSocket upgrade required
+        # for the admin console's live event stream.
+        location /keycloak/ {
+            proxy_pass http://keycloak:8080;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection $http_connection;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Forwarded-Host $host;
+            proxy_buffering off;
+            # Keycloak 25 sets some long-lived tokens; generous timeout.
+            proxy_read_timeout 300s;
+            client_max_body_size 20m;
+        }
+
+%{ endif ~}
 
         # --- Admin Portal ---
         location /admin {

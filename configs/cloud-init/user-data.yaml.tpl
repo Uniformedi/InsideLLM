@@ -390,6 +390,16 @@ write_files:
       ${indent(6, data_connector_tool_py)}
 %{ endif ~}
 
+%{ if keycloak_enable ~}
+  # --- Keycloak realm import (consumed on first boot; Keycloak ignores
+  # existing realms so re-runs after deploy are safe) ---
+  - path: /opt/InsideLLM/keycloak/import/insidellm-realm.json
+    permissions: "0644"
+    owner: root:root
+    content: |
+      ${indent(6, keycloak_realm_json)}
+%{ endif ~}
+
 %{ if ops_grafana_enable ~}
   # --- Loki config ---
   - path: /opt/InsideLLM/loki/loki-config.yml

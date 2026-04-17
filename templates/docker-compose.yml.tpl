@@ -871,6 +871,85 @@ services:
 
 %{ endif ~}
 
+%{ if keycloak_enable ~}
+  # -------------------------------------------------------------------------
+  # Keycloak DB init — creates a dedicated `${keycloak_db_name}` database
+  # inside the shared insidellm-postgres service. Idempotent; completes and
+  # exits so the main keycloak container can start against a ready schema.
+  # -------------------------------------------------------------------------
+  keycloak-db-init:
+    image: postgres:16-alpine
+    container_name: insidellm-keycloak-db-init
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: "$${POSTGRES_PASSWORD}"
+    entrypoint:
+      - sh
+      - -c
+      - |
+        psql -h postgres -U litellm -d litellm -tc "SELECT 1 FROM pg_database WHERE datname='${keycloak_db_name}'" | grep -q 1 || \
+        psql -h postgres -U litellm -d litellm -c "CREATE DATABASE ${keycloak_db_name} OWNER litellm"
+    networks:
+      - insidellm-internal
+
+  # -------------------------------------------------------------------------
+  # Keycloak — local SSO provider (OIDC). Stores identity in local Postgres;
+  # the gov-hub's keycloak_sync service replicates realm + group state to the
+  # central MSSQL fleet store so the portfolio view has one identity plane.
+  #
+  # Served behind nginx at /keycloak/ (KC_HTTP_RELATIVE_PATH=/keycloak). The
+  # relative-path trick is what keeps Keycloak's generated URLs consistent
+  # when it sits behind a reverse proxy without owning the full hostname.
+  # -------------------------------------------------------------------------
+  keycloak:
+    image: quay.io/keycloak/keycloak:${keycloak_version}
+    container_name: insidellm-keycloak
+    restart: always
+    depends_on:
+      keycloak-db-init:
+        condition: service_completed_successfully
+    command: ["start", "--optimized", "--import-realm"]
+    environment:
+      # DB — shared local Postgres. Same credentials as LiteLLM/Gov-Hub use.
+      KC_DB: postgres
+      KC_DB_URL: "jdbc:postgresql://postgres:5432/${keycloak_db_name}"
+      KC_DB_USERNAME: litellm
+      KC_DB_PASSWORD: "$${POSTGRES_PASSWORD}"
+
+      # Master-realm admin (break-glass via the shared litellm_master_key).
+      KEYCLOAK_ADMIN: "${keycloak_admin_user}"
+      KEYCLOAK_ADMIN_PASSWORD: "$${LITELLM_MASTER_KEY}"
+
+      # Proxy — TLS is terminated at nginx; Keycloak trusts the X-Forwarded-*
+      # headers and serves everything under /keycloak/.
+      KC_PROXY: edge
+      KC_HOSTNAME_STRICT: "false"
+      KC_HOSTNAME_STRICT_HTTPS: "false"
+      KC_HTTP_ENABLED: "true"
+      KC_HTTP_RELATIVE_PATH: /keycloak
+      KC_HEALTH_ENABLED: "true"
+      KC_METRICS_ENABLED: "true"
+
+      # Optional production hygiene — tune if needed.
+      KC_LOG_LEVEL: INFO
+      KC_CACHE: local
+    volumes:
+      - /opt/InsideLLM/keycloak/import:/opt/keycloak/data/import:ro
+    healthcheck:
+      # Keycloak 25 exposes readiness at /health/ready; the relative path
+      # prefix applies to the app but not the management endpoint.
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000; echo -e 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3; grep -q '\"status\": \"UP\"' <&3"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    networks:
+      - insidellm-internal
+
+%{ endif ~}
 %{ if effective_pkg_mirror_enable ~}
   # -------------------------------------------------------------------------
   # Local package mirrors — only run on the fleet primary. Every other VM's

@@ -1380,6 +1380,13 @@ log "    Docker registry:  http://${docker_mirror_host}:5000"
 log "  Remote (Guacamole): https://$VM_IP/remote/"
 log "    (login: insidellm-admin + LITELLM_MASTER_KEY; guacadmin default rotated)"
 %{ endif ~}
+%{ if keycloak_enable ~}
+log "  Keycloak SSO: https://$VM_IP/keycloak/"
+log "    Master admin: insidellm-admin + LITELLM_MASTER_KEY"
+log "    Realm imported: ${keycloak_realm_name} (groups: InsideLLM-View/Admin/Approve)"
+log "    OIDC issuer for downstream services:"
+log "      https://$VM_IP/keycloak/realms/${keycloak_realm_name}"
+%{ endif ~}
 %{ if claude_code_enable ~}
 log ""
 log "  Claude Code CLI installed for ${ssh_admin_user}."

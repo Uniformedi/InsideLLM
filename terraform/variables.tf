@@ -1076,3 +1076,62 @@ variable "claude_code_enable" {
   type        = bool
   default     = true
 }
+
+# -----------------------------------------------------------------------------
+# Keycloak — optional local SSO (tenant-scoped; opt-in)
+# -----------------------------------------------------------------------------
+# Pattern: local Keycloak container reads/writes a dedicated `keycloak`
+# database inside the existing insidellm-postgres service. A downstream
+# sync service (next phase) pushes realm + group state up to the central
+# MSSQL governance store. This keeps Keycloak fast (per-VM) while the
+# fleet-wide identity view lives in the central DB.
+variable "keycloak_enable" {
+  description = "Deploy a local Keycloak instance for SSO. Default false (opt-in)."
+  type        = bool
+  default     = false
+}
+
+variable "keycloak_version" {
+  description = "Keycloak container image tag (keep pinned for deterministic deploys)."
+  type        = string
+  default     = "25.0.6"
+}
+
+variable "keycloak_realm_name" {
+  description = "Name of the realm auto-imported on first boot."
+  type        = string
+  default     = "insidellm"
+}
+
+variable "keycloak_db_name" {
+  description = "Name of the database Keycloak uses inside insidellm-postgres."
+  type        = string
+  default     = "keycloak"
+}
+
+variable "keycloak_admin_user" {
+  description = "Keycloak master-realm admin username. Defaults to insidellm-admin so break-glass stays single-source."
+  type        = string
+  default     = "insidellm-admin"
+}
+
+variable "keycloak_govhub_client_secret" {
+  description = "OIDC client secret for the governance-hub client. Generate via `openssl rand -hex 32`."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "keycloak_owui_client_secret" {
+  description = "OIDC client secret for the open-webui client."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "keycloak_litellm_client_secret" {
+  description = "OIDC client secret for the litellm client."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
