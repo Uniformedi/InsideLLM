@@ -33,8 +33,96 @@ class Valves(BaseModel):
 
 
 class Pipeline:
+    # Prefix stamped by the manifest→runtime translator on OWUI model ids.
+    # Must match configs/governance-hub/src/services/agent_translator.py.
+    _AGENT_MODEL_PREFIX = "insidellm-agent-"
+
     def __init__(self):
         self.valves = Valves()
+        # Small in-process TTL cache for agent knowledge scope so that
+        # every chat-turn doesn't pay a gov-hub round trip. Keyed by
+        # (tenant_id, agent_id); value = (expires_epoch, scope_dict).
+        self._scope_cache: dict[tuple, tuple[float, dict]] = {}
+        self._scope_cache_ttl_seconds = 60.0
+
+    # -- Agent identity + scope helpers -----------------------------------
+
+    def _parse_agent_id_from_model(self, model_id: str) -> tuple[str, str] | None:
+        """Return (tenant_id, agent_id) for translator-owned model ids,
+        else None (request targets a plain model, not a declarative agent)."""
+        if not model_id or not model_id.startswith(self._AGENT_MODEL_PREFIX):
+            return None
+        # Format: insidellm-agent-<tenant>--<agent>
+        tail = model_id[len(self._AGENT_MODEL_PREFIX):]
+        if "--" not in tail:
+            return None
+        tenant, agent = tail.split("--", 1)
+        if not tenant or not agent:
+            return None
+        return (tenant, agent)
+
+    def _fetch_agent_scope(self, tenant_id: str, agent_id: str) -> dict:
+        """Hit gov-hub for the agent's declared knowledge collections
+        and scope. Returns {"collections": [...], "scope": "strict"}.
+
+        TTL-cached so repeated turns in a session don't hammer gov-hub.
+        Fails soft to {} on error — the OPA rule treats empty declared
+        sets conservatively (see configs/opa/policies/humility/rag_scope.rego).
+        """
+        import time
+        key = (tenant_id, agent_id)
+        now = time.time()
+        cached = self._scope_cache.get(key)
+        if cached and cached[0] > now:
+            return cached[1]
+
+        try:
+            resp = requests.get(
+                f"{self.valves.governance_hub_url}/api/v1/agents/{tenant_id}/{agent_id}",
+                timeout=2,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            manifest = data.get("manifest", {}) or {}
+            knowledge = manifest.get("knowledge", {}) or {}
+            scope = {
+                "collections": list(knowledge.get("collections") or []),
+                "scope": knowledge.get("scope") or "strict",
+            }
+        except Exception as exc:
+            logger.debug(
+                f"agent scope fetch failed for {tenant_id}/{agent_id}: {exc}"
+            )
+            scope = {}
+
+        self._scope_cache[key] = (now + self._scope_cache_ttl_seconds, scope)
+        return scope
+
+    def _extract_requested_collections(self, body: dict) -> list[str]:
+        """Pull retrieval collection ids from the inbound OWUI request.
+
+        OWUI RAG wiring scatters this across a handful of keys depending
+        on the flow (chat history, file attachment, knowledge-panel):
+          - body["collection_ids"]                 — explicit knowledge panel
+          - body["files"][*]["collection_name"]    — file-attached retrieval
+          - body["metadata"]["collection_id"]      — legacy single-collection hint
+        We gather all of them, de-dup, and drop empties.
+        """
+        seen: set[str] = set()
+        for cid in body.get("collection_ids") or []:
+            if cid:
+                seen.add(cid)
+        for f in body.get("files") or []:
+            if not isinstance(f, dict):
+                continue
+            cn = f.get("collection_name") or f.get("collection_id")
+            if cn:
+                seen.add(cn)
+        meta = body.get("metadata") or {}
+        cid = meta.get("collection_id")
+        if cid:
+            seen.add(cid)
+        return sorted(seen)
 
     async def inlet(self, body: dict, __user__: dict = {}) -> dict:
         """Intercept incoming messages, evaluate policy, execute obligations."""
@@ -124,9 +212,27 @@ class Pipeline:
                 last_user_msg = msg.get("content", "")
                 break
 
+        model_id = body.get("model", "")
+
+        # Declarative-agent identity + knowledge scope (RAG rule consumes).
+        agent_id = ""
+        tenant_id = ""
+        declared_collections: list[str] = []
+        knowledge_scope = "strict"
+        parsed = self._parse_agent_id_from_model(model_id)
+        if parsed is not None:
+            tenant_id, agent_id = parsed
+            scope = self._fetch_agent_scope(tenant_id, agent_id)
+            declared_collections = scope.get("collections", [])
+            knowledge_scope = scope.get("scope", "strict")
+
+        requested_collections = self._extract_requested_collections(body)
+
         return {
             "messages": messages,
-            "model": body.get("model", ""),
+            "model": model_id,
+            "agent_id": agent_id,
+            "tenant_id": tenant_id,
             "user_id": user.get("id", ""),
             "user_name": user.get("name", ""),
             "user_role": user.get("role", ""),
@@ -141,6 +247,10 @@ class Pipeline:
             "ferpa_authorized": False,
             "glba_authorized": False,
             "break_glass": False,
+            # Knowledge layer — see configs/opa/policies/humility/rag_scope.rego
+            "agent_knowledge_collections": declared_collections,
+            "knowledge_scope": knowledge_scope,
+            "requested_collections": requested_collections,
             "message_hash": hashlib.sha256(last_user_msg.encode()).hexdigest()[:16],
         }
 

@@ -147,6 +147,7 @@ def build_litellm_key_payload(
     expects to read via `/key/info`.
     """
     g = manifest.guardrails
+    k = manifest.knowledge
     # Pydantic with use_enum_values=True returns plain strings already.
     allowed_models = list(g.allowed_models) or [_DEFAULT_MODEL_FALLBACK]
 
@@ -172,6 +173,10 @@ def build_litellm_key_payload(
                 "allow_financials": g.dlp_overrides.allow_financials,
                 "allow_credentials": g.dlp_overrides.allow_credentials,
             },
+            # Knowledge layer — the OPA rag_scope rule reads these to verify
+            # that retrieval targets live inside the manifest's declared set.
+            "knowledge_collections": list(k.collections),
+            "knowledge_scope": k.scope,
             "team": manifest.team,
         },
     }

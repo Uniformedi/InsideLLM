@@ -21,10 +21,12 @@ from src.db.models import Agent
 from src.schemas.agents import (
     AgentDisplay,
     AgentGuardrails,
+    AgentKnowledge,
     AgentManifest,
     AgentVisibility,
     DlpOverrides,
     GuardrailProfile,
+    KnowledgeScope,
     VisibilityScope,
 )
 from src.services import agent_translator as at
@@ -374,7 +376,35 @@ def test_litellm_metadata_includes_all_opa_input_keys():
         "guardrail_profile", "visibility_scope", "pii_handling",
         "max_actions_per_session", "token_budget_per_session",
         "temperature_cap", "dlp_overrides",
+        # Knowledge layer — consumed by the rag_scope OPA rule.
+        "knowledge_collections", "knowledge_scope",
     }
     assert required.issubset(payload["metadata"].keys()), (
         f"missing keys: {required - set(payload['metadata'].keys())}"
     )
+
+
+def test_litellm_metadata_propagates_knowledge_scope():
+    """Translator must surface manifest.knowledge.{collections,scope}
+    onto the LiteLLM key metadata so OPA's rag_scope rule has the
+    declared allowlist at evaluation time."""
+    manifest = _mk_manifest(
+        knowledge=AgentKnowledge(
+            collections=["organization-fdcpa-letters", "organization-account-policies"],
+            scope=KnowledgeScope.STRICT,
+        ),
+    )
+    payload = at.build_litellm_key_payload(manifest, manifest_hash="y" * 64, version=1)
+    md = payload["metadata"]
+    assert md["knowledge_collections"] == ["organization-fdcpa-letters", "organization-account-policies"]
+    assert md["knowledge_scope"] == "strict"
+
+
+def test_litellm_metadata_empty_knowledge_defaults_strict():
+    """Manifest with no declared collections still carries a `strict`
+    scope marker so downstream OPA defaults to the safe behaviour."""
+    manifest = _mk_manifest(knowledge=AgentKnowledge(collections=[]))
+    payload = at.build_litellm_key_payload(manifest, manifest_hash="z" * 64, version=1)
+    md = payload["metadata"]
+    assert md["knowledge_collections"] == []
+    assert md["knowledge_scope"] == "strict"

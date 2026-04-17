@@ -141,6 +141,14 @@ def _build_opa_input(messages: list[dict], user_info: dict,
         "data_classes_in_context": agent_meta.get("data_classes_in_context", []),
         "data_classification": agent_meta.get("data_classification", "internal"),
 
+        # --- Knowledge layer (RAG scope rule consumes these) --------------
+        # Declared set comes from the manifest → LiteLLM key metadata.
+        # requested_collections is set per-request by the frontend OPA
+        # pipeline; empty = no retrieval in play.
+        "agent_knowledge_collections": agent_meta.get("knowledge_collections", []),
+        "knowledge_scope": agent_meta.get("knowledge_scope", "strict"),
+        "requested_collections": agent_meta.get("requested_collections", []),
+
         # --- Model selection -----------------------------------------------
         "model_requested": agent_meta.get("model_requested", ""),
         "allowed_models": agent_meta.get("allowed_models", []),
