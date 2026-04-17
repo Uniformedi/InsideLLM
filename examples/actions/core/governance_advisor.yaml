@@ -1,0 +1,117 @@
+# Governance Advisor — shared catalog actions (tenant_id: core)
+#
+# Wraps configs/open-webui/governance-advisor-tool.py methods. Hits the
+# Governance Hub's own /advisor, /changes, /sync, /schema endpoints.
+#
+# P1.3 — InsideLLM Declarative Agent Platform
+
+schema_version: "1.0"
+actions:
+  - schema_version: "1.0"
+    action_id: advisor_analyze_governance
+    tenant_id: core
+    display_name: "Governance Advisor — Analyze"
+    description: "Run an AI-driven governance analysis and produce change-proposal suggestions (never auto-implemented)."
+    category: classify
+    backend:
+      type: fastapi_http
+      url: "http://governance-hub:8090/api/v1/advisor/analyze"
+      method: POST
+      timeout_ms: 25000
+    inputs:
+      analysis_type:
+        type: string
+        required: true
+        enum: [cost, compliance, keyword_drift, budget, holistic]
+        description: "Which lens to apply when generating suggestions."
+      time_range_days:
+        type: integer
+        required: false
+        default: 7
+        description: "Telemetry lookback window."
+      focus_areas:
+        type: array
+        required: false
+        description: "Optional list of focus topics (e.g. [\"pii-redaction\", \"tier2-spend\"])."
+    outputs:
+      suggestions:
+        type: array
+        description: "List of proposed changes queued for supervisor approval."
+    guardrail_requirements:
+      minimum_guardrail_tier: tier_general_business
+      data_classes: []
+      requires_approval: false
+    audit:
+      log_inputs: true
+      log_outputs: true
+      redact_fields: []
+    rate_limit:
+      per_minute: 5
+      per_day: 50
+    maintainer: insidellm-core
+    version: "1.0.0"
+
+  - schema_version: "1.0"
+    action_id: advisor_list_pending_changes
+    tenant_id: core
+    display_name: "Governance Advisor — Pending Changes"
+    description: "List governance change proposals awaiting approval."
+    category: retrieve
+    backend:
+      type: fastapi_http
+      url: "http://governance-hub:8090/api/v1/changes"
+      method: GET
+      timeout_ms: 5000
+    inputs:
+      status:
+        type: string
+        required: false
+        enum: [pending, approved, rejected, implemented]
+        description: "Filter by proposal status."
+    outputs:
+      proposals:
+        type: array
+        description: "Array of change proposal records."
+    guardrail_requirements:
+      minimum_guardrail_tier: tier_general_business
+      data_classes: []
+      requires_approval: false
+    audit:
+      log_inputs: true
+      log_outputs: true
+      redact_fields: []
+    rate_limit:
+      per_minute: 30
+      per_day: 1000
+    maintainer: insidellm-core
+    version: "1.0.0"
+
+  - schema_version: "1.0"
+    action_id: advisor_compliance_summary
+    tenant_id: core
+    display_name: "Governance Advisor — Compliance Summary"
+    description: "Aggregate snapshot: last sync, active framework version, pending change count."
+    category: retrieve
+    backend:
+      type: fastapi_http
+      url: "http://governance-hub:8090/api/v1/sync/status"
+      method: GET
+      timeout_ms: 5000
+    inputs: {}
+    outputs:
+      status:
+        type: object
+        description: "Object combining sync, schema, and change-proposal state."
+    guardrail_requirements:
+      minimum_guardrail_tier: tier_general_business
+      data_classes: []
+      requires_approval: false
+    audit:
+      log_inputs: false
+      log_outputs: true
+      redact_fields: []
+    rate_limit:
+      per_minute: 60
+      per_day: 2000
+    maintainer: insidellm-core
+    version: "1.0.0"

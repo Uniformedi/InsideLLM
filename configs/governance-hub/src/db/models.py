@@ -512,3 +512,45 @@ class Agent(Base):
         UniqueConstraint("tenant_id", "agent_id", name="uq_agent_tenant_agent_id"),
         Index("ix_agent_tenant_status", "tenant_id", "status"),
     )
+
+
+class ActionCatalog(Base):
+    """Registered catalog action. One row per (tenant_id, action_id).
+
+    Actions are the verbs an agent's manifest can reference by action_id.
+    The runtime (P1.2 translator + P2 orchestrator) looks up the row,
+    validates guardrail tier + data classes against the calling agent,
+    and dispatches to the backend recorded here.
+
+    tenant_id == "core" means shared across every tenant; tenant-scoped
+    entries take precedence when both exist with the same action_id.
+    """
+    __tablename__ = "governance_actions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    action_id = Column(String(64), nullable=False, index=True)
+    tenant_id = Column(String(128), nullable=False, default="core", index=True)
+
+    display_name = Column(String(255), nullable=False)
+    description = Column(Text)
+    category = Column(String(32), default="other", index=True)
+
+    # Full v1.0 entry stored verbatim; derived indexable columns below.
+    entry_json = Column("entry", JSONB, nullable=False, default=dict)
+    schema_version = Column(String(16), default="1.0")
+
+    # Derived columns for fast filtering without scanning JSONB.
+    backend_type = Column(String(32), index=True)           # fastapi_http | celery_task | ...
+    minimum_guardrail_tier = Column(String(64), index=True)
+    requires_approval = Column(Boolean, default=False)
+    deprecated = Column(Boolean, default=False, index=True)
+    version = Column(String(16), default="1.0.0")
+    maintainer = Column(String(128))
+
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "action_id", name="uq_action_tenant_action_id"),
+        Index("ix_action_tenant_backend", "tenant_id", "backend_type"),
+    )

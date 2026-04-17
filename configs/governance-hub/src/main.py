@@ -10,7 +10,7 @@ from sqlalchemy import text
 from .config import settings
 from .db.local_db import AsyncSessionLocal, SyncSessionLocal, engine
 from .db.models import Base
-from .routers import ad_join, advisor, agents, audit, auth, changes, chat, config_snapshots, connectors, fleet, framework, hyperv, keyword_templates, obligations, policies, prompts, restore, schema, skills, sync, vendors
+from .routers import actions, ad_join, advisor, agents, audit, auth, changes, chat, config_snapshots, connectors, fleet, framework, hyperv, keyword_templates, obligations, policies, prompts, restore, schema, skills, sync, vendors
 from .services.config_service import capture_snapshot
 from .services.sync_service import collect_telemetry, export_to_central
 
@@ -63,6 +63,7 @@ app.include_router(vendors.router)
 app.include_router(hyperv.router)
 app.include_router(ad_join.router)
 app.include_router(agents.router)
+app.include_router(actions.router)
 
 if settings.chat_enable:
     app.include_router(chat.router)
@@ -281,6 +282,19 @@ async def startup():
         logger.info(f"Capability registry: published {written} local capabilities; heartbeat started")
     except Exception as e:
         logger.warning(f"Capability publish failed (non-fatal): {e}")
+
+    # Seed the core action-catalog wrappers (DocForge, GovAdvisor, FleetMgmt,
+    # SysDesigner, DataConnector). Idempotent — unchanged entries are no-ops.
+    try:
+        from .db.local_db import AsyncSessionLocal
+        from .services.action_catalog_seed import load_core_wrappers
+        from .services.action_catalog_service import seed_entries
+        core_entries = load_core_wrappers()
+        async with AsyncSessionLocal() as db:
+            counts = await seed_entries(db, core_entries, actor_email="startup_seed")
+        logger.info(f"Action catalog seeded: {counts} across {len(core_entries)} core entries")
+    except Exception as e:
+        logger.warning(f"Action catalog seed failed (non-fatal): {e}")
 
     # Load settings overrides from DB (replaces .env file approach)
     try:

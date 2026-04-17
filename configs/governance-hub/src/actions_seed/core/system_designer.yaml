@@ -1,0 +1,151 @@
+# System Designer — shared catalog actions (tenant_id: core)
+#
+# Wraps configs/open-webui/system-designer-tool.py. Planning/estimation
+# actions that call the Gov-Hub's internal AI advisor for fleet design
+# and cost modeling.
+#
+# P1.3 — InsideLLM Declarative Agent Platform
+
+schema_version: "1.0"
+actions:
+  - schema_version: "1.0"
+    action_id: sysdesigner_design_deployment
+    tenant_id: core
+    display_name: "System Designer — Deployment Plan"
+    description: "Propose a single-instance deployment topology matching the operator's requirements."
+    category: draft
+    backend:
+      type: fastapi_http
+      url: "http://governance-hub:8090/api/v1/advisor/design_deployment"
+      method: POST
+      timeout_ms: 30000
+    inputs:
+      user_count:
+        type: integer
+        required: true
+        description: "Expected concurrent user count."
+      industry:
+        type: string
+        required: false
+        description: "Industry context for policy tuning."
+      constraints:
+        type: object
+        required: false
+        description: "Optional constraints (budget, compliance tier, data-residency region)."
+    outputs:
+      plan:
+        type: object
+        description: "Proposed deployment with VM sizing, module toggles, tier rationale."
+    guardrail_requirements:
+      minimum_guardrail_tier: tier_general_business
+      data_classes: []
+      requires_approval: false
+    audit:
+      log_inputs: true
+      log_outputs: true
+      redact_fields: []
+    rate_limit:
+      per_minute: 5
+      per_day: 50
+    maintainer: insidellm-core
+    version: "1.0.0"
+
+  - schema_version: "1.0"
+    action_id: sysdesigner_estimate_costs
+    tenant_id: core
+    display_name: "System Designer — Cost Estimate"
+    description: "Produce a 12-month cost forecast for the proposed deployment."
+    category: classify
+    backend:
+      type: fastapi_http
+      url: "http://governance-hub:8090/api/v1/advisor/estimate_costs"
+      method: POST
+      timeout_ms: 30000
+    inputs:
+      plan:
+        type: object
+        required: true
+        description: "Deployment plan produced by sysdesigner_design_deployment."
+    outputs:
+      costs:
+        type: object
+        description: "Cost lines: infra, LLM API spend, optional modules."
+    guardrail_requirements:
+      minimum_guardrail_tier: tier_general_business
+      data_classes: []
+      requires_approval: false
+    audit:
+      log_inputs: true
+      log_outputs: true
+      redact_fields: []
+    rate_limit:
+      per_minute: 10
+      per_day: 100
+    maintainer: insidellm-core
+    version: "1.0.0"
+
+  - schema_version: "1.0"
+    action_id: sysdesigner_recommend_config
+    tenant_id: core
+    display_name: "System Designer — Recommend Config"
+    description: "Suggest a module/Valves configuration matching the caller's workload profile."
+    category: classify
+    backend:
+      type: fastapi_http
+      url: "http://governance-hub:8090/api/v1/advisor/recommend_config"
+      method: POST
+      timeout_ms: 30000
+    inputs:
+      workload:
+        type: object
+        required: true
+        description: "Workload descriptor: departments, data classes, expected throughput."
+    outputs:
+      recommendation:
+        type: object
+    guardrail_requirements:
+      minimum_guardrail_tier: tier_general_business
+      data_classes: []
+      requires_approval: false
+    audit:
+      log_inputs: true
+      log_outputs: true
+      redact_fields: []
+    rate_limit:
+      per_minute: 10
+      per_day: 100
+    maintainer: insidellm-core
+    version: "1.0.0"
+
+  - schema_version: "1.0"
+    action_id: sysdesigner_plan_fleet
+    tenant_id: core
+    display_name: "System Designer — Plan Fleet"
+    description: "Produce a multi-instance fleet plan (primary, per-department, gateway, edge)."
+    category: draft
+    backend:
+      type: fastapi_http
+      url: "http://governance-hub:8090/api/v1/advisor/plan_fleet"
+      method: POST
+      timeout_ms: 30000
+    inputs:
+      company_profile:
+        type: object
+        required: true
+        description: "Org structure: departments, headcount, compliance obligations, segregation rules."
+    outputs:
+      fleet_plan:
+        type: object
+    guardrail_requirements:
+      minimum_guardrail_tier: tier_general_business
+      data_classes: []
+      requires_approval: true
+    audit:
+      log_inputs: true
+      log_outputs: true
+      redact_fields: []
+    rate_limit:
+      per_minute: 3
+      per_day: 20
+    maintainer: insidellm-core
+    version: "1.0.0"

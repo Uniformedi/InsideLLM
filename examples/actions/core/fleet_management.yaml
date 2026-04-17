@@ -1,0 +1,177 @@
+# Fleet Management — shared catalog actions (tenant_id: core)
+#
+# Wraps configs/open-webui/fleet-management-tool.py. Read-only fleet
+# telemetry + restore-config generation — mutating fleet state is done
+# via Terraform, not agents.
+#
+# P1.3 — InsideLLM Declarative Agent Platform
+
+schema_version: "1.0"
+actions:
+  - schema_version: "1.0"
+    action_id: fleet_list_deployments
+    tenant_id: core
+    display_name: "Fleet — List Deployments"
+    description: "Return all registered InsideLLM instances with role, version, health."
+    category: retrieve
+    backend:
+      type: fastapi_http
+      url: "http://governance-hub:8090/api/v1/fleet/instances"
+      method: GET
+      timeout_ms: 5000
+    inputs: {}
+    outputs:
+      instances:
+        type: array
+        description: "Instance records."
+    guardrail_requirements:
+      minimum_guardrail_tier: tier_general_business
+      data_classes: []
+      requires_approval: false
+    audit:
+      log_inputs: false
+      log_outputs: true
+      redact_fields: []
+    rate_limit:
+      per_minute: 60
+      per_day: 5000
+    maintainer: insidellm-core
+    version: "1.0.0"
+
+  - schema_version: "1.0"
+    action_id: fleet_instance_detail
+    tenant_id: core
+    display_name: "Fleet — Instance Detail"
+    description: "Full metadata for one fleet instance including capability registry."
+    category: retrieve
+    backend:
+      type: fastapi_http
+      url: "http://governance-hub:8090/api/v1/fleet/instances/{instance_id}"
+      method: GET
+      timeout_ms: 5000
+    inputs:
+      instance_id:
+        type: string
+        required: true
+        description: "Instance identifier (slug)."
+    outputs:
+      instance:
+        type: object
+        description: "Instance detail."
+    guardrail_requirements:
+      minimum_guardrail_tier: tier_general_business
+      data_classes: []
+      requires_approval: false
+    audit:
+      log_inputs: true
+      log_outputs: true
+      redact_fields: []
+    rate_limit:
+      per_minute: 60
+      per_day: 5000
+    maintainer: insidellm-core
+    version: "1.0.0"
+
+  - schema_version: "1.0"
+    action_id: fleet_summary
+    tenant_id: core
+    display_name: "Fleet — Aggregate Summary"
+    description: "Top-level counters: total instances, per-role breakdown, aggregate spend."
+    category: retrieve
+    backend:
+      type: fastapi_http
+      url: "http://governance-hub:8090/api/v1/fleet/summary"
+      method: GET
+      timeout_ms: 5000
+    inputs: {}
+    outputs:
+      summary:
+        type: object
+        description: "Aggregate fleet counters."
+    guardrail_requirements:
+      minimum_guardrail_tier: tier_general_business
+      data_classes: []
+      requires_approval: false
+    audit:
+      log_inputs: false
+      log_outputs: true
+      redact_fields: []
+    rate_limit:
+      per_minute: 60
+      per_day: 5000
+    maintainer: insidellm-core
+    version: "1.0.0"
+
+  - schema_version: "1.0"
+    action_id: fleet_generate_restore_config
+    tenant_id: core
+    display_name: "Fleet — Generate Restore tfvars"
+    description: "Produce a Terraform tfvars file that rebuilds a prior instance from its captured snapshot."
+    category: draft
+    backend:
+      type: fastapi_http
+      url: "http://governance-hub:8090/api/v1/restore/generate-tfvars"
+      method: POST
+      timeout_ms: 15000
+    inputs:
+      instance_id:
+        type: string
+        required: true
+        description: "Instance to rebuild."
+      snapshot_id:
+        type: string
+        required: false
+        description: "Specific snapshot to restore (default: latest)."
+      target_host:
+        type: string
+        required: false
+        description: "Optional new host IP; default: same as original."
+    outputs:
+      tfvars:
+        type: string
+        description: "Rendered tfvars content."
+    guardrail_requirements:
+      minimum_guardrail_tier: tier_general_business
+      data_classes: []
+      requires_approval: true
+    audit:
+      log_inputs: true
+      log_outputs: false
+      redact_fields: [tfvars]
+    rate_limit:
+      per_minute: 5
+      per_day: 50
+    maintainer: insidellm-core
+    version: "1.0.0"
+
+  - schema_version: "1.0"
+    action_id: fleet_list_snapshots
+    tenant_id: core
+    display_name: "Fleet — List Snapshots"
+    description: "Return available configuration snapshots for an instance."
+    category: retrieve
+    backend:
+      type: fastapi_http
+      url: "http://governance-hub:8090/api/v1/restore/snapshots/{instance_id}"
+      method: GET
+      timeout_ms: 5000
+    inputs:
+      instance_id:
+        type: string
+        required: true
+    outputs:
+      snapshots:
+        type: array
+    guardrail_requirements:
+      minimum_guardrail_tier: tier_general_business
+      data_classes: []
+      requires_approval: false
+    audit:
+      log_inputs: true
+      log_outputs: true
+      redact_fields: []
+    rate_limit:
+      per_minute: 60
+      per_day: 5000
+    maintainer: insidellm-core
+    version: "1.0.0"

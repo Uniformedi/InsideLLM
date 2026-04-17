@@ -1,0 +1,91 @@
+# DocForge — shared catalog actions (tenant_id: core)
+#
+# Wraps configs/open-webui/docforge-tool.py methods as declarative actions
+# an agent manifest can reference by action_id. Backend is the platform's
+# DocForge Express service running on the internal Docker network.
+#
+# P1.3 — InsideLLM Declarative Agent Platform
+
+schema_version: "1.0"
+actions:
+  - schema_version: "1.0"
+    action_id: docforge_generate
+    tenant_id: core
+    display_name: "DocForge — Generate Document"
+    description: "Generate a file (DOCX, XLSX, PPTX, PDF, CSV, JSON, XML, YAML, Markdown, TXT) from structured data."
+    category: draft
+    backend:
+      type: fastapi_http
+      url: "http://docforge:3000/api/generate"
+      method: POST
+      timeout_ms: 30000
+    inputs:
+      format:
+        type: string
+        required: true
+        enum: [docx, xlsx, pptx, pdf, csv, json, xml, yaml, markdown, txt]
+        description: "Output file format."
+      data:
+        type: object
+        required: true
+        description: "Format-specific structured payload — see docforge docs for the per-format schema."
+      filename:
+        type: string
+        required: false
+        description: "Optional output filename (auto-generated if omitted)."
+    outputs:
+      file_url:
+        type: string
+        description: "Downloadable file URL returned by DocForge."
+    guardrail_requirements:
+      minimum_guardrail_tier: tier_general_business
+      data_classes: []
+      requires_approval: false
+    audit:
+      log_inputs: true
+      log_outputs: true
+      redact_fields: []
+    rate_limit:
+      per_minute: 30
+      per_day: 1000
+    maintainer: insidellm-core
+    version: "1.0.0"
+
+  - schema_version: "1.0"
+    action_id: docforge_convert
+    tenant_id: core
+    display_name: "DocForge — Convert File"
+    description: "Convert an uploaded document between formats (e.g. DOCX → PDF) via LibreOffice headless."
+    category: transform
+    backend:
+      type: fastapi_http
+      url: "http://docforge:3000/api/convert"
+      method: POST
+      timeout_ms: 30000
+    inputs:
+      source_path:
+        type: string
+        required: true
+        description: "Path to the input file on the shared uploads volume."
+      target_format:
+        type: string
+        required: true
+        enum: [pdf, docx, xlsx, pptx, csv, txt, odt, ods, odp]
+        description: "Target format."
+    outputs:
+      file_url:
+        type: string
+        description: "Converted file URL."
+    guardrail_requirements:
+      minimum_guardrail_tier: tier_general_business
+      data_classes: []
+      requires_approval: false
+    audit:
+      log_inputs: true
+      log_outputs: true
+      redact_fields: []
+    rate_limit:
+      per_minute: 20
+      per_day: 500
+    maintainer: insidellm-core
+    version: "1.0.0"
