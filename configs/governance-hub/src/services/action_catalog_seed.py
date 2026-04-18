@@ -28,6 +28,7 @@ _SEED_DIR = Path(__file__).resolve().parent.parent / "actions_seed" / "core"
 # time if someone drops a file or renames one without updating the
 # manifest. Alphabetical; the loader sorts for deterministic ordering.
 _WRAPPERS = (
+    "async_tasks.yaml",
     "data_connector.yaml",
     "docforge.yaml",
     "fleet_management.yaml",

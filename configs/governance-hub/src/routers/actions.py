@@ -27,7 +27,9 @@ from ..services.action_catalog_service import (
     seed_entries,
     upsert_action,
 )
+from ..services.action_dispatcher import dispatch, get_task_status
 from ..services.rbac import require_admin, require_view
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger("governance-hub.actions.router")
 
@@ -161,3 +163,43 @@ async def seed_core(
     entries = load_core_wrappers()
     counts = await seed_entries(db, entries, actor_email=_actor(request) or "seed_core")
     return {"counts": counts, "total": len(entries)}
+
+
+# ---------------------------------------------------------------------------
+# Dispatch (P3.3 — polyglot backend executor)
+# ---------------------------------------------------------------------------
+
+
+class DispatchRequest(BaseModel):
+    inputs: dict = Field(default_factory=dict)
+
+
+@router.post("/dispatch/{tenant_id}/{action_id}", dependencies=[require_admin])
+async def dispatch_action(
+    tenant_id: str,
+    action_id: str,
+    payload: DispatchRequest,
+    db: AsyncSession = Depends(get_local_db),
+) -> dict:
+    """Dispatch an action by id. Resolves tenant→core fallback, then
+    routes to the right backend (fastapi_http: returns inline;
+    celery_task: returns task_id for polling)."""
+    row = await resolve_action(db, tenant_id, action_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="action not found (tenant or core)")
+    if row.deprecated:
+        raise HTTPException(status_code=410, detail="action is deprecated")
+
+    try:
+        entry = ActionCatalogEntry.model_validate(row.entry_json)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"stored action entry malformed: {e}")
+
+    result = await dispatch(entry, payload.inputs)
+    return result.to_dict()
+
+
+@router.get("/status/{task_id}", dependencies=[require_view])
+async def task_status(task_id: str) -> dict:
+    """Poll a Celery task's state. Returns state + result when ready."""
+    return await get_task_status(task_id)

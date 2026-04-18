@@ -560,6 +560,13 @@ services:
 %{ endif }
       # Break-glass: local insidellm-admin account uses this as the password.
       LITELLM_MASTER_KEY: "$${LITELLM_MASTER_KEY}"
+%{ if workers_enable ~}
+      # Celery broker + result backend (P3.3). Gov-hub publishes to the
+      # insidellm-celery-worker via Redis when dispatching catalog actions
+      # whose backend.type == celery_task.
+      CELERY_BROKER_URL: "redis://redis:6379/1"
+      CELERY_RESULT_BACKEND: "redis://redis:6379/2"
+%{ endif ~}
 %{ if keycloak_enable ~}
       # Keycloak identity sync (Phase 2). Auto-enabled when the local
       # keycloak container is deployed; pushes realm/groups/users to the
@@ -905,6 +912,45 @@ services:
       timeout: 5s
       retries: 3
       start_period: 20s
+    networks:
+      - insidellm-internal
+
+  # -------------------------------------------------------------------------
+  # InsideLLM Celery Worker — async / queued declarative-agent actions (P3.3)
+  #
+  # Same image as insidellm-workers; different command. Listens on the
+  # `actions` (short) and `bulk` (long-running) queues. Catalog entries
+  # with backend.type = celery_task dispatch here via the gov-hub's
+  # action_dispatcher.
+  # -------------------------------------------------------------------------
+  insidellm-celery-worker:
+    build:
+      context: /opt/InsideLLM/insidellm-workers
+      dockerfile: Dockerfile
+    container_name: insidellm-celery-worker
+    restart: always
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      CELERY_BROKER_URL: "redis://redis:6379/1"
+      CELERY_RESULT_BACKEND: "redis://redis:6379/2"
+    command:
+      - "celery"
+      - "-A"
+      - "src.celery_app"
+      - "worker"
+      - "--loglevel=info"
+      - "--queues=actions,bulk"
+      - "--concurrency=2"
+    healthcheck:
+      # `celery inspect ping` returns non-zero if no worker responds on
+      # the control channel within the timeout.
+      test: ["CMD-SHELL", "celery -A src.celery_app inspect ping -t 3 >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     networks:
       - insidellm-internal
 

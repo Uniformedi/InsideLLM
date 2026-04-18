@@ -1,0 +1,128 @@
+# Async / queued catalog actions (P3.3) — tenant_id: core
+#
+# Demonstrates the `celery_task` backend type. The gov-hub's
+# action_dispatcher publishes to the insidellm-celery-worker queue via
+# Redis and returns a task_id; callers poll
+#   GET /api/v1/actions/status/{task_id}
+# to retrieve the eventual result.
+#
+# Task names map 1:1 to the functions in
+# configs/insidellm-workers/src/tasks.py.
+
+schema_version: "1.0"
+actions:
+  - schema_version: "1.0"
+    action_id: batch_letter_merge
+    tenant_id: core
+    display_name: "Batch Letter Merge (async)"
+    description: "Generate one letter per account number from a template. Long-running; routed to the `bulk` queue."
+    category: workflow
+    backend:
+      type: celery_task
+      task: "insidellm.tasks.batch_letter_merge"
+      queue: bulk
+      timeout_seconds: 900
+      retries: 1
+    inputs:
+      account_numbers:
+        type: array
+        required: true
+        description: "List of Organization account ids to merge."
+      letter_template_id:
+        type: string
+        required: true
+    outputs:
+      artifacts:
+        type: array
+        description: "Per-account letter metadata (letter_id, generated_at)."
+    guardrail_requirements:
+      minimum_guardrail_tier: tier_fdcpa_regulated
+      data_classes: [pii]
+      requires_approval: true
+    audit:
+      log_inputs: true
+      log_outputs: true
+      redact_fields: [artifacts]
+    rate_limit:
+      per_minute: 2
+      per_day: 20
+    maintainer: insidellm-core
+    version: "1.0.0"
+
+  - schema_version: "1.0"
+    action_id: ocr_document
+    tenant_id: core
+    display_name: "OCR Document (async)"
+    description: "Extract text from a document via OCR. Idempotent; safe to retry."
+    category: transform
+    backend:
+      type: celery_task
+      task: "insidellm.tasks.ocr_document"
+      queue: actions
+      timeout_seconds: 120
+      retries: 2
+    inputs:
+      document_url:
+        type: string
+        required: true
+      language:
+        type: string
+        required: false
+        default: "eng"
+    outputs:
+      text:
+        type: string
+      page_count:
+        type: integer
+    guardrail_requirements:
+      minimum_guardrail_tier: tier_general_business
+      data_classes: []
+      requires_approval: false
+    audit:
+      log_inputs: true
+      log_outputs: false
+      redact_fields: [text]
+    rate_limit:
+      per_minute: 30
+      per_day: 500
+    maintainer: insidellm-core
+    version: "1.0.0"
+
+  - schema_version: "1.0"
+    action_id: account_portfolio_export
+    tenant_id: core
+    display_name: "Account Portfolio Export (async)"
+    description: "Export a tenant's account portfolio for reporting. Long-running in production."
+    category: retrieve
+    backend:
+      type: celery_task
+      task: "insidellm.tasks.account_portfolio_export"
+      queue: actions
+      timeout_seconds: 600
+      retries: 1
+    inputs:
+      tenant_id:
+        type: string
+        required: true
+      cutoff_date:
+        type: string
+        required: false
+        description: "ISO date (YYYY-MM-DD) for as-of export; defaults to today."
+    outputs:
+      export_url:
+        type: string
+      rows:
+        type: integer
+    guardrail_requirements:
+      minimum_guardrail_tier: tier_financial_regulated
+      data_classes: [financial, pii]
+      requires_approval: true
+    audit:
+      log_inputs: true
+      log_outputs: true
+      redact_fields: [export_url]
+    rate_limit:
+      per_minute: 3
+      per_day: 30
+    maintainer: insidellm-core
+    version: "1.0.0"
