@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>InsideLLM — Portfolio Observability</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    background: #0a0e1a;
+    color: #e2e8f0;
+    min-height: 100vh;
+    padding: 24px;
+  }
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #2a3650;
+  }
+  header h1 {
+    color: #22d3ee;
+    font-family: "SF Mono", Consolas, monospace;
+    font-size: 22px;
+    letter-spacing: -0.5px;
+  }
+  header .meta {
+    color: #64748b;
+    font-size: 13px;
+  }
+  .refresh {
+    background: #1a2234;
+    border: 1px solid #2a3650;
+    color: #22d3ee;
+    padding: 6px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 12px;
+  }
+  .refresh:hover { border-color: #22d3ee; }
+
+  .grid { display: grid; gap: 16px; }
+  .grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+  .grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+  .grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+  @media (max-width: 1100px) { .grid.cols-4 { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 720px) { .grid.cols-4, .grid.cols-3, .grid.cols-2 { grid-template-columns: 1fr; } }
+
+  .card {
+    background: #1a2234;
+    border: 1px solid #2a3650;
+    border-radius: 10px;
+    padding: 18px;
+  }
+  .card h2 {
+    font-size: 12px;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+    font-weight: 600;
+  }
+  .card .big {
+    font-size: 32px;
+    font-family: "SF Mono", Consolas, monospace;
+    color: #e2e8f0;
+    font-weight: 300;
+  }
+  .card .big.ok    { color: #22d3ee; }
+  .card .big.warn  { color: #fbbf24; }
+  .card .big.alert { color: #f87171; }
+  .card .sub {
+    font-size: 12px;
+    color: #64748b;
+    margin-top: 4px;
+  }
+
+  section { margin-bottom: 24px; }
+  section h3 {
+    font-size: 13px;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 12px;
+    font-weight: 600;
+  }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 10px 12px; }
+  th {
+    color: #94a3b8;
+    font-weight: 500;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid #2a3650;
+  }
+  tbody tr { border-bottom: 1px solid #2a3650; }
+  tbody tr:last-child { border-bottom: 0; }
+  tbody td.num { font-family: "SF Mono", Consolas, monospace; color: #cbd5e1; text-align: right; }
+  tbody td .tag {
+    display: inline-block;
+    padding: 2px 8px;
+    background: #111827;
+    border: 1px solid #2a3650;
+    border-radius: 4px;
+    font-size: 11px;
+    color: #94a3b8;
+  }
+  .risk {
+    background: rgba(248, 113, 113, 0.08);
+    border: 1px solid rgba(248, 113, 113, 0.3);
+    color: #fca5a5;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+  }
+  .risk.low_compliance  { background: rgba(251, 191, 36, 0.08); border-color: rgba(251, 191, 36, 0.3); color: #fcd34d; }
+  .risk.stale_telemetry { background: rgba(148, 163, 184, 0.08); border-color: rgba(148, 163, 184, 0.3); color: #94a3b8; }
+
+  .chart-wrap { position: relative; height: 240px; }
+  .empty {
+    text-align: center;
+    color: #64748b;
+    padding: 32px 0;
+    font-size: 13px;
+  }
+  a { color: #22d3ee; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>InsideLLM — Portfolio Observability</h1>
+    <div class="meta">Cross-tenant aggregate · pulled from the central governance DB</div>
+  </div>
+  <div>
+    <span class="meta" id="last-updated">loading…</span>
+    &nbsp;
+    <button class="refresh" onclick="loadAll()">refresh</button>
+  </div>
+</header>
+
+<!-- Headline KPI row -->
+<section>
+  <h3>Fleet</h3>
+  <div class="grid cols-4">
+    <div class="card">
+      <h2>Instances</h2>
+      <div class="big ok" id="kpi-instances">–</div>
+      <div class="sub" id="kpi-instances-sub">active</div>
+    </div>
+    <div class="card">
+      <h2>Users</h2>
+      <div class="big" id="kpi-users">–</div>
+      <div class="sub" id="kpi-users-sub">across fleet</div>
+    </div>
+    <div class="card">
+      <h2>Requests</h2>
+      <div class="big" id="kpi-requests">–</div>
+      <div class="sub">latest reporting cycle</div>
+    </div>
+    <div class="card">
+      <h2>Spend</h2>
+      <div class="big" id="kpi-spend">–</div>
+      <div class="sub">latest reporting cycle</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="grid cols-3">
+    <div class="card">
+      <h2>Avg Compliance</h2>
+      <div class="big" id="kpi-compliance">–</div>
+      <div class="sub">across reporting instances</div>
+    </div>
+    <div class="card">
+      <h2>Critical Flags</h2>
+      <div class="big" id="kpi-flags">–</div>
+      <div class="sub">fleet total, last cycle</div>
+    </div>
+    <div class="card">
+      <h2>At Risk</h2>
+      <div class="big" id="kpi-atrisk">–</div>
+      <div class="sub" id="kpi-atrisk-sub">instances needing attention</div>
+    </div>
+  </div>
+</section>
+
+<!-- Charts -->
+<section class="grid cols-2">
+  <div class="card">
+    <h2>Daily Trend — Requests &amp; Spend</h2>
+    <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
+  </div>
+  <div class="card">
+    <h2>Instances By Industry</h2>
+    <div class="chart-wrap"><canvas id="industryChart"></canvas></div>
+  </div>
+</section>
+
+<!-- Per-instance table -->
+<section>
+  <h3>Instances</h3>
+  <div class="card">
+    <table>
+      <thead><tr>
+        <th>Instance</th>
+        <th>Industry</th>
+        <th>Tier</th>
+        <th>Version</th>
+        <th class="num">Users</th>
+        <th class="num">Requests</th>
+        <th class="num">Spend&nbsp;($)</th>
+        <th class="num">Compl.</th>
+        <th class="num">Flags</th>
+        <th>Last Sync</th>
+      </tr></thead>
+      <tbody id="instances-body">
+        <tr><td colspan="10" class="empty">loading…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- At-risk -->
+<section>
+  <h3>Flagged For Review</h3>
+  <div class="card">
+    <table>
+      <thead><tr>
+        <th>Instance</th>
+        <th>Industry</th>
+        <th>Reason</th>
+        <th class="num">Compl.</th>
+        <th class="num">Errors</th>
+        <th class="num">Crit Flags</th>
+        <th>Last Sync</th>
+      </tr></thead>
+      <tbody id="atrisk-body">
+        <tr><td colspan="7" class="empty">loading…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<script>
+// Formatting helpers — keep pure, easy to tweak.
+const fmt = {
+  num: (n) => (n == null ? "–" : Number(n).toLocaleString()),
+  money: (n) => (n == null ? "–" : "$" + Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 })),
+  pct: (n) => (n == null ? "–" : Number(n).toFixed(1) + "%"),
+  date: (s) => {
+    if (!s) return "–";
+    const d = new Date(s);
+    return isNaN(d) ? s : d.toLocaleString();
+  },
+};
+
+let trendChart = null;
+let industryChart = null;
+
+function pickComplianceClass(score) {
+  if (score == null) return "";
+  if (score >= 90) return "ok";
+  if (score >= 70) return "warn";
+  return "alert";
+}
+
+async function fetchJSON(url) {
+  const resp = await fetch(url, { credentials: "include" });
+  if (!resp.ok) throw new Error(url + " → " + resp.status);
+  return await resp.json();
+}
+
+async function loadOverview() {
+  const data = await fetchJSON("/governance/api/v1/portfolio/overview");
+  const fleet = data.fleet || {};
+  const id = data.identity || {};
+
+  document.getElementById("kpi-instances").textContent = fmt.num(fleet.total_instances || 0);
+  document.getElementById("kpi-instances-sub").textContent =
+    (fleet.reporting_instances || 0) + " reporting · " + (fleet.stale_instances || 0) + " stale";
+
+  document.getElementById("kpi-users").textContent = fmt.num(id.total_users || fleet.fleet_total_users || 0);
+  document.getElementById("kpi-users-sub").textContent =
+    id.total_users ? (id.instances_with_identity || 0) + " via Keycloak" : "telemetry snapshot";
+
+  document.getElementById("kpi-requests").textContent = fmt.num(fleet.fleet_total_requests || 0);
+  document.getElementById("kpi-spend").textContent = fmt.money(fleet.fleet_total_spend || 0);
+
+  const compliance = fleet.avg_compliance_score || 0;
+  const elC = document.getElementById("kpi-compliance");
+  elC.textContent = fmt.pct(compliance);
+  elC.className = "big " + pickComplianceClass(compliance);
+
+  document.getElementById("kpi-flags").textContent = fmt.num(fleet.total_critical_flags || 0);
+}
+
+async function loadInstances() {
+  const data = await fetchJSON("/governance/api/v1/portfolio/instances");
+  const body = document.getElementById("instances-body");
+  const rows = data.instances || [];
+  if (!rows.length) {
+    body.innerHTML = '<tr><td colspan="10" class="empty">No active instances yet.</td></tr>';
+    return;
+  }
+  body.innerHTML = rows.map((r) => `
+    <tr>
+      <td>${escapeHtml(r.instance_name || r.instance_id)}</td>
+      <td><span class="tag">${escapeHtml(r.industry || "—")}</span></td>
+      <td>${escapeHtml(r.governance_tier || "—")}</td>
+      <td>${escapeHtml(r.platform_version || "—")}</td>
+      <td class="num">${fmt.num(r.unique_users)}</td>
+      <td class="num">${fmt.num(r.total_requests)}</td>
+      <td class="num">${fmt.money(r.total_spend)}</td>
+      <td class="num" style="color:${complianceColor(r.compliance_score)}">${fmt.pct(r.compliance_score)}</td>
+      <td class="num">${fmt.num(r.critical_flags)}</td>
+      <td>${fmt.date(r.last_sync_at)}</td>
+    </tr>`).join("");
+}
+
+function complianceColor(score) {
+  if (score == null) return "#cbd5e1";
+  if (score >= 90) return "#22d3ee";
+  if (score >= 70) return "#fbbf24";
+  return "#f87171";
+}
+
+async function loadAtRisk() {
+  const data = await fetchJSON("/governance/api/v1/portfolio/at-risk");
+  const rows = data.flagged || [];
+  const body = document.getElementById("atrisk-body");
+  document.getElementById("kpi-atrisk").textContent = fmt.num(rows.length);
+  document.getElementById("kpi-atrisk").className =
+    "big " + (rows.length === 0 ? "ok" : rows.length < 3 ? "warn" : "alert");
+  document.getElementById("kpi-atrisk-sub").textContent =
+    rows.length === 0 ? "fleet is green" : "see flagged list below";
+
+  if (!rows.length) {
+    body.innerHTML = '<tr><td colspan="7" class="empty">No instances currently flagged.</td></tr>';
+    return;
+  }
+  body.innerHTML = rows.map((r) => `
+    <tr>
+      <td>${escapeHtml(r.instance_name || r.instance_id)}</td>
+      <td><span class="tag">${escapeHtml(r.industry || "—")}</span></td>
+      <td><span class="risk ${escapeHtml(r.risk_reason)}">${escapeHtml(r.risk_reason)}</span></td>
+      <td class="num">${fmt.pct(r.compliance_score)}</td>
+      <td class="num">${fmt.num(r.error_count)}</td>
+      <td class="num">${fmt.num(r.critical_flags)}</td>
+      <td>${fmt.date(r.last_sync_at)}</td>
+    </tr>`).join("");
+}
+
+async function loadTimeSeries() {
+  const data = await fetchJSON("/governance/api/v1/portfolio/time-series?days=14");
+  const points = data.points || [];
+  if (trendChart) trendChart.destroy();
+  const ctx = document.getElementById("trendChart").getContext("2d");
+  trendChart = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: points.map((p) => (p.day || "").slice(0, 10)),
+      datasets: [
+        {
+          label: "Requests",
+          data: points.map((p) => p.total_requests || 0),
+          borderColor: "#22d3ee",
+          backgroundColor: "rgba(34,211,238,0.08)",
+          yAxisID: "y",
+          tension: 0.3,
+        },
+        {
+          label: "Spend ($)",
+          data: points.map((p) => p.total_spend || 0),
+          borderColor: "#a78bfa",
+          backgroundColor: "rgba(167,139,250,0.08)",
+          yAxisID: "y1",
+          tension: 0.3,
+        },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: "#94a3b8", font: { size: 11 } } },
+      },
+      scales: {
+        x: { ticks: { color: "#64748b" }, grid: { color: "#1e293b" } },
+        y: { position: "left", ticks: { color: "#22d3ee" }, grid: { color: "#1e293b" } },
+        y1: { position: "right", ticks: { color: "#a78bfa" }, grid: { drawOnChartArea: false } },
+      },
+    },
+  });
+}
+
+async function loadIndustries() {
+  const data = await fetchJSON("/governance/api/v1/portfolio/industries");
+  const rows = data.industries || [];
+  if (industryChart) industryChart.destroy();
+  const ctx = document.getElementById("industryChart").getContext("2d");
+  const palette = ["#22d3ee", "#a78bfa", "#fbbf24", "#f472b6", "#34d399", "#60a5fa", "#f87171", "#fcd34d"];
+  industryChart = new Chart(ctx, {
+    type: "doughnut",
+    data: {
+      labels: rows.map((r) => r.industry),
+      datasets: [{
+        data: rows.map((r) => r.instances),
+        backgroundColor: rows.map((_, i) => palette[i % palette.length]),
+        borderColor: "#0a0e1a",
+        borderWidth: 2,
+      }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: "right", labels: { color: "#94a3b8", font: { size: 11 }, boxWidth: 12 } },
+      },
+    },
+  });
+}
+
+function escapeHtml(s) {
+  if (s == null) return "";
+  return String(s).replace(/[&<>"']/g, (c) => (
+    { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
+  ));
+}
+
+async function loadAll() {
+  document.getElementById("last-updated").textContent = "loading…";
+  try {
+    await Promise.all([
+      loadOverview(),
+      loadInstances(),
+      loadTimeSeries(),
+      loadIndustries(),
+      loadAtRisk(),
+    ]);
+    document.getElementById("last-updated").textContent = "updated " + new Date().toLocaleTimeString();
+  } catch (e) {
+    document.getElementById("last-updated").textContent = "error: " + e.message;
+  }
+}
+
+loadAll();
+setInterval(loadAll, 60_000);  // auto-refresh every minute
+</script>
+</body>
+</html>

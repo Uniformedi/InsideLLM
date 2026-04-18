@@ -10,7 +10,7 @@ from sqlalchemy import text
 from .config import settings
 from .db.local_db import AsyncSessionLocal, SyncSessionLocal, engine
 from .db.models import Base
-from .routers import actions, ad_join, advisor, agents, audit, auth, changes, chat, config_snapshots, connectors, fleet, framework, hyperv, identity, keyword_templates, obligations, policies, prompts, restore, schema, skills, sync, vendors
+from .routers import actions, ad_join, advisor, agents, audit, auth, changes, chat, config_snapshots, connectors, fleet, framework, hyperv, identity, keyword_templates, obligations, policies, portfolio, prompts, restore, schema, skills, sync, vendors
 from .services.config_service import capture_snapshot
 from .services.sync_service import collect_telemetry, export_to_central
 
@@ -65,6 +65,7 @@ app.include_router(ad_join.router)
 app.include_router(agents.router)
 app.include_router(actions.router)
 app.include_router(identity.router)
+app.include_router(portfolio.router)
 
 if settings.chat_enable:
     app.include_router(chat.router)
@@ -121,6 +122,10 @@ async def landing():
     <a href="/admin">
       <span class="icon" style="background:#2563eb">CC</span>
       <div><div class="label">Command Center</div><div class="desc">Governance dashboard, change management, fleet overview, monitoring</div></div>
+    </a>
+    <a href="/governance/portfolio">
+      <span class="icon" style="background:#22d3ee">PF</span>
+      <div><div class="label">Portfolio Observability</div><div class="desc">Cross-tenant aggregate — every InsideLLM instance in your portfolio, one view. Spend, compliance, at-risk flags.</div></div>
     </a>
     <a href="/governance/skills">
       <span class="icon" style="background:#0891b2">SK</span>

@@ -340,6 +340,127 @@ class _PostgreSQL:
         LIMIT :lim OFFSET :off
     """
 
+    # --- Portfolio observability (P4.1) -------------------------------------
+    # Aggregates across the fleet for the Parent Organization-style cross-tenant view.
+    # All metrics pivot on the *latest* telemetry row per instance so a
+    # reporting lag doesn't distort the headline numbers.
+
+    portfolio_per_instance = """
+        SELECT
+            i.instance_id,
+            i.instance_name,
+            i.industry,
+            i.governance_tier,
+            i.platform_version,
+            i.last_sync_at,
+            i.status,
+            COALESCE(t.total_requests, 0)          AS total_requests,
+            COALESCE(t.total_spend, 0)             AS total_spend,
+            COALESCE(t.unique_users, 0)            AS unique_users,
+            COALESCE(t.dlp_blocks, 0)              AS dlp_blocks,
+            COALESCE(t.error_count, 0)             AS error_count,
+            COALESCE(t.keyword_flags_critical, 0)  AS critical_flags,
+            COALESCE(t.keyword_flags_high, 0)      AS high_flags,
+            COALESCE(t.compliance_score, 0)        AS compliance_score,
+            t.synced_at                            AS last_telemetry_at
+        FROM governance_instances i
+        LEFT JOIN LATERAL (
+            SELECT total_requests, total_spend, unique_users, dlp_blocks,
+                   error_count, keyword_flags_critical, keyword_flags_high,
+                   compliance_score, synced_at
+            FROM governance_telemetry
+            WHERE instance_id = i.instance_id
+            ORDER BY synced_at DESC LIMIT 1
+        ) t ON TRUE
+        WHERE i.status = 'active'
+        ORDER BY i.instance_name
+    """
+
+    portfolio_by_industry = """
+        WITH latest AS (
+            SELECT DISTINCT ON (instance_id) instance_id, total_requests,
+                   total_spend, unique_users, dlp_blocks, error_count,
+                   keyword_flags_critical, compliance_score
+            FROM governance_telemetry
+            ORDER BY instance_id, synced_at DESC
+        )
+        SELECT
+            COALESCE(i.industry, 'unspecified')  AS industry,
+            COUNT(*)                             AS instances,
+            COALESCE(SUM(l.total_requests), 0)   AS total_requests,
+            COALESCE(SUM(l.total_spend), 0)      AS total_spend,
+            COALESCE(SUM(l.unique_users), 0)     AS total_users,
+            COALESCE(SUM(l.dlp_blocks), 0)       AS dlp_blocks,
+            COALESCE(SUM(l.error_count), 0)      AS error_count,
+            COALESCE(SUM(l.keyword_flags_critical), 0) AS critical_flags,
+            COALESCE(AVG(l.compliance_score), 0) AS avg_compliance
+        FROM governance_instances i
+        LEFT JOIN latest l ON i.instance_id = l.instance_id
+        WHERE i.status = 'active'
+        GROUP BY COALESCE(i.industry, 'unspecified')
+        ORDER BY instances DESC, industry
+    """
+
+    portfolio_time_series = """
+        SELECT
+            DATE_TRUNC('day', synced_at)         AS day,
+            COUNT(DISTINCT instance_id)          AS reporting_instances,
+            SUM(total_requests)                  AS total_requests,
+            SUM(total_spend)                     AS total_spend,
+            SUM(unique_users)                    AS unique_users,
+            SUM(dlp_blocks)                      AS dlp_blocks,
+            SUM(error_count)                     AS error_count,
+            AVG(compliance_score)                AS avg_compliance
+        FROM governance_telemetry
+        WHERE synced_at >= NOW() - (:days * INTERVAL '1 day')
+        GROUP BY DATE_TRUNC('day', synced_at)
+        ORDER BY day
+    """
+
+    portfolio_at_risk = """
+        WITH latest AS (
+            SELECT DISTINCT ON (instance_id) instance_id, total_spend,
+                   compliance_score, error_count, keyword_flags_critical,
+                   dlp_blocks, synced_at
+            FROM governance_telemetry
+            ORDER BY instance_id, synced_at DESC
+        )
+        SELECT
+            i.instance_id,
+            i.instance_name,
+            i.industry,
+            i.last_sync_at,
+            COALESCE(l.compliance_score, 0)     AS compliance_score,
+            COALESCE(l.error_count, 0)          AS error_count,
+            COALESCE(l.keyword_flags_critical, 0) AS critical_flags,
+            COALESCE(l.dlp_blocks, 0)           AS dlp_blocks,
+            COALESCE(l.total_spend, 0)          AS total_spend,
+            CASE
+                WHEN i.last_sync_at IS NULL OR i.last_sync_at < NOW() - INTERVAL '24 hours' THEN 'stale_telemetry'
+                WHEN l.compliance_score IS NOT NULL AND l.compliance_score < :compliance_threshold THEN 'low_compliance'
+                WHEN l.keyword_flags_critical > :critical_flag_threshold THEN 'critical_flags'
+                WHEN l.error_count > :error_threshold THEN 'high_error_rate'
+                ELSE 'ok'
+            END AS risk_reason
+        FROM governance_instances i
+        LEFT JOIN latest l ON i.instance_id = l.instance_id
+        WHERE i.status = 'active' AND (
+              i.last_sync_at IS NULL OR i.last_sync_at < NOW() - INTERVAL '24 hours'
+           OR (l.compliance_score IS NOT NULL AND l.compliance_score < :compliance_threshold)
+           OR l.keyword_flags_critical > :critical_flag_threshold
+           OR l.error_count > :error_threshold
+        )
+        ORDER BY i.instance_name
+    """
+
+    portfolio_identity_totals = """
+        SELECT
+            COUNT(DISTINCT instance_id || '|' || keycloak_user_id) AS total_users,
+            COUNT(DISTINCT instance_id)                            AS instances_with_identity
+        FROM governance_identity_users
+        WHERE enabled = true
+    """
+
 
 class _MSSQL:
     """Microsoft SQL Server dialect."""
@@ -655,6 +776,115 @@ class _MSSQL:
         OFFSET :off ROWS FETCH NEXT :lim ROWS ONLY
     """
 
+    # --- Portfolio observability (P4.1) -------------------------------------
+    # MSSQL: CROSS APPLY replaces LATERAL; DATEADD replaces INTERVAL.
+
+    portfolio_per_instance = """
+        SELECT
+            i.instance_id, i.instance_name, i.industry, i.governance_tier,
+            i.platform_version, i.last_sync_at, i.status,
+            COALESCE(t.total_requests, 0)         AS total_requests,
+            COALESCE(t.total_spend, 0)            AS total_spend,
+            COALESCE(t.unique_users, 0)           AS unique_users,
+            COALESCE(t.dlp_blocks, 0)             AS dlp_blocks,
+            COALESCE(t.error_count, 0)            AS error_count,
+            COALESCE(t.keyword_flags_critical, 0) AS critical_flags,
+            COALESCE(t.keyword_flags_high, 0)     AS high_flags,
+            COALESCE(t.compliance_score, 0)       AS compliance_score,
+            t.synced_at                           AS last_telemetry_at
+        FROM governance_instances i
+        OUTER APPLY (
+            SELECT TOP 1 total_requests, total_spend, unique_users, dlp_blocks,
+                   error_count, keyword_flags_critical, keyword_flags_high,
+                   compliance_score, synced_at
+            FROM governance_telemetry
+            WHERE instance_id = i.instance_id
+            ORDER BY synced_at DESC
+        ) t
+        WHERE i.status = 'active'
+        ORDER BY i.instance_name
+    """
+
+    portfolio_by_industry = """
+        WITH latest AS (
+            SELECT instance_id, total_requests, total_spend, unique_users,
+                   dlp_blocks, error_count, keyword_flags_critical, compliance_score,
+                   ROW_NUMBER() OVER (PARTITION BY instance_id ORDER BY synced_at DESC) rn
+            FROM governance_telemetry
+        )
+        SELECT
+            COALESCE(i.industry, 'unspecified') AS industry,
+            COUNT(*)                            AS instances,
+            COALESCE(SUM(l.total_requests), 0)  AS total_requests,
+            COALESCE(SUM(l.total_spend), 0)     AS total_spend,
+            COALESCE(SUM(l.unique_users), 0)    AS total_users,
+            COALESCE(SUM(l.dlp_blocks), 0)      AS dlp_blocks,
+            COALESCE(SUM(l.error_count), 0)     AS error_count,
+            COALESCE(SUM(l.keyword_flags_critical), 0) AS critical_flags,
+            COALESCE(AVG(l.compliance_score), 0) AS avg_compliance
+        FROM governance_instances i
+        LEFT JOIN latest l ON i.instance_id = l.instance_id AND l.rn = 1
+        WHERE i.status = 'active'
+        GROUP BY COALESCE(i.industry, 'unspecified')
+        ORDER BY COUNT(*) DESC, COALESCE(i.industry, 'unspecified')
+    """
+
+    portfolio_time_series = """
+        SELECT
+            CAST(synced_at AS DATE)           AS day,
+            COUNT(DISTINCT instance_id)       AS reporting_instances,
+            SUM(total_requests)               AS total_requests,
+            SUM(total_spend)                  AS total_spend,
+            SUM(unique_users)                 AS unique_users,
+            SUM(dlp_blocks)                   AS dlp_blocks,
+            SUM(error_count)                  AS error_count,
+            AVG(compliance_score)             AS avg_compliance
+        FROM governance_telemetry
+        WHERE synced_at >= DATEADD(day, -:days, GETDATE())
+        GROUP BY CAST(synced_at AS DATE)
+        ORDER BY day
+    """
+
+    portfolio_at_risk = """
+        WITH latest AS (
+            SELECT instance_id, total_spend, compliance_score, error_count,
+                   keyword_flags_critical, dlp_blocks, synced_at,
+                   ROW_NUMBER() OVER (PARTITION BY instance_id ORDER BY synced_at DESC) rn
+            FROM governance_telemetry
+        )
+        SELECT
+            i.instance_id, i.instance_name, i.industry, i.last_sync_at,
+            COALESCE(l.compliance_score, 0)       AS compliance_score,
+            COALESCE(l.error_count, 0)            AS error_count,
+            COALESCE(l.keyword_flags_critical, 0) AS critical_flags,
+            COALESCE(l.dlp_blocks, 0)             AS dlp_blocks,
+            COALESCE(l.total_spend, 0)            AS total_spend,
+            CASE
+                WHEN i.last_sync_at IS NULL OR i.last_sync_at < DATEADD(hour, -24, GETDATE()) THEN 'stale_telemetry'
+                WHEN l.compliance_score IS NOT NULL AND l.compliance_score < :compliance_threshold THEN 'low_compliance'
+                WHEN l.keyword_flags_critical > :critical_flag_threshold THEN 'critical_flags'
+                WHEN l.error_count > :error_threshold THEN 'high_error_rate'
+                ELSE 'ok'
+            END AS risk_reason
+        FROM governance_instances i
+        LEFT JOIN latest l ON i.instance_id = l.instance_id AND l.rn = 1
+        WHERE i.status = 'active' AND (
+              i.last_sync_at IS NULL OR i.last_sync_at < DATEADD(hour, -24, GETDATE())
+           OR (l.compliance_score IS NOT NULL AND l.compliance_score < :compliance_threshold)
+           OR l.keyword_flags_critical > :critical_flag_threshold
+           OR l.error_count > :error_threshold
+        )
+        ORDER BY i.instance_name
+    """
+
+    portfolio_identity_totals = """
+        SELECT
+            COUNT(DISTINCT CONCAT(instance_id, '|', keycloak_user_id)) AS total_users,
+            COUNT(DISTINCT instance_id)                                AS instances_with_identity
+        FROM governance_identity_users
+        WHERE enabled = 1
+    """
+
 
 class _MariaDB:
     """MariaDB / MySQL dialect."""
@@ -821,6 +1051,116 @@ class _MariaDB:
 
     list_identity_users = _PostgreSQL.list_identity_users
     list_identity_groups = _PostgreSQL.list_identity_groups
+
+    # --- Portfolio observability (P4.1) -------------------------------------
+    # MariaDB/MySQL: no LATERAL in MySQL <8.0.14; use correlated subqueries.
+
+    portfolio_per_instance = """
+        SELECT
+            i.instance_id, i.instance_name, i.industry, i.governance_tier,
+            i.platform_version, i.last_sync_at, i.status,
+            COALESCE((SELECT total_requests FROM governance_telemetry
+                      WHERE instance_id = i.instance_id ORDER BY synced_at DESC LIMIT 1), 0) AS total_requests,
+            COALESCE((SELECT total_spend FROM governance_telemetry
+                      WHERE instance_id = i.instance_id ORDER BY synced_at DESC LIMIT 1), 0) AS total_spend,
+            COALESCE((SELECT unique_users FROM governance_telemetry
+                      WHERE instance_id = i.instance_id ORDER BY synced_at DESC LIMIT 1), 0) AS unique_users,
+            COALESCE((SELECT dlp_blocks FROM governance_telemetry
+                      WHERE instance_id = i.instance_id ORDER BY synced_at DESC LIMIT 1), 0) AS dlp_blocks,
+            COALESCE((SELECT error_count FROM governance_telemetry
+                      WHERE instance_id = i.instance_id ORDER BY synced_at DESC LIMIT 1), 0) AS error_count,
+            COALESCE((SELECT keyword_flags_critical FROM governance_telemetry
+                      WHERE instance_id = i.instance_id ORDER BY synced_at DESC LIMIT 1), 0) AS critical_flags,
+            COALESCE((SELECT keyword_flags_high FROM governance_telemetry
+                      WHERE instance_id = i.instance_id ORDER BY synced_at DESC LIMIT 1), 0) AS high_flags,
+            COALESCE((SELECT compliance_score FROM governance_telemetry
+                      WHERE instance_id = i.instance_id ORDER BY synced_at DESC LIMIT 1), 0) AS compliance_score,
+            (SELECT synced_at FROM governance_telemetry
+             WHERE instance_id = i.instance_id ORDER BY synced_at DESC LIMIT 1) AS last_telemetry_at
+        FROM governance_instances i
+        WHERE i.status = 'active'
+        ORDER BY i.instance_name
+    """
+
+    portfolio_by_industry = """
+        WITH latest AS (
+            SELECT instance_id, total_requests, total_spend, unique_users,
+                   dlp_blocks, error_count, keyword_flags_critical, compliance_score,
+                   ROW_NUMBER() OVER (PARTITION BY instance_id ORDER BY synced_at DESC) AS rn
+            FROM governance_telemetry
+        )
+        SELECT
+            COALESCE(i.industry, 'unspecified') AS industry,
+            COUNT(*) AS instances,
+            COALESCE(SUM(l.total_requests), 0) AS total_requests,
+            COALESCE(SUM(l.total_spend), 0)    AS total_spend,
+            COALESCE(SUM(l.unique_users), 0)   AS total_users,
+            COALESCE(SUM(l.dlp_blocks), 0)     AS dlp_blocks,
+            COALESCE(SUM(l.error_count), 0)    AS error_count,
+            COALESCE(SUM(l.keyword_flags_critical), 0) AS critical_flags,
+            COALESCE(AVG(l.compliance_score), 0) AS avg_compliance
+        FROM governance_instances i
+        LEFT JOIN latest l ON i.instance_id = l.instance_id AND l.rn = 1
+        WHERE i.status = 'active'
+        GROUP BY COALESCE(i.industry, 'unspecified')
+        ORDER BY instances DESC, industry
+    """
+
+    portfolio_time_series = """
+        SELECT
+            DATE(synced_at)                  AS day,
+            COUNT(DISTINCT instance_id)      AS reporting_instances,
+            SUM(total_requests)              AS total_requests,
+            SUM(total_spend)                 AS total_spend,
+            SUM(unique_users)                AS unique_users,
+            SUM(dlp_blocks)                  AS dlp_blocks,
+            SUM(error_count)                 AS error_count,
+            AVG(compliance_score)            AS avg_compliance
+        FROM governance_telemetry
+        WHERE synced_at >= NOW() - INTERVAL :days DAY
+        GROUP BY DATE(synced_at)
+        ORDER BY day
+    """
+
+    portfolio_at_risk = """
+        WITH latest AS (
+            SELECT instance_id, total_spend, compliance_score, error_count,
+                   keyword_flags_critical, dlp_blocks, synced_at,
+                   ROW_NUMBER() OVER (PARTITION BY instance_id ORDER BY synced_at DESC) AS rn
+            FROM governance_telemetry
+        )
+        SELECT
+            i.instance_id, i.instance_name, i.industry, i.last_sync_at,
+            COALESCE(l.compliance_score, 0)       AS compliance_score,
+            COALESCE(l.error_count, 0)            AS error_count,
+            COALESCE(l.keyword_flags_critical, 0) AS critical_flags,
+            COALESCE(l.dlp_blocks, 0)             AS dlp_blocks,
+            COALESCE(l.total_spend, 0)            AS total_spend,
+            CASE
+                WHEN i.last_sync_at IS NULL OR i.last_sync_at < NOW() - INTERVAL 24 HOUR THEN 'stale_telemetry'
+                WHEN l.compliance_score IS NOT NULL AND l.compliance_score < :compliance_threshold THEN 'low_compliance'
+                WHEN l.keyword_flags_critical > :critical_flag_threshold THEN 'critical_flags'
+                WHEN l.error_count > :error_threshold THEN 'high_error_rate'
+                ELSE 'ok'
+            END AS risk_reason
+        FROM governance_instances i
+        LEFT JOIN latest l ON i.instance_id = l.instance_id AND l.rn = 1
+        WHERE i.status = 'active' AND (
+              i.last_sync_at IS NULL OR i.last_sync_at < NOW() - INTERVAL 24 HOUR
+           OR (l.compliance_score IS NOT NULL AND l.compliance_score < :compliance_threshold)
+           OR l.keyword_flags_critical > :critical_flag_threshold
+           OR l.error_count > :error_threshold
+        )
+        ORDER BY i.instance_name
+    """
+
+    portfolio_identity_totals = """
+        SELECT
+            COUNT(DISTINCT CONCAT(instance_id, '|', keycloak_user_id)) AS total_users,
+            COUNT(DISTINCT instance_id)                                AS instances_with_identity
+        FROM governance_identity_users
+        WHERE enabled = 1
+    """
 
 
 def _get_dialect_class():
