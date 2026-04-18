@@ -884,6 +884,31 @@ services:
 
 %{ endif ~}
 
+%{ if workers_enable ~}
+  # -------------------------------------------------------------------------
+  # InsideLLM Workers — stub FastAPI service that backs declarative-agent
+  # actions for demo / showcase agents (e.g. Dispute Handler's
+  # lookup_account, draft_fdcpa_letter, send_letter, schedule_callback).
+  #
+  # Production tenants replace this with their own service — the action
+  # catalog URL is per-tenant so no platform change is required.
+  # -------------------------------------------------------------------------
+  insidellm-workers:
+    build:
+      context: /opt/InsideLLM/insidellm-workers
+      dockerfile: Dockerfile
+    container_name: insidellm-workers
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks:
+      - insidellm-internal
+
+%{ endif ~}
 %{ if keycloak_enable ~}
   # -------------------------------------------------------------------------
   # Keycloak DB init — creates a dedicated `${keycloak_db_name}` database

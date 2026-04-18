@@ -425,6 +425,13 @@ data "archive_file" "governance_hub" {
   output_path = "${path.module}/.terraform/tmp/governance-hub.zip"
 }
 
+data "archive_file" "insidellm_workers" {
+  count       = var.workers_enable ? 1 : 0
+  type        = "zip"
+  source_dir  = "${path.module}/../configs/insidellm-workers"
+  output_path = "${path.module}/.terraform/tmp/insidellm-workers.zip"
+}
+
 # ---------------------------------------------------------------------------
 # Render configuration templates
 # ---------------------------------------------------------------------------
@@ -588,6 +595,8 @@ locals {
     keycloak_realm_name = var.keycloak_realm_name
     keycloak_db_name    = var.keycloak_db_name
     keycloak_admin_user = var.keycloak_admin_user
+    # Demo workers — stub action backing for showcase agents (P1.6).
+    workers_enable = var.workers_enable
   })
 }
 
@@ -695,6 +704,9 @@ locals {
     apt_mirror_host            = var.apt_mirror_host
     docker_mirror_host         = var.docker_mirror_host
     pkg_mirror_enable          = local.effective_pkg_mirror_enable
+    # Demo workers — stub action backing for showcase agents (P1.6).
+    workers_enable   = var.workers_enable
+    workers_zip_b64  = var.workers_enable ? filebase64(data.archive_file.insidellm_workers[0].output_path) : ""
     # Keycloak — local SSO (opt-in). Realm JSON is rendered here so the
     # client secrets in it never leave the Terraform variable space; the
     # file lands on the VM only when keycloak_enable is true.

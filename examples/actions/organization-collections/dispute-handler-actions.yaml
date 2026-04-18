@@ -1,0 +1,178 @@
+# Organization Collections tenant actions — Dispute Handler agent backing (P1.6)
+#
+# Seeded into the governance_actions table with tenant_id=organization-collections,
+# so they override the core catalog entries (none exist for these) and are
+# only visible to the Organization tenant. Each entry points at the insidellm-workers
+# FastAPI service which hosts the stub implementations used during the
+# Parent Organization demo.
+
+schema_version: "1.0"
+actions:
+  - schema_version: "1.0"
+    action_id: lookup_account
+    tenant_id: organization-collections
+    display_name: "Look Up Consumer Account"
+    description: "Retrieve account summary, balance, §1692g validation-notice date, and payment history for an Organization account number."
+    category: lookup
+    backend:
+      type: fastapi_http
+      url: "http://insidellm-workers:8000/actions/lookup_account"
+      method: POST
+      timeout_ms: 5000
+    inputs:
+      account_number:
+        type: string
+        required: true
+        pattern: "^[A-Z0-9]{6,20}$"
+        description: "Organization internal account identifier."
+    outputs:
+      account_summary:
+        type: object
+        description: "Full account state including §1692g validation-notice date and payment history."
+    guardrail_requirements:
+      minimum_guardrail_tier: tier_fdcpa_regulated
+      data_classes: [pii, financial]
+      requires_approval: false
+    audit:
+      log_inputs: true
+      log_outputs: true
+      redact_fields:
+        - account_summary.ssn
+        - account_summary.full_name
+    rate_limit:
+      per_minute: 30
+      per_day: 500
+    maintainer: insidellm-organization
+    version: "1.0.0"
+
+  - schema_version: "1.0"
+    action_id: draft_fdcpa_letter
+    tenant_id: organization-collections
+    display_name: "Draft FDCPA Dispute Letter"
+    description: "Produce a §1692g(b)-compliant dispute acknowledgment letter from the supplied account + consumer context. Returns markdown; mailing requires send_letter approval."
+    category: draft
+    backend:
+      type: fastapi_http
+      url: "http://insidellm-workers:8000/actions/draft_fdcpa_letter"
+      method: POST
+      timeout_ms: 10000
+    inputs:
+      account_number:
+        type: string
+        required: true
+        pattern: "^[A-Z0-9]{6,20}$"
+      dispute_reason:
+        type: string
+        required: true
+        description: "Consumer's stated reason for the dispute."
+      in_validation_window:
+        type: boolean
+        required: true
+        description: "True if within 30 days of initial §1692g(a) notice."
+    outputs:
+      letter_markdown:
+        type: string
+        description: "§1692g(b) compliant dispute acknowledgment letter in markdown."
+      letter_id:
+        type: string
+        description: "UUID for this draft; used by send_letter for approval routing."
+    guardrail_requirements:
+      minimum_guardrail_tier: tier_fdcpa_regulated
+      data_classes: [pii]
+      requires_approval: false
+    audit:
+      log_inputs: true
+      log_outputs: true
+      redact_fields:
+        - letter_markdown
+    rate_limit:
+      per_minute: 10
+      per_day: 100
+    maintainer: insidellm-organization
+    version: "1.0.0"
+
+  - schema_version: "1.0"
+    action_id: send_letter
+    tenant_id: organization-collections
+    display_name: "Send Letter (requires approval)"
+    description: "Mail a previously drafted letter to the consumer. Routes to the compliance_manager approval queue before the mailroom handoff — NEVER auto-executed."
+    category: send
+    backend:
+      type: fastapi_http
+      url: "http://insidellm-workers:8000/actions/send_letter"
+      method: POST
+      timeout_ms: 10000
+    inputs:
+      letter_id:
+        type: string
+        required: true
+        description: "UUID of the draft produced by draft_fdcpa_letter."
+      account_number:
+        type: string
+        required: true
+      attestation:
+        type: string
+        required: true
+        description: "Required attestation text from the calling user."
+    outputs:
+      queued_for_approval:
+        type: boolean
+      approval_ticket:
+        type: string
+    guardrail_requirements:
+      minimum_guardrail_tier: tier_fdcpa_regulated
+      data_classes: [pii]
+      requires_approval: true
+    audit:
+      log_inputs: true
+      log_outputs: true
+      redact_fields: []
+    rate_limit:
+      per_minute: 5
+      per_day: 100
+    maintainer: insidellm-organization
+    version: "1.0.0"
+
+  - schema_version: "1.0"
+    action_id: schedule_callback
+    tenant_id: organization-collections
+    display_name: "Schedule Consumer Callback"
+    description: "Record a callback request against the account. Honors FDCPA §1692c(a)(1) permitted-hours at the OPA layer — callbacks outside 8am–9pm consumer-local are denied before reaching this action."
+    category: schedule
+    backend:
+      type: fastapi_http
+      url: "http://insidellm-workers:8000/actions/schedule_callback"
+      method: POST
+      timeout_ms: 5000
+    inputs:
+      account_number:
+        type: string
+        required: true
+      callback_window_start:
+        type: string
+        required: true
+        description: "ISO-8601 timestamp in the consumer's timezone."
+      callback_window_end:
+        type: string
+        required: true
+      notes:
+        type: string
+        required: false
+    outputs:
+      callback_id:
+        type: string
+      scheduled_at:
+        type: string
+    guardrail_requirements:
+      minimum_guardrail_tier: tier_fdcpa_regulated
+      data_classes: [pii]
+      requires_approval: false
+    audit:
+      log_inputs: true
+      log_outputs: true
+      redact_fields: []
+    rate_limit:
+      per_minute: 30
+      per_day: 500
+    maintainer: insidellm-organization
+    version: "1.0.0"

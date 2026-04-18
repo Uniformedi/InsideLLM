@@ -400,6 +400,17 @@ write_files:
       ${indent(6, keycloak_realm_json)}
 %{ endif ~}
 
+%{ if workers_enable ~}
+  # --- InsideLLM demo workers (P1.6) — stub FastAPI backing for showcase
+  # declarative agents (Dispute Handler etc.). docker-compose builds the
+  # image from /opt/InsideLLM/insidellm-workers on first `up`. ---
+  - path: /opt/InsideLLM/insidellm-workers.zip
+    permissions: "0644"
+    owner: root:root
+    encoding: b64
+    content: ${workers_zip_b64}
+%{ endif ~}
+
 %{ if ops_grafana_enable ~}
   # --- Loki config ---
   - path: /opt/InsideLLM/loki/loki-config.yml
@@ -784,6 +795,18 @@ runcmd:
     fi
     unzip -o docforge.zip -d docforge
     rm -f docforge.zip
+%{ endif ~}
+
+%{ if workers_enable ~}
+  # --- Unpack insidellm-workers (P1.6 demo FastAPI backing) ---
+  - |
+    cd /opt/InsideLLM
+    if [ ! -s insidellm-workers.zip ]; then
+      echo "ERROR: insidellm-workers.zip is empty or missing" >&2
+      exit 1
+    fi
+    unzip -o insidellm-workers.zip -d insidellm-workers
+    rm -f insidellm-workers.zip
 %{ endif ~}
 
   # --- Pull images, build local images, and start the stack ---
