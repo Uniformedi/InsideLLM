@@ -107,3 +107,78 @@ CREATE TABLE IF NOT EXISTS governance_framework_documents (
     uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     uploaded_from_instance VARCHAR(255)
 );
+
+-- =============================================================================
+-- Keycloak identity replication (Phase 2 of local-Keycloak + central-DB)
+--
+-- Each InsideLLM VM runs its own Keycloak against local Postgres. This gov-hub
+-- sync job pulls realm/groups/users via Keycloak's Admin REST API and mirrors
+-- them up here so the fleet-wide identity view stays central while auth stays
+-- fast per-VM. Tables are (instance_id, realm_name, keycloak_<entity>_id) —
+-- the same username on two VMs correctly produces two rows.
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS governance_identity_realms (
+    instance_id VARCHAR(255) NOT NULL,
+    realm_name VARCHAR(128) NOT NULL,
+    display_name VARCHAR(255),
+    enabled BOOLEAN DEFAULT TRUE,
+    realm_json JSONB,
+    last_synced_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    PRIMARY KEY (instance_id, realm_name)
+);
+
+CREATE TABLE IF NOT EXISTS governance_identity_users (
+    instance_id VARCHAR(255) NOT NULL,
+    realm_name VARCHAR(128) NOT NULL,
+    keycloak_user_id VARCHAR(64) NOT NULL,
+    username VARCHAR(255) NOT NULL,
+    email VARCHAR(320),
+    first_name VARCHAR(128),
+    last_name VARCHAR(128),
+    enabled BOOLEAN DEFAULT TRUE,
+    email_verified BOOLEAN DEFAULT FALSE,
+    groups_csv TEXT,                            -- /InsideLLM-Admin,/InsideLLM-View
+    realm_roles_csv TEXT,                       -- admin,view,approve
+    attributes_json JSONB,
+    created_at_kc TIMESTAMP WITH TIME ZONE,     -- Keycloak's createdTimestamp
+    last_synced_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    PRIMARY KEY (instance_id, realm_name, keycloak_user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_identity_users_email
+    ON governance_identity_users (email);
+CREATE INDEX IF NOT EXISTS idx_identity_users_username_instance
+    ON governance_identity_users (username, instance_id);
+
+CREATE TABLE IF NOT EXISTS governance_identity_groups (
+    instance_id VARCHAR(255) NOT NULL,
+    realm_name VARCHAR(128) NOT NULL,
+    keycloak_group_id VARCHAR(64) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    path VARCHAR(500),                          -- /InsideLLM-Admin
+    parent_group_id VARCHAR(64),
+    attributes_json JSONB,
+    realm_roles_csv TEXT,
+    last_synced_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    PRIMARY KEY (instance_id, realm_name, keycloak_group_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_identity_groups_path
+    ON governance_identity_groups (instance_id, realm_name, path);
+
+CREATE TABLE IF NOT EXISTS governance_identity_sync_log (
+    id SERIAL PRIMARY KEY,
+    instance_id VARCHAR(255) NOT NULL,
+    realm_name VARCHAR(128) NOT NULL,
+    started_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    ended_at TIMESTAMP WITH TIME ZONE,
+    status VARCHAR(32) DEFAULT 'running',       -- running | success | error
+    users_synced INTEGER DEFAULT 0,
+    groups_synced INTEGER DEFAULT 0,
+    duration_ms INTEGER,
+    error_message TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_identity_sync_log_instance_time
+    ON governance_identity_sync_log (instance_id, started_at DESC);

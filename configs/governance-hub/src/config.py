@@ -75,6 +75,18 @@ class Settings(BaseSettings):
     # Read from the plain LITELLM_MASTER_KEY env var (no GOVERNANCE_HUB_ prefix).
     litellm_master_key: str = Field(default="", validation_alias="LITELLM_MASTER_KEY")
 
+    # Keycloak — local SSO provider with sync to central DB (Phase 2).
+    # Enabled only when the local keycloak container is deployed.
+    keycloak_sync_enable: bool = False
+    keycloak_url: str = "http://keycloak:8080/keycloak"  # in-container base
+    keycloak_realm: str = "insidellm"
+    keycloak_admin_client_id: str = "admin-cli"
+    keycloak_admin_user: str = "insidellm-admin"
+    keycloak_admin_password: str = Field(default="", validation_alias="KEYCLOAK_ADMIN_PASSWORD")
+    keycloak_sync_schedule: str = "*/15 * * * *"  # every 15 min
+    keycloak_sync_page_size: int = 500
+    keycloak_http_timeout_seconds: float = 10.0
+
     # Chat (Mattermost embed)
     chat_enable: bool = False
     chat_team_name: str = "insidellm"

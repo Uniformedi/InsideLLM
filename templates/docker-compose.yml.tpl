@@ -560,6 +560,19 @@ services:
 %{ endif }
       # Break-glass: local insidellm-admin account uses this as the password.
       LITELLM_MASTER_KEY: "$${LITELLM_MASTER_KEY}"
+%{ if keycloak_enable ~}
+      # Keycloak identity sync (Phase 2). Auto-enabled when the local
+      # keycloak container is deployed; pushes realm/groups/users to the
+      # central governance DB so the fleet-wide identity view is one query.
+      GOVERNANCE_HUB_KEYCLOAK_SYNC_ENABLE: "true"
+      GOVERNANCE_HUB_KEYCLOAK_URL: "http://keycloak:8080/keycloak"
+      GOVERNANCE_HUB_KEYCLOAK_REALM: "${keycloak_realm_name}"
+      GOVERNANCE_HUB_KEYCLOAK_ADMIN_USER: "${keycloak_admin_user}"
+      # Master-realm admin password == LITELLM_MASTER_KEY (the break-glass
+      # pattern every other bundled service shares). Kept as a plain env so
+      # config.py reads it via validation_alias="KEYCLOAK_ADMIN_PASSWORD".
+      KEYCLOAK_ADMIN_PASSWORD: "$${LITELLM_MASTER_KEY}"
+%{ endif ~}
       # Fleet role + capability advertisement. The capability_service reads
       # CAP_* to decide which services to publish to the registry.
       VM_ROLE: "${vm_role}"

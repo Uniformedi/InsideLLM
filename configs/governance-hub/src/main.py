@@ -10,7 +10,7 @@ from sqlalchemy import text
 from .config import settings
 from .db.local_db import AsyncSessionLocal, SyncSessionLocal, engine
 from .db.models import Base
-from .routers import actions, ad_join, advisor, agents, audit, auth, changes, chat, config_snapshots, connectors, fleet, framework, hyperv, keyword_templates, obligations, policies, prompts, restore, schema, skills, sync, vendors
+from .routers import actions, ad_join, advisor, agents, audit, auth, changes, chat, config_snapshots, connectors, fleet, framework, hyperv, identity, keyword_templates, obligations, policies, prompts, restore, schema, skills, sync, vendors
 from .services.config_service import capture_snapshot
 from .services.sync_service import collect_telemetry, export_to_central
 
@@ -64,6 +64,7 @@ app.include_router(hyperv.router)
 app.include_router(ad_join.router)
 app.include_router(agents.router)
 app.include_router(actions.router)
+app.include_router(identity.router)
 
 if settings.chat_enable:
     app.include_router(chat.router)
@@ -357,6 +358,29 @@ async def startup():
     # Sync on startup
     if settings.sync_on_startup and settings.central_db_url:
         asyncio.create_task(scheduled_sync())
+
+    # Keycloak identity sync — separate cadence from the governance sync
+    # because Keycloak changes (new user/group) should propagate faster
+    # than the 6-hour telemetry window.
+    if settings.keycloak_sync_enable and settings.central_db_url:
+        try:
+            from .services.keycloak_sync import run_sync_once
+
+            async def _kc_job():
+                try:
+                    await run_sync_once()
+                except Exception as e:
+                    logger.error(f"keycloak_sync scheduled run failed: {e}")
+
+            if not scheduler.running:
+                scheduler.start()
+            kc_trigger = CronTrigger.from_crontab(settings.keycloak_sync_schedule)
+            scheduler.add_job(_kc_job, kc_trigger, id="keycloak_identity_sync", replace_existing=True)
+            logger.info(f"Keycloak identity sync scheduled: {settings.keycloak_sync_schedule}")
+            # One immediate run so the central DB has data without waiting for the first tick.
+            asyncio.create_task(_kc_job())
+        except Exception as e:
+            logger.error(f"Failed to schedule keycloak identity sync: {e}")
 
 
 @app.on_event("shutdown")

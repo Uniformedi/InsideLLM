@@ -242,6 +242,104 @@ class _PostgreSQL:
             updated_by = EXCLUDED.updated_by
     """
 
+    # --- Keycloak identity replication (Phase 2) -----------------------------
+
+    upsert_identity_realm = """
+        INSERT INTO governance_identity_realms
+            (instance_id, realm_name, display_name, enabled, realm_json, last_synced_at)
+        VALUES (:iid, :realm, :display, :enabled, CAST(:realm_json AS JSONB), NOW())
+        ON CONFLICT (instance_id, realm_name) DO UPDATE SET
+            display_name = EXCLUDED.display_name,
+            enabled = EXCLUDED.enabled,
+            realm_json = EXCLUDED.realm_json,
+            last_synced_at = NOW()
+    """
+
+    upsert_identity_user = """
+        INSERT INTO governance_identity_users
+            (instance_id, realm_name, keycloak_user_id, username, email, first_name, last_name,
+             enabled, email_verified, groups_csv, realm_roles_csv, attributes_json,
+             created_at_kc, last_synced_at)
+        VALUES (:iid, :realm, :user_id, :username, :email, :first_name, :last_name,
+                :enabled, :email_verified, :groups_csv, :roles_csv, CAST(:attributes AS JSONB),
+                :created_at_kc, NOW())
+        ON CONFLICT (instance_id, realm_name, keycloak_user_id) DO UPDATE SET
+            username = EXCLUDED.username,
+            email = EXCLUDED.email,
+            first_name = EXCLUDED.first_name,
+            last_name = EXCLUDED.last_name,
+            enabled = EXCLUDED.enabled,
+            email_verified = EXCLUDED.email_verified,
+            groups_csv = EXCLUDED.groups_csv,
+            realm_roles_csv = EXCLUDED.realm_roles_csv,
+            attributes_json = EXCLUDED.attributes_json,
+            last_synced_at = NOW()
+    """
+
+    upsert_identity_group = """
+        INSERT INTO governance_identity_groups
+            (instance_id, realm_name, keycloak_group_id, name, path, parent_group_id,
+             attributes_json, realm_roles_csv, last_synced_at)
+        VALUES (:iid, :realm, :group_id, :name, :path, :parent_id,
+                CAST(:attributes AS JSONB), :roles_csv, NOW())
+        ON CONFLICT (instance_id, realm_name, keycloak_group_id) DO UPDATE SET
+            name = EXCLUDED.name,
+            path = EXCLUDED.path,
+            parent_group_id = EXCLUDED.parent_group_id,
+            attributes_json = EXCLUDED.attributes_json,
+            realm_roles_csv = EXCLUDED.realm_roles_csv,
+            last_synced_at = NOW()
+    """
+
+    # Delete rows that weren't refreshed by the current sync cycle. Use the
+    # started_at timestamp as a cursor so concurrent syncs don't stomp.
+    prune_identity_users = """
+        DELETE FROM governance_identity_users
+        WHERE instance_id = :iid AND realm_name = :realm AND last_synced_at < :cursor
+    """
+    prune_identity_groups = """
+        DELETE FROM governance_identity_groups
+        WHERE instance_id = :iid AND realm_name = :realm AND last_synced_at < :cursor
+    """
+
+    insert_identity_sync_log = """
+        INSERT INTO governance_identity_sync_log
+            (instance_id, realm_name, started_at, ended_at, status,
+             users_synced, groups_synced, duration_ms, error_message)
+        VALUES (:iid, :realm, :started_at, :ended_at, :status,
+                :users, :groups, :duration, :error)
+    """
+
+    recent_identity_sync_log = """
+        SELECT instance_id, realm_name, started_at, ended_at, status,
+               users_synced, groups_synced, duration_ms, error_message
+        FROM governance_identity_sync_log
+        WHERE (:iid IS NULL OR instance_id = :iid)
+        ORDER BY started_at DESC
+        LIMIT :lim
+    """
+
+    list_identity_users = """
+        SELECT instance_id, realm_name, keycloak_user_id, username, email,
+               first_name, last_name, enabled, email_verified,
+               groups_csv, realm_roles_csv, last_synced_at
+        FROM governance_identity_users
+        WHERE (:iid IS NULL OR instance_id = :iid)
+          AND (:realm IS NULL OR realm_name = :realm)
+        ORDER BY instance_id, username
+        LIMIT :lim OFFSET :off
+    """
+
+    list_identity_groups = """
+        SELECT instance_id, realm_name, keycloak_group_id, name, path,
+               parent_group_id, realm_roles_csv, last_synced_at
+        FROM governance_identity_groups
+        WHERE (:iid IS NULL OR instance_id = :iid)
+          AND (:realm IS NULL OR realm_name = :realm)
+        ORDER BY instance_id, path
+        LIMIT :lim OFFSET :off
+    """
+
 
 class _MSSQL:
     """Microsoft SQL Server dialect."""
@@ -456,6 +554,107 @@ class _MSSQL:
         VALUES (:iid, :alert_webhook, GETDATE(), :updated_by);
     """
 
+    # --- Keycloak identity replication (Phase 2) -----------------------------
+    # MSSQL stores the JSONB-like payloads in NVARCHAR(MAX); no CAST needed.
+
+    upsert_identity_realm = """
+        MERGE governance_identity_realms AS target
+        USING (SELECT :iid AS instance_id, :realm AS realm_name) AS source
+        ON target.instance_id = source.instance_id AND target.realm_name = source.realm_name
+        WHEN MATCHED THEN UPDATE SET
+            display_name = :display, enabled = :enabled,
+            realm_json = :realm_json, last_synced_at = GETDATE()
+        WHEN NOT MATCHED THEN INSERT
+            (instance_id, realm_name, display_name, enabled, realm_json, last_synced_at)
+        VALUES (:iid, :realm, :display, :enabled, :realm_json, GETDATE());
+    """
+
+    upsert_identity_user = """
+        MERGE governance_identity_users AS target
+        USING (SELECT :iid AS instance_id, :realm AS realm_name,
+                      :user_id AS keycloak_user_id) AS source
+        ON target.instance_id = source.instance_id
+           AND target.realm_name = source.realm_name
+           AND target.keycloak_user_id = source.keycloak_user_id
+        WHEN MATCHED THEN UPDATE SET
+            username = :username, email = :email, first_name = :first_name,
+            last_name = :last_name, enabled = :enabled, email_verified = :email_verified,
+            groups_csv = :groups_csv, realm_roles_csv = :roles_csv,
+            attributes_json = :attributes, last_synced_at = GETDATE()
+        WHEN NOT MATCHED THEN INSERT
+            (instance_id, realm_name, keycloak_user_id, username, email, first_name,
+             last_name, enabled, email_verified, groups_csv, realm_roles_csv,
+             attributes_json, created_at_kc, last_synced_at)
+        VALUES (:iid, :realm, :user_id, :username, :email, :first_name, :last_name,
+                :enabled, :email_verified, :groups_csv, :roles_csv, :attributes,
+                :created_at_kc, GETDATE());
+    """
+
+    upsert_identity_group = """
+        MERGE governance_identity_groups AS target
+        USING (SELECT :iid AS instance_id, :realm AS realm_name,
+                      :group_id AS keycloak_group_id) AS source
+        ON target.instance_id = source.instance_id
+           AND target.realm_name = source.realm_name
+           AND target.keycloak_group_id = source.keycloak_group_id
+        WHEN MATCHED THEN UPDATE SET
+            name = :name, path = :path, parent_group_id = :parent_id,
+            attributes_json = :attributes, realm_roles_csv = :roles_csv,
+            last_synced_at = GETDATE()
+        WHEN NOT MATCHED THEN INSERT
+            (instance_id, realm_name, keycloak_group_id, name, path, parent_group_id,
+             attributes_json, realm_roles_csv, last_synced_at)
+        VALUES (:iid, :realm, :group_id, :name, :path, :parent_id,
+                :attributes, :roles_csv, GETDATE());
+    """
+
+    prune_identity_users = """
+        DELETE FROM governance_identity_users
+        WHERE instance_id = :iid AND realm_name = :realm AND last_synced_at < :cursor
+    """
+    prune_identity_groups = """
+        DELETE FROM governance_identity_groups
+        WHERE instance_id = :iid AND realm_name = :realm AND last_synced_at < :cursor
+    """
+
+    insert_identity_sync_log = """
+        INSERT INTO governance_identity_sync_log
+            (instance_id, realm_name, started_at, ended_at, status,
+             users_synced, groups_synced, duration_ms, error_message)
+        VALUES (:iid, :realm, :started_at, :ended_at, :status,
+                :users, :groups, :duration, :error)
+    """
+
+    # MSSQL uses TOP + OFFSET/FETCH. Pagination for list_* is OFFSET/FETCH.
+    recent_identity_sync_log = """
+        SELECT TOP (:lim) instance_id, realm_name, started_at, ended_at, status,
+               users_synced, groups_synced, duration_ms, error_message
+        FROM governance_identity_sync_log
+        WHERE (:iid IS NULL OR instance_id = :iid)
+        ORDER BY started_at DESC
+    """
+
+    list_identity_users = """
+        SELECT instance_id, realm_name, keycloak_user_id, username, email,
+               first_name, last_name, enabled, email_verified,
+               groups_csv, realm_roles_csv, last_synced_at
+        FROM governance_identity_users
+        WHERE (:iid IS NULL OR instance_id = :iid)
+          AND (:realm IS NULL OR realm_name = :realm)
+        ORDER BY instance_id, username
+        OFFSET :off ROWS FETCH NEXT :lim ROWS ONLY
+    """
+
+    list_identity_groups = """
+        SELECT instance_id, realm_name, keycloak_group_id, name, path,
+               parent_group_id, realm_roles_csv, last_synced_at
+        FROM governance_identity_groups
+        WHERE (:iid IS NULL OR instance_id = :iid)
+          AND (:realm IS NULL OR realm_name = :realm)
+        ORDER BY instance_id, path
+        OFFSET :off ROWS FETCH NEXT :lim ROWS ONLY
+    """
+
 
 class _MariaDB:
     """MariaDB / MySQL dialect."""
@@ -556,6 +755,72 @@ class _MariaDB:
             updated_at = NOW(),
             updated_by = VALUES(updated_by)
     """
+
+    # --- Keycloak identity replication (Phase 2) -----------------------------
+    # MariaDB stores the JSON fields as LONGTEXT / JSON; no CAST.
+
+    upsert_identity_realm = """
+        INSERT INTO governance_identity_realms
+            (instance_id, realm_name, display_name, enabled, realm_json, last_synced_at)
+        VALUES (:iid, :realm, :display, :enabled, :realm_json, NOW())
+        ON DUPLICATE KEY UPDATE
+            display_name = VALUES(display_name),
+            enabled = VALUES(enabled),
+            realm_json = VALUES(realm_json),
+            last_synced_at = NOW()
+    """
+
+    upsert_identity_user = """
+        INSERT INTO governance_identity_users
+            (instance_id, realm_name, keycloak_user_id, username, email, first_name, last_name,
+             enabled, email_verified, groups_csv, realm_roles_csv, attributes_json,
+             created_at_kc, last_synced_at)
+        VALUES (:iid, :realm, :user_id, :username, :email, :first_name, :last_name,
+                :enabled, :email_verified, :groups_csv, :roles_csv, :attributes,
+                :created_at_kc, NOW())
+        ON DUPLICATE KEY UPDATE
+            username = VALUES(username),
+            email = VALUES(email),
+            first_name = VALUES(first_name),
+            last_name = VALUES(last_name),
+            enabled = VALUES(enabled),
+            email_verified = VALUES(email_verified),
+            groups_csv = VALUES(groups_csv),
+            realm_roles_csv = VALUES(realm_roles_csv),
+            attributes_json = VALUES(attributes_json),
+            last_synced_at = NOW()
+    """
+
+    upsert_identity_group = """
+        INSERT INTO governance_identity_groups
+            (instance_id, realm_name, keycloak_group_id, name, path, parent_group_id,
+             attributes_json, realm_roles_csv, last_synced_at)
+        VALUES (:iid, :realm, :group_id, :name, :path, :parent_id,
+                :attributes, :roles_csv, NOW())
+        ON DUPLICATE KEY UPDATE
+            name = VALUES(name),
+            path = VALUES(path),
+            parent_group_id = VALUES(parent_group_id),
+            attributes_json = VALUES(attributes_json),
+            realm_roles_csv = VALUES(realm_roles_csv),
+            last_synced_at = NOW()
+    """
+
+    prune_identity_users = _PostgreSQL.prune_identity_users
+    prune_identity_groups = _PostgreSQL.prune_identity_groups
+    insert_identity_sync_log = _PostgreSQL.insert_identity_sync_log
+
+    recent_identity_sync_log = """
+        SELECT instance_id, realm_name, started_at, ended_at, status,
+               users_synced, groups_synced, duration_ms, error_message
+        FROM governance_identity_sync_log
+        WHERE (:iid IS NULL OR instance_id = :iid)
+        ORDER BY started_at DESC
+        LIMIT :lim
+    """
+
+    list_identity_users = _PostgreSQL.list_identity_users
+    list_identity_groups = _PostgreSQL.list_identity_groups
 
 
 def _get_dialect_class():
