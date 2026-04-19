@@ -109,16 +109,20 @@ async def dispatch(
         return _dispatch_celery(
             entry, backend, inputs, celery_app_factory=celery_app_factory, **base_meta
         )
-    if isinstance(backend, (N8nBackend, ActivepiecesBackend, MCPBackend)):
-        # P3.1 (n8n) / P3.2 (activepieces) / future (mcp) will implement
-        # these; for now fail explicitly so catalog entries referencing
-        # them get a clear error rather than silently failing.
+    if isinstance(backend, N8nBackend):
+        return await _dispatch_n8n(
+            entry, backend, inputs, http_timeout=http_timeout, **base_meta
+        )
+    if isinstance(backend, (ActivepiecesBackend, MCPBackend)):
+        # P3.2 (activepieces) / future (mcp) will implement these; for now
+        # fail explicitly so catalog entries referencing them get a clear
+        # error rather than silently failing.
         return DispatchResult(
             ok=False,
             mode="sync",
             output=None,
             error=f"backend type '{getattr(backend, 'type', '?')}' not yet implemented "
-                  f"(scheduled: P3.1 / P3.2 / future)",
+                  f"(scheduled: P3.2 / future)",
             **base_meta,
         )
 
@@ -186,6 +190,95 @@ async def _dispatch_fastapi(
                 mode="sync",
                 output=None,
                 error=f"{type(e).__name__}: {e}"[:500],
+                **meta,
+            )
+
+
+# ---------------------------------------------------------------------------
+# n8n webhook backend (P3.1)
+# ---------------------------------------------------------------------------
+
+
+def _hmac_signature(secret: str, body: bytes) -> str:
+    """Hex HMAC-SHA256 — matches what n8n's Code node recomputes to verify."""
+    import hashlib
+    import hmac as _hmac
+    return _hmac.new(secret.encode("utf-8"), body, hashlib.sha256).hexdigest()
+
+
+async def _dispatch_n8n(
+    entry: ActionCatalogEntry,
+    backend: N8nBackend,
+    inputs: dict[str, Any],
+    *,
+    http_timeout: float | None,
+    **meta: Any,
+) -> DispatchResult:
+    """POST to an n8n webhook URL with HMAC signature.
+
+    The signature header is `X-Insidellm-Signature` (hex HMAC-SHA256 over the
+    JSON body), the secret is read from the env var named by
+    `backend.hmac_secret_env` (default `N8N_WEBHOOK_SECRET`).
+
+    Workflow-side: first node is a Code node that recomputes the signature
+    and rejects on mismatch. Template workflow ships in
+    configs/n8n/workflows/verify-signature.json.
+    """
+    import json
+    url = str(backend.webhook_url)
+    # Path-param substitution (same as fastapi_http).
+    for k, v in (inputs or {}).items():
+        for token in ("{" + k + "}", "%7B" + k + "%7D"):
+            if token in url:
+                url = url.replace(token, str(v))
+
+    body_bytes = json.dumps(inputs or {}, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    headers = {
+        "Content-Type": "application/json",
+        "User-Agent": "insidellm-dispatcher/1.0",
+        "X-Insidellm-Tenant": entry.tenant_id or "core",
+        "X-Insidellm-Action": entry.action_id,
+    }
+
+    secret_env = backend.hmac_secret_env or "N8N_WEBHOOK_SECRET"
+    secret = os.environ.get(secret_env, "")
+    if secret:
+        headers["X-Insidellm-Signature"] = _hmac_signature(secret, body_bytes)
+    # Missing secret is not fatal — some tenants may operate in trusted
+    # networks. Warn via log; workflows that reject unsigned bodies will
+    # still surface a useful error.
+    elif secret_env:
+        logger.warning(
+            f"n8n webhook dispatch without HMAC: env var {secret_env} unset "
+            f"(action={entry.action_id})"
+        )
+
+    timeout = http_timeout or 15.0
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        try:
+            resp = await client.post(url, content=body_bytes, headers=headers)
+            resp.raise_for_status()
+            output = resp.json() if resp.content else {}
+            return DispatchResult(
+                ok=True,
+                mode="sync",
+                output=output if isinstance(output, dict) else {"result": output},
+                **meta,
+            )
+        except httpx.HTTPStatusError as e:
+            return DispatchResult(
+                ok=False,
+                mode="sync",
+                output=None,
+                error=f"n8n HTTP {e.response.status_code}: {_short_body(e.response)}",
+                **meta,
+            )
+        except Exception as e:
+            return DispatchResult(
+                ok=False,
+                mode="sync",
+                output=None,
+                error=f"n8n dispatch failed: {type(e).__name__}: {e}"[:500],
                 **meta,
             )
 

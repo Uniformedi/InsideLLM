@@ -405,6 +405,27 @@ http {
         }
 
 %{ endif ~}
+%{ if n8n_enable ~}
+        # --- n8n (per-tenant tool factory, P3.1) ---
+        # Editor + webhook endpoints behind /n8n/. N8N_PATH=/n8n/ inside the
+        # container keeps links internally consistent; proxy_pass strips the
+        # trailing slash so http://n8n:5678/<path> resolves correctly.
+        # WebSocket upgrade required for the editor's live execution feed.
+        location /n8n/ {
+            proxy_pass http://n8n:5678/n8n/;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection $http_connection;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_buffering off;
+            proxy_read_timeout 3600s;
+            client_max_body_size 50m;
+        }
+
+%{ endif ~}
 %{ if keycloak_enable ~}
         # --- Keycloak (local SSO provider) ---
         # KC_HTTP_RELATIVE_PATH=/keycloak inside the container, so paths are

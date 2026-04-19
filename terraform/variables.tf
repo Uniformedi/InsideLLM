@@ -1103,6 +1103,38 @@ variable "workers_enable" {
   default     = false
 }
 
+# -----------------------------------------------------------------------------
+# n8n tool factory — per-tenant low-code workflow builder (P3.1)
+# -----------------------------------------------------------------------------
+# n8n Community Edition (Apache 2.0 + Sustainable Use License — fine for
+# single-tenant self-host). Each VM runs its own n8n container against the
+# shared local Postgres; action catalog entries with backend.type=n8n_webhook
+# hit n8n's webhook endpoint via the gov-hub dispatcher.
+variable "n8n_enable" {
+  description = "Deploy a local n8n workflow service. Default false (opt-in per tenant)."
+  type        = bool
+  default     = false
+}
+
+variable "n8n_version" {
+  description = "n8n container image tag. Pin for deterministic deploys."
+  type        = string
+  default     = "1.67.1"
+}
+
+variable "n8n_db_name" {
+  description = "Database name n8n uses inside insidellm-postgres."
+  type        = string
+  default     = "n8n"
+}
+
+variable "n8n_webhook_secret" {
+  description = "HMAC secret for n8n webhook signature verification. Generate via `openssl rand -hex 32`. Empty = generated at deploy time."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
 variable "keycloak_version" {
   description = "Keycloak container image tag (keep pinned for deterministic deploys)."
   type        = string

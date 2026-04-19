@@ -567,6 +567,12 @@ services:
       CELERY_BROKER_URL: "redis://redis:6379/1"
       CELERY_RESULT_BACKEND: "redis://redis:6379/2"
 %{ endif ~}
+%{ if n8n_enable ~}
+      # n8n webhook HMAC — the dispatcher signs outbound calls to n8n
+      # workflows with this key; workflows verify via a Code node.
+      # Name must match the `hmac_secret_env` value in catalog entries.
+      N8N_WEBHOOK_SECRET: "$${N8N_WEBHOOK_SECRET}"
+%{ endif ~}
 %{ if keycloak_enable ~}
       # Keycloak identity sync (Phase 2). Auto-enabled when the local
       # keycloak container is deployed; pushes realm/groups/users to the
@@ -950,6 +956,110 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 30s
+    networks:
+      - insidellm-internal
+
+%{ endif ~}
+%{ if n8n_enable ~}
+  # -------------------------------------------------------------------------
+  # n8n DB init — creates a dedicated `${n8n_db_name}` database inside
+  # the shared insidellm-postgres service (same pattern as mattermost/keycloak).
+  # -------------------------------------------------------------------------
+  n8n-db-init:
+    image: postgres:16-alpine
+    container_name: insidellm-n8n-db-init
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: "$${POSTGRES_PASSWORD}"
+    entrypoint:
+      - sh
+      - -c
+      - |
+        psql -h postgres -U litellm -d litellm -tc "SELECT 1 FROM pg_database WHERE datname='${n8n_db_name}'" | grep -q 1 || \
+        psql -h postgres -U litellm -d litellm -c "CREATE DATABASE ${n8n_db_name} OWNER litellm"
+    networks:
+      - insidellm-internal
+
+  # -------------------------------------------------------------------------
+  # n8n — per-tenant tool factory (P3.1). Low-code workflow builder that
+  # declarative agents invoke via the n8n_webhook backend in the action
+  # catalog. nginx proxies /n8n/ to this container's port 5678.
+  #
+  # Auth: break-glass (insidellm-admin + LITELLM_MASTER_KEY) — same pattern
+  # every other bundled service uses, so operators sign in once.
+  #
+  # Webhook HMAC: the gov-hub dispatcher signs outbound calls with
+  # X-Insidellm-Signature (hex-HMAC-SHA256 over the raw body) keyed by
+  # N8N_WEBHOOK_SECRET. n8n workflows verify via a Crypto node or a small
+  # Code node — template workflows ship in configs/n8n/workflows/.
+  # -------------------------------------------------------------------------
+  n8n:
+    image: n8nio/n8n:${n8n_version}
+    container_name: insidellm-n8n
+    restart: always
+    depends_on:
+      n8n-db-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    environment:
+      # Persistence — shared Postgres, dedicated database.
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_PORT: "5432"
+      DB_POSTGRESDB_DATABASE: "${n8n_db_name}"
+      DB_POSTGRESDB_USER: litellm
+      DB_POSTGRESDB_PASSWORD: "$${POSTGRES_PASSWORD}"
+
+      # Queue mode uses Redis for multi-worker scale-out; defer to single-
+      # process "regular" mode until a tenant actually needs workers.
+      EXECUTIONS_MODE: regular
+
+      # Behind nginx at /n8n/. N8N_HOST is the external hostname; the
+      # proxy strips nothing, so N8N_PATH lines up with the nginx route.
+      N8N_HOST: "${server_name}"
+      N8N_PROTOCOL: https
+      N8N_PORT: "5678"
+      N8N_PATH: /n8n/
+      N8N_EDITOR_BASE_URL: "https://${server_name}/n8n/"
+      WEBHOOK_URL: "https://${server_name}/n8n/"
+      N8N_PROXY_HOPS: "1"
+
+      # Basic auth fronts the editor until SSO is wired in P1.5 follow-up.
+      N8N_BASIC_AUTH_ACTIVE: "true"
+      N8N_BASIC_AUTH_USER: "insidellm-admin"
+      N8N_BASIC_AUTH_PASSWORD: "$${LITELLM_MASTER_KEY}"
+
+      # Encryption key for credentials stored in the n8n DB. Pinned to the
+      # master key so a re-deploy against an existing DB keeps secrets
+      # decryptable. Rotate manually via `n8n export/import` if needed.
+      N8N_ENCRYPTION_KEY: "$${LITELLM_MASTER_KEY}"
+
+      # Webhook HMAC shared secret — the dispatcher signs, workflows verify.
+      N8N_WEBHOOK_SECRET: "$${N8N_WEBHOOK_SECRET}"
+
+      # Logging — emit structured JSON so Promtail tags cleanly.
+      N8N_LOG_LEVEL: info
+      N8N_LOG_OUTPUT: console
+      N8N_LOG_FORMAT: json
+
+      # Limits + hardening.
+      N8N_METRICS: "true"
+      N8N_DIAGNOSTICS_ENABLED: "false"
+      N8N_VERSION_NOTIFICATIONS_ENABLED: "false"
+      N8N_PERSONALIZATION_ENABLED: "false"
+      N8N_HIRING_BANNER_ENABLED: "false"
+    volumes:
+      - /opt/InsideLLM/data/n8n:/home/node/.n8n
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:5678/healthz | grep -q ok || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
       start_period: 30s
     networks:
       - insidellm-internal

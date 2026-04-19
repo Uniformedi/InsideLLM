@@ -33,6 +33,7 @@ _WRAPPERS = (
     "docforge.yaml",
     "fleet_management.yaml",
     "governance_advisor.yaml",
+    "n8n_examples.yaml",
     "system_designer.yaml",
 )
 

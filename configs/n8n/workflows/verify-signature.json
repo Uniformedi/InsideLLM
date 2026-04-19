@@ -1,0 +1,52 @@
+{
+  "name": "[InsideLLM] Verify Signature — Template",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "insidellm/verify-signature",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Verify the HMAC signature the gov-hub dispatcher attached\n// in X-Insidellm-Signature. Secret lives in the N8N_WEBHOOK_SECRET env.\n//\n// Signed body is the *canonicalized* JSON the dispatcher sent:\n//   JSON.stringify(inputs, Object.keys(inputs).sort()) with no spaces\n// but since we receive the already-parsed body, we re-canonicalize here.\n\nconst crypto = require('crypto');\n\nconst secret = $env.N8N_WEBHOOK_SECRET || '';\nconst providedSig = $input.item.binary\n  ? undefined\n  : ($input.item.json.headers?.['x-insidellm-signature']\n     || $input.item.json.headers?.['X-Insidellm-Signature']);\n\nconst body = $input.item.json.body || $input.item.json;\nconst canon = JSON.stringify(\n  body,\n  Object.keys(body).sort(),\n);\n\nconst expected = crypto\n  .createHmac('sha256', secret)\n  .update(canon)\n  .digest('hex');\n\nif (!secret) {\n  // Fail-open only in dev; production workflows should refuse unsigned.\n  return { json: { ok: false, reason: 'no N8N_WEBHOOK_SECRET configured' } };\n}\nif (!providedSig || providedSig !== expected) {\n  return { json: { ok: false, reason: 'invalid signature' } };\n}\nreturn { json: { ok: true, body } };"
+      },
+      "id": "verify-sig",
+      "name": "Verify Signature",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}"
+      },
+      "id": "respond",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [640, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Verify Signature", "type": "main", "index": 0 }]]
+    },
+    "Verify Signature": {
+      "main": [[{ "node": "Respond", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {},
+  "meta": {
+    "description": "Template for InsideLLM agent-dispatcher-signed webhooks. Drop this into n8n (Import from file), plug your real logic between Verify Signature and Respond, and wire the webhook URL into a catalog entry with backend.type=n8n_webhook.",
+    "insidellm_template_version": "1.0"
+  }
+}

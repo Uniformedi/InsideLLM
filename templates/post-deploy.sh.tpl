@@ -1387,6 +1387,13 @@ log "    Realm imported: ${keycloak_realm_name} (groups: InsideLLM-View/Admin/Ap
 log "    OIDC issuer for downstream services:"
 log "      https://$VM_IP/keycloak/realms/${keycloak_realm_name}"
 %{ endif ~}
+%{ if n8n_enable ~}
+log "  n8n Tool Factory: https://$VM_IP/n8n/"
+log "    Basic auth: insidellm-admin + LITELLM_MASTER_KEY"
+log "    Catalog entries use backend.type=n8n_webhook; dispatcher signs with"
+log "    X-Insidellm-Signature (HMAC-SHA256, secret = N8N_WEBHOOK_SECRET)"
+log "    Template workflow: configs/n8n/workflows/verify-signature.json"
+%{ endif ~}
 %{ if claude_code_enable ~}
 log ""
 log "  Claude Code CLI installed for ${ssh_admin_user}."

@@ -87,6 +87,13 @@ class _FakeClient:
         self.calls.append((method, url, json or {}))
         return self._resp
 
+    async def post(self, url, content=None, json=None, headers=None):
+        # n8n dispatch uses client.post(url, content=…, headers=…).
+        payload = content if content is not None else (json or {})
+        self.calls.append(("POST", url, payload))
+        self.last_headers = dict(headers or {})
+        return self._resp
+
 
 @pytest.mark.asyncio
 async def test_fastapi_post_returns_inline_sync():
@@ -253,13 +260,100 @@ async def test_get_task_status_failure_does_not_raise():
 
 
 # ---------------------------------------------------------------------------
+# n8n webhook backend (P3.1)
+# ---------------------------------------------------------------------------
+
+
+def test_hmac_signature_is_hex_sha256_over_body():
+    import hashlib, hmac
+    secret = "s3cret"
+    body = b'{"x":1}'
+    expected = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+    assert d._hmac_signature(secret, body) == expected
+
+
+@pytest.mark.asyncio
+async def test_n8n_dispatch_posts_with_signature_and_headers():
+    entry = _entry_with({
+        "type": "n8n_webhook",
+        "webhook_url": "http://n8n:5678/webhook/foo",
+        "hmac_secret_env": "N8N_WEBHOOK_SECRET",
+    })
+    fake = _FakeClient(_FakeResp(200, {"ok": True, "echo": 42}))
+
+    with patch.object(d, "httpx") as mhttpx, \
+         patch.dict("os.environ", {"N8N_WEBHOOK_SECRET": "s3cret"}, clear=False):
+        mhttpx.AsyncClient = MagicMock(return_value=fake)
+        import httpx as _real
+        mhttpx.HTTPStatusError = _real.HTTPStatusError
+        result = await d.dispatch(entry, {"foo": "bar", "n": 1})
+
+    assert result.ok is True
+    assert result.mode == "sync"
+    assert result.backend_type == "n8n_webhook"
+    assert result.output == {"ok": True, "echo": 42}
+
+    # Verify the FakeClient recorded a POST with the signed body.
+    method, url, body = fake.calls[0]
+    assert method == "POST"
+    assert url == "http://n8n:5678/webhook/foo"
+    # Body is canonicalized JSON; verify the signature header matches.
+    import hashlib, hmac
+    expected = hmac.new(b"s3cret", body, hashlib.sha256).hexdigest()
+    assert fake.last_headers.get("X-Insidellm-Signature") == expected
+    assert fake.last_headers.get("X-Insidellm-Tenant") == "core"
+    assert fake.last_headers.get("X-Insidellm-Action") == "probe"
+
+
+@pytest.mark.asyncio
+async def test_n8n_missing_secret_still_dispatches_but_logs():
+    """Some tenants trust the internal network — no secret shouldn't
+    block dispatch, but the workflow will typically reject it."""
+    entry = _entry_with({
+        "type": "n8n_webhook",
+        "webhook_url": "http://n8n:5678/webhook/bar",
+        "hmac_secret_env": "N8N_WEBHOOK_SECRET_MISSING",
+    })
+    fake = _FakeClient(_FakeResp(200, {"ok": True}))
+
+    with patch.object(d, "httpx") as mhttpx, \
+         patch.dict("os.environ", {}, clear=False):
+        import os as _os
+        _os.environ.pop("N8N_WEBHOOK_SECRET_MISSING", None)
+        mhttpx.AsyncClient = MagicMock(return_value=fake)
+        import httpx as _real
+        mhttpx.HTTPStatusError = _real.HTTPStatusError
+        result = await d.dispatch(entry, {})
+
+    assert result.ok is True  # dispatch succeeds; downstream decides.
+
+
+@pytest.mark.asyncio
+async def test_n8n_http_error_bubbles_useful_message():
+    entry = _entry_with({
+        "type": "n8n_webhook",
+        "webhook_url": "http://n8n:5678/webhook/broken",
+    })
+    fake = _FakeClient(_FakeResp(403, None, text="invalid signature"))
+
+    with patch.object(d, "httpx") as mhttpx:
+        mhttpx.AsyncClient = MagicMock(return_value=fake)
+        import httpx as _real
+        mhttpx.HTTPStatusError = _real.HTTPStatusError
+        result = await d.dispatch(entry, {})
+
+    assert result.ok is False
+    assert "n8n HTTP 403" in (result.error or "")
+    assert "invalid signature" in (result.error or "")
+
+
+# ---------------------------------------------------------------------------
 # Not-yet-implemented backends
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("backend_dict", [
-    {"type": "n8n_webhook", "webhook_url": "http://n8n/hook/a"},
     {"type": "activepieces_trigger", "trigger_url": "http://ap/hook/b"},
     {"type": "mcp_tool", "server": "svc", "tool_name": "x"},
 ])

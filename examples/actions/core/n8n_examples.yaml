@@ -1,0 +1,45 @@
+# n8n-backed catalog actions (P3.1) — tenant_id: core
+#
+# Demonstrates the `n8n_webhook` backend. The gov-hub dispatcher POSTs
+# to the workflow's webhook URL with an HMAC signature header derived
+# from the secret named by `hmac_secret_env`.
+#
+# Each entry below maps to a workflow template in
+# configs/n8n/workflows/; replace the URLs with the actual paths your
+# workflows expose after import.
+
+schema_version: "1.0"
+actions:
+  - schema_version: "1.0"
+    action_id: n8n_verify_signature_probe
+    tenant_id: core
+    display_name: "n8n Probe — Signature Verification"
+    description: "Smoke-test action that hits the verify-signature template workflow. Confirms the HMAC + webhook round-trip works end-to-end."
+    category: other
+    backend:
+      type: n8n_webhook
+      webhook_url: "http://n8n:5678/webhook/insidellm/verify-signature"
+      hmac_secret_env: N8N_WEBHOOK_SECRET
+    inputs:
+      probe_message:
+        type: string
+        required: false
+        description: "Arbitrary string echoed back by the workflow."
+    outputs:
+      ok:
+        type: boolean
+      body:
+        type: object
+    guardrail_requirements:
+      minimum_guardrail_tier: tier_general_business
+      data_classes: []
+      requires_approval: false
+    audit:
+      log_inputs: true
+      log_outputs: true
+      redact_fields: []
+    rate_limit:
+      per_minute: 30
+      per_day: 500
+    maintainer: insidellm-core
+    version: "1.0.0"

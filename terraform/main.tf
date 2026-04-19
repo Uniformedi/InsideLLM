@@ -76,6 +76,15 @@ resource "random_password" "keepalived_password" {
   special = false
 }
 
+# n8n webhook HMAC secret — only generated when n8n is enabled AND the
+# operator didn't pin one via var.n8n_webhook_secret. Stable across
+# re-applies because random_password persists in state.
+resource "random_password" "n8n_webhook_secret" {
+  count   = var.n8n_enable && var.n8n_webhook_secret == "" ? 1 : 0
+  length  = 48
+  special = false
+}
+
 locals {
   litellm_master_key    = var.litellm_master_key != "" ? var.litellm_master_key : "sk-${random_password.litellm_master_key[0].result}"
   litellm_salt_key      = var.litellm_salt_key != "" ? var.litellm_salt_key : random_password.litellm_salt_key[0].result
@@ -485,6 +494,7 @@ locals {
     hyperv_password        = var.hyperv_password
     guacamole_db_password  = local.guacamole_db_password
     fleet_edge_secret      = random_password.fleet_edge_secret.result
+    n8n_webhook_secret     = var.n8n_webhook_secret != "" ? var.n8n_webhook_secret : (var.n8n_enable ? random_password.n8n_webhook_secret[0].result : "")
   })
 }
 
@@ -597,6 +607,11 @@ locals {
     keycloak_admin_user = var.keycloak_admin_user
     # Demo workers — stub action backing for showcase agents (P1.6).
     workers_enable = var.workers_enable
+    # n8n per-tenant tool factory (P3.1).
+    n8n_enable         = var.n8n_enable
+    n8n_version        = var.n8n_version
+    n8n_db_name        = var.n8n_db_name
+    n8n_webhook_secret = var.n8n_webhook_secret != "" ? var.n8n_webhook_secret : (var.n8n_enable ? random_password.n8n_webhook_secret[0].result : "")
   })
 }
 
@@ -616,6 +631,7 @@ locals {
     cockpit_enable         = var.cockpit_enable
     guacamole_enable       = local.effective_guacamole_enable
     keycloak_enable        = var.keycloak_enable
+    n8n_enable             = var.n8n_enable
     # Stream C — edge trust. When an incoming request carries X-User-Email
     # (claims edge-forwarded identity), backends require X-Edge-Secret to
     # match this value before honouring the claim.
@@ -744,6 +760,7 @@ locals {
       department             = var.department
       keycloak_enable        = var.keycloak_enable
       keycloak_realm_name    = var.keycloak_realm_name
+      n8n_enable             = var.n8n_enable
       fleet_primary_host     = var.fleet_primary_host
     })
   })

@@ -44,3 +44,8 @@ GUACAMOLE_DB_PASSWORD=${guacamole_db_password}
 # Backends require X-Edge-Secret header match from the edge router before
 # trusting forwarded X-User-* claims. Rotate with coordinated restart.
 FLEET_EDGE_SECRET=${fleet_edge_secret}
+
+# --- n8n webhook HMAC secret (P3.1) ----------------------------------------
+# Gov-hub dispatcher signs outbound webhook calls; n8n workflows verify.
+# Empty when n8n_enable=false.
+N8N_WEBHOOK_SECRET=${n8n_webhook_secret}

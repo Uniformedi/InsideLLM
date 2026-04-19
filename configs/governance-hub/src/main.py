@@ -131,6 +131,10 @@ async def landing():
       <span class="icon" style="background:#0891b2">SK</span>
       <div><div class="label">Shared Skills</div><div class="desc">Org-wide AI skill catalog — create, edit, publish to Open WebUI, gate by AD group</div></div>
     </a>
+    <a href="/n8n/">
+      <span class="icon" style="background:#ea4560">N8</span>
+      <div><div class="label">Tool Factory (n8n)</div><div class="desc">Low-code webhook workflows that declarative agents call as catalog actions. Shown when n8n_enable=true.</div></div>
+    </a>
     <a href="/governance/policies">
       <span class="icon" style="background:#dc2626">OP</span>
       <div><div class="label">OPA Policies</div><div class="desc">Edit Rego policies — Humility, Integrity, industry overlays. OPA-validated saves with hot reload.</div></div>
