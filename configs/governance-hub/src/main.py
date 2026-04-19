@@ -10,7 +10,7 @@ from sqlalchemy import text
 from .config import settings
 from .db.local_db import AsyncSessionLocal, SyncSessionLocal, engine
 from .db.models import Base
-from .routers import actions, ad_join, advisor, agents, agents_ui, audit, auth, changes, chat, config_snapshots, connectors, fleet, framework, hyperv, identity, keyword_templates, obligations, policies, portfolio, prompts, restore, schema, skills, sync, vendors
+from .routers import actions, ad_join, advisor, agents, agents_ui, audit, auth, changes, chat, config_snapshots, connectors, fleet, framework, hyperv, identity, keyword_templates, notifications, obligations, policies, portfolio, prompts, restore, schema, skills, sync, vendors
 from .services.config_service import capture_snapshot
 from .services.sync_service import collect_telemetry, export_to_central
 
@@ -67,6 +67,7 @@ app.include_router(agents_ui.router)
 app.include_router(actions.router)
 app.include_router(identity.router)
 app.include_router(portfolio.router)
+app.include_router(notifications.router)
 
 if settings.chat_enable:
     app.include_router(chat.router)

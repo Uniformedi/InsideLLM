@@ -49,3 +49,12 @@ FLEET_EDGE_SECRET=${fleet_edge_secret}
 # Gov-hub dispatcher signs outbound webhook calls; n8n workflows verify.
 # Empty when n8n_enable=false.
 N8N_WEBHOOK_SECRET=${n8n_webhook_secret}
+
+# --- Teams/Slack/email notification webhooks (P2.1) ------------------------
+# Empty by default. Paste the Incoming Webhook URL from Teams or Slack
+# here (or edit /opt/InsideLLM/.env on the VM) to activate outbound
+# notifications for agent publish approvals, at-risk alerts, etc. Every
+# send passes through the DLP sidecar scanner before leaving the VM.
+TEAMS_WEBHOOK_DEFAULT=
+SLACK_WEBHOOK_DEFAULT=
+SMTP_HOST=

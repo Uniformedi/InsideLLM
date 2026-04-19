@@ -324,6 +324,17 @@ async def publish_agent(
             f"agent_publish_proposed: {row.tenant_id}/{row.agent_id} "
             f"change_id={proposal.id}"
         )
+
+        # P2.1 — notify approvers that a publish is pending. Fire-and-forget;
+        # the DB state is already committed so a notification failure
+        # doesn't block the workflow.
+        try:
+            await _notify_agent_publish_pending(
+                row, proposal_id=proposal.id, actor=actor_email or "system"
+            )
+        except Exception as e:
+            logger.warning(f"notify on publish_proposed skipped: {e}")
+
         return row, proposal.id
 
     # private / team — publish immediately.
@@ -359,6 +370,56 @@ async def publish_agent(
 # ---------------------------------------------------------------------------
 # Runtime translation — manifest → LiteLLM key + OWUI model
 # ---------------------------------------------------------------------------
+
+
+async def _notify_agent_publish_pending(
+    row: Agent,
+    *,
+    proposal_id: int,
+    actor: str,
+) -> None:
+    """Emit a Teams + Slack default-channel notification when a publish
+    request lands in the change queue. DLP sidecar scrubs the body before
+    it hits the webhook; see services/notification_service.py."""
+    from .notification_service import NotificationRequest, send_many
+
+    subject = f"[InsideLLM] Agent publish pending approval — {row.agent_id}"
+    body = (
+        f"Tenant: {row.tenant_id}\n"
+        f"Agent: {row.agent_id} (v{row.version})\n"
+        f"Guardrail profile: {row.guardrail_profile}\n"
+        f"Visibility scope: {row.visibility_scope}\n"
+        f"Manifest hash: {(row.manifest_hash or '')[:16]}…\n"
+        f"Requested by: {actor}\n"
+        f"Change ID: {proposal_id}\n\n"
+        f"Approve via: /governance/api/v1/changes/{proposal_id}/approve "
+        f"or the change review UI."
+    )
+    # Default channels — operators override via TEAMS_WEBHOOK_<CHAN> /
+    # SLACK_WEBHOOK_<CHAN> env or settings_overrides.
+    targets = ["teams://default", "slack://default"]
+    results = await send_many([
+        NotificationRequest(
+            event_type="agent_publish_pending",
+            target=t,
+            subject=subject,
+            body=body,
+            severity="warning",
+            metadata={
+                "tenant_id": row.tenant_id,
+                "agent_id": row.agent_id,
+                "change_id": proposal_id,
+                "actor": actor,
+            },
+            dlp_mode="redact",
+        )
+        for t in targets
+    ])
+    for r in results:
+        if not r.ok:
+            # Missing webhook config is common in early deploys; INFO-level
+            # rather than WARNING to keep logs quiet.
+            logger.info(f"notification skipped: target={r.target} reason={r.error}")
 
 
 async def _provision_and_audit(

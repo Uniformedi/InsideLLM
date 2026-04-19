@@ -573,6 +573,12 @@ services:
       # Name must match the `hmac_secret_env` value in catalog entries.
       N8N_WEBHOOK_SECRET: "$${N8N_WEBHOOK_SECRET}"
 %{ endif ~}
+      # P2.1 — Teams/Slack notification webhooks. Empty by default; set in
+      # /opt/InsideLLM/.env (and thus docker compose env) or via
+      # settings_overrides to activate. DLP sidecar runs in-path regardless.
+      TEAMS_WEBHOOK_DEFAULT: "$${TEAMS_WEBHOOK_DEFAULT:-}"
+      SLACK_WEBHOOK_DEFAULT: "$${SLACK_WEBHOOK_DEFAULT:-}"
+      SMTP_HOST: "$${SMTP_HOST:-}"
 %{ if keycloak_enable ~}
       # Keycloak identity sync (Phase 2). Auto-enabled when the local
       # keycloak container is deployed; pushes realm/groups/users to the
