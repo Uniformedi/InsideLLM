@@ -27,7 +27,14 @@ logger = logging.getLogger("governance-hub.dlp")
 # Pattern set — same shape as dlp_guardrail.py (source of truth)
 # ---------------------------------------------------------------------------
 
+# IMPORTANT: The `regex` + key names below MUST stay in sync with
+# `configs/litellm/callbacks/dlp_guardrail.py::PATTERNS`. The
+# `scripts/check-dlp-pattern-sync.py` drift check (and the paired
+# pytest test) fail if they diverge. Gov-hub may add *extra* keys
+# (e.g. `email` — not appropriate to block on LLM calls but useful to
+# flag on outbound notifications); shared keys must match verbatim.
 PATTERNS: dict[str, dict[str, object]] = {
+    # ---- Mirrored from dlp_guardrail.py ----------------------------------
     "ssn": {
         "regex": r"\b\d{3}[-\u2013\u2014\s]?\d{2}[-\u2013\u2014\s]?\d{4}\b",
         "description": "Social Security Number",
@@ -46,6 +53,12 @@ PATTERNS: dict[str, dict[str, object]] = {
         "severity": "critical",
         "mask": "[REDACTED-CC]",
     },
+    "credit_card_generic": {
+        "regex": r"\b(?:\d{4}[-\s]){3}\d{4}\b",
+        "description": "Potential Credit Card Number",
+        "severity": "high",
+        "mask": "[REDACTED-CC]",
+    },
     "phi_mrn": {
         "regex": r"\b(?:MRN|Medical Record|Patient ID)[\s:#]*\d{5,}\b",
         "description": "Medical Record Number",
@@ -53,51 +66,70 @@ PATTERNS: dict[str, dict[str, object]] = {
         "mask": "[REDACTED-MRN]",
     },
     "phi_dob": {
-        "regex": r"\b(?:DOB|D\.O\.B\.?|date\s+of\s+birth|birth\s*date)[\s:]*\d{1,2}[/\-\.]\d{1,2}[/\-\.]\d{2,4}\b",
-        "description": "Date of Birth",
+        "regex": r"\b(?:DOB|D\.O\.B\.?|date\s+of\s+birth|birth\s*date|birth\s*day|b[\-\s]?day|born(?:\s+on)?|fecha\s+de\s+nacimiento)[\s:]*\d{1,2}[/\-\.]\d{1,2}[/\-\.]\d{2,4}\b",
+        "description": "Date of Birth (labeled)",
         "severity": "high",
         "mask": "[REDACTED-DOB]",
     },
-    "email": {
-        # Notifications routinely contain emails (recipient address, Teams
-        # mentions); treat as a LOW-severity hit but DON'T redact by
-        # default — would break routing. Callers that want aggressive
-        # redaction can request it explicitly.
-        "regex": r"\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b",
-        "description": "Email Address",
-        "severity": "low",
-        "mask": "[email]",
-        "redact_default": False,
+    "phi_dob_iso": {
+        "regex": r"\b(?:DOB|D\.O\.B\.?|date\s+of\s+birth|birth\s*date|birth\s*day|b[\-\s]?day|born(?:\s+on)?)[\s:]*\d{4}[/\-\.]\d{1,2}[/\-\.]\d{1,2}\b",
+        "description": "Date of Birth - ISO format",
+        "severity": "high",
+        "mask": "[REDACTED-DOB]",
     },
-    "api_key_sk": {
-        "regex": r"\bsk-[a-zA-Z0-9]{20,}",
-        "description": "API Key (sk-)",
+    "phi_dob_text_month": {
+        "regex": r"\b(?:DOB|D\.O\.B\.?|date\s+of\s+birth|birth\s*date|birth\s*day|b[\-\s]?day|born(?:\s+on)?)[\s:]*(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\.?\s+\d{1,2},?\s+\d{2,4}",
+        "description": "Date of Birth - text month",
+        "severity": "high",
+        "mask": "[REDACTED-DOB]",
+    },
+    "phi_dob_standalone": {
+        "regex": r"\b(?:0?[1-9]|1[0-2])[/\-](?:0?[1-9]|[12]\d|3[01])[/\-](?:19|20)\d{2}\b",
+        "description": "Date Pattern (MM/DD/YYYY)",
+        "severity": "medium",
+        "mask": "[REDACTED-DATE]",
+    },
+    "phi_dob_standalone_iso": {
+        "regex": r"\b(?:19|20)\d{2}[/\-](?:0?[1-9]|1[0-2])[/\-](?:0?[1-9]|[12]\d|3[01])\b",
+        "description": "Date Pattern (YYYY-MM-DD)",
+        "severity": "medium",
+        "mask": "[REDACTED-DATE]",
+    },
+    "phi_diagnosis": {
+        "regex": r"\b(?:ICD[-\s]?(?:9|10)[-\s]?(?:CM|PCS)?[\s:#]*[A-Z]\d{2}(?:\.\d{1,4})?)\b",
+        "description": "ICD Diagnosis Code",
+        "severity": "medium",
+        "mask": "[REDACTED-ICD]",
+    },
+    "api_key": {
+        "regex": r"\b(?:sk-[a-zA-Z0-9]{20,}|api[_\-]?key[\s=:]+[\"']?[a-zA-Z0-9_\-]{16,})",
+        "description": "API Key",
         "severity": "critical",
         "mask": "[REDACTED-API-KEY]",
-    },
-    "api_key_labeled": {
-        "regex": r"(?:api[_\-]?key|token)[\s=:]+[\"']?[a-zA-Z0-9_\-]{16,}",
-        "description": "Labeled API Key / Token",
-        "severity": "critical",
-        "mask": "[REDACTED-API-KEY]",
-    },
-    "aws_access_key": {
-        "regex": r"\b(?:AKIA|ASIA)[A-Z0-9]{16}\b",
-        "description": "AWS Access Key",
-        "severity": "critical",
-        "mask": "[REDACTED-AWS]",
-    },
-    "private_key_header": {
-        "regex": r"-----BEGIN (?:RSA |EC |DSA )?PRIVATE KEY-----",
-        "description": "Private Key Header",
-        "severity": "critical",
-        "mask": "[REDACTED-KEY]",
     },
     "password_inline": {
         "regex": r"(?:password|passwd|pwd)[\s]*[=:]+[\s]*[\"']?[^\s\"']{8,}",
         "description": "Inline Password",
         "severity": "critical",
         "mask": "[REDACTED-PASSWORD]",
+    },
+    "connection_string": {
+        "regex": r"(?:Server|Data Source|Host|Provider)=[^;\n]+;(?:.*?(?:Password|Pwd|User ID)=[^;\n]+)",
+        "description": "Database Connection String",
+        "severity": "critical",
+        "mask": "[REDACTED-CONN]",
+    },
+    "aws_key": {
+        "regex": r"\b(?:AKIA|ASIA)[A-Z0-9]{16}\b",
+        "description": "AWS Access Key",
+        "severity": "critical",
+        "mask": "[REDACTED-AWS]",
+    },
+    "private_key": {
+        "regex": r"-----BEGIN (?:RSA |EC |DSA )?PRIVATE KEY-----",
+        "description": "Private Key",
+        "severity": "critical",
+        "mask": "[REDACTED-KEY]",
     },
     "bank_routing": {
         "regex": r"\b(?:routing|ABA)[\s#:]*\d{9}\b",
@@ -108,8 +140,21 @@ PATTERNS: dict[str, dict[str, object]] = {
     "bank_account": {
         "regex": r"\b(?:account|acct)[\s#:]*\d{8,17}\b",
         "description": "Bank Account Number",
-        "severity": "high",
+        "severity": "critical",
         "mask": "[REDACTED-ACCT]",
+    },
+
+    # ---- Gov-hub-only additions (not applicable to LLM-request blocking) -
+    "email": {
+        # Notifications routinely contain emails (recipient address, Teams
+        # mentions); treat as a LOW-severity hit but DON'T redact by
+        # default — would break routing. Callers that want aggressive
+        # redaction can request it explicitly via force_patterns=['email'].
+        "regex": r"\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b",
+        "description": "Email Address",
+        "severity": "low",
+        "mask": "[email]",
+        "redact_default": False,
     },
 }
 

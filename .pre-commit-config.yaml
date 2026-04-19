@@ -1,0 +1,27 @@
+# InsideLLM pre-commit hooks
+#
+# Install locally:
+#   pip install pre-commit
+#   pre-commit install
+#
+# Run manually against the whole tree:
+#   pre-commit run --all-files
+#
+# CI also runs `pytest configs/governance-hub/tests/` which exercises
+# the drift guard via subprocess — pre-commit is a developer-side
+# shortcut; the pytest path is the authoritative enforcement point.
+
+repos:
+  - repo: local
+    hooks:
+      - id: dlp-pattern-sync
+        name: DLP patterns mirror LiteLLM
+        description: >-
+          configs/governance-hub/src/services/dlp_scan.py must stay in
+          sync with configs/litellm/callbacks/dlp_guardrail.py::PATTERNS.
+          Shared keys must have identical regex; gov-hub may add extras
+          like `email` that don't apply to LLM blocking.
+        entry: python scripts/check-dlp-pattern-sync.py
+        language: system
+        files: ^(configs/litellm/callbacks/dlp_guardrail\.py|configs/governance-hub/src/services/dlp_scan\.py)$
+        pass_filenames: false

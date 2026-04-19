@@ -119,10 +119,5 @@ async def list_configured_channels() -> dict:
         "teams_default": bool(os.environ.get("TEAMS_WEBHOOK_DEFAULT")),
         "slack_default": bool(os.environ.get("SLACK_WEBHOOK_DEFAULT")),
         "email_smtp": bool(os.environ.get("SMTP_HOST")),
-        "dlp_patterns": [
-            "ssn", "credit_card", "phi_mrn", "phi_dob",
-            "api_key_sk", "api_key_labeled", "aws_access_key",
-            "private_key_header", "password_inline",
-            "bank_routing", "bank_account",
-        ],
+        "dlp_patterns": sorted(__import__("src.services.dlp_scan", fromlist=["PATTERNS"]).PATTERNS.keys()),
     }
