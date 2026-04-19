@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>InsideLLM — Agent Builder</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    background: #0a0e1a;
+    color: #e2e8f0;
+    min-height: 100vh;
+    padding: 24px;
+  }
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #2a3650;
+  }
+  header h1 {
+    color: #22d3ee;
+    font-family: "SF Mono", Consolas, monospace;
+    font-size: 22px;
+  }
+  header .meta { color: #64748b; font-size: 13px; }
+
+  .layout { display: grid; grid-template-columns: 380px 1fr; gap: 20px; }
+  @media (max-width: 980px) { .layout { grid-template-columns: 1fr; } }
+
+  .panel {
+    background: #1a2234;
+    border: 1px solid #2a3650;
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .panel h2 {
+    font-size: 12px;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 12px;
+    font-weight: 600;
+  }
+
+  /* Agent list (left) */
+  .agent-list { max-height: 72vh; overflow-y: auto; }
+  .agent-item {
+    padding: 12px 14px;
+    border: 1px solid #2a3650;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .agent-item:hover { border-color: #22d3ee; }
+  .agent-item.active { border-color: #22d3ee; background: rgba(34,211,238,0.06); }
+  .agent-item .row { display: flex; justify-content: space-between; align-items: baseline; }
+  .agent-item .name { font-size: 14px; color: #e2e8f0; font-weight: 600; }
+  .agent-item .tenant { font-family: "SF Mono", Consolas, monospace; font-size: 11px; color: #64748b; }
+  .agent-item .tags { margin-top: 6px; display: flex; gap: 4px; flex-wrap: wrap; }
+  .tag {
+    display: inline-block;
+    padding: 1px 6px;
+    background: #111827;
+    border: 1px solid #2a3650;
+    border-radius: 3px;
+    font-size: 10px;
+    color: #94a3b8;
+  }
+  .tag.ok   { color: #22d3ee; border-color: rgba(34,211,238,0.3); }
+  .tag.warn { color: #fbbf24; border-color: rgba(251,191,36,0.3); }
+  .tag.err  { color: #f87171; border-color: rgba(248,113,113,0.3); }
+
+  .btn {
+    background: #111827;
+    border: 1px solid #2a3650;
+    color: #22d3ee;
+    padding: 7px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .btn:hover { border-color: #22d3ee; }
+  .btn.primary { background: #22d3ee; color: #0a0e1a; border-color: #22d3ee; font-weight: 600; }
+  .btn.primary:hover { background: #0ea5b7; }
+  .btn.danger { color: #f87171; }
+  .btn.danger:hover { border-color: #f87171; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* Form (right) */
+  .form-grid { display: grid; gap: 16px; }
+  .form-row { display: grid; gap: 6px; }
+  .form-row label {
+    font-size: 11px;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 500;
+  }
+  .form-row label .hint { text-transform: none; letter-spacing: 0; color: #64748b; font-weight: 400; margin-left: 6px; }
+  .form-row input,
+  .form-row textarea,
+  .form-row select {
+    background: #0a0e1a;
+    border: 1px solid #2a3650;
+    color: #e2e8f0;
+    padding: 9px 12px;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 13px;
+  }
+  .form-row input:focus,
+  .form-row textarea:focus,
+  .form-row select:focus {
+    outline: none;
+    border-color: #22d3ee;
+  }
+  .form-row textarea { min-height: 120px; resize: vertical; font-family: "SF Mono", Consolas, monospace; }
+  .form-row .short { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  .chips-input {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 6px;
+    background: #0a0e1a;
+    border: 1px solid #2a3650;
+    border-radius: 6px;
+  }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #111827;
+    border: 1px solid #2a3650;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 12px;
+    color: #cbd5e1;
+  }
+  .chip button {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 0 2px;
+    line-height: 1;
+  }
+  .chip button:hover { color: #f87171; }
+  .chips-input input {
+    flex: 1;
+    min-width: 100px;
+    background: transparent;
+    border: none;
+    color: #e2e8f0;
+    padding: 4px;
+    outline: none;
+    font-family: inherit;
+    font-size: 12px;
+  }
+
+  /* Action repeater */
+  .actions-list { display: grid; gap: 8px; }
+  .action-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr auto;
+    gap: 8px;
+    align-items: center;
+  }
+  .action-row select,
+  .action-row input { padding: 7px 10px; font-size: 12px; }
+
+  fieldset {
+    border: 1px solid #2a3650;
+    border-radius: 8px;
+    padding: 12px 14px 14px;
+    margin-bottom: 12px;
+  }
+  fieldset legend {
+    color: #22d3ee;
+    font-family: "SF Mono", Consolas, monospace;
+    font-size: 12px;
+    padding: 0 6px;
+  }
+
+  .form-footer {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid #2a3650;
+  }
+
+  /* Modal */
+  .modal-bg {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.6);
+    display: none; align-items: center; justify-content: center;
+    z-index: 100;
+  }
+  .modal-bg.open { display: flex; }
+  .modal {
+    background: #0a0e1a;
+    border: 1px solid #2a3650;
+    border-radius: 10px;
+    padding: 20px 24px;
+    width: 90vw; max-width: 880px;
+    max-height: 85vh;
+    overflow-y: auto;
+  }
+  .modal h3 { color: #22d3ee; font-size: 16px; margin-bottom: 14px; }
+  .modal pre {
+    background: #000;
+    color: #cbd5e1;
+    padding: 12px;
+    border-radius: 6px;
+    font-size: 11px;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+  .modal-close { float: right; }
+
+  .toast {
+    position: fixed;
+    bottom: 24px; right: 24px;
+    background: #1a2234;
+    border: 1px solid #2a3650;
+    border-radius: 8px;
+    padding: 12px 18px;
+    font-size: 13px;
+    color: #e2e8f0;
+    min-width: 260px;
+    z-index: 200;
+    display: none;
+  }
+  .toast.ok    { border-color: #22d3ee; color: #22d3ee; }
+  .toast.err   { border-color: #f87171; color: #f87171; }
+  .toast.open  { display: block; }
+
+  .empty {
+    text-align: center; color: #64748b; padding: 28px 0; font-size: 13px;
+  }
+  a { color: #22d3ee; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>InsideLLM — Agent Builder</h1>
+    <div class="meta">No-code authoring for declarative agents · publishes via /api/v1/agents</div>
+  </div>
+  <div>
+    <button class="btn" onclick="loadAgents()">refresh</button>
+    &nbsp;
+    <button class="btn primary" onclick="startNew()">+ new agent</button>
+  </div>
+</header>
+
+<div class="layout">
+  <!-- Left: agent list -->
+  <section class="panel">
+    <h2>Agents</h2>
+    <div class="agent-list" id="agent-list">
+      <div class="empty">loading…</div>
+    </div>
+  </section>
+
+  <!-- Right: form -->
+  <section class="panel">
+    <h2 id="form-title">Select an agent, or create a new one</h2>
+    <div id="form-empty" class="empty">
+      Pick an agent on the left, or click <strong>+ new agent</strong>.
+    </div>
+
+    <form id="agent-form" class="form-grid" style="display: none;" onsubmit="return false;">
+      <!-- Identity -->
+      <fieldset>
+        <legend>identity</legend>
+        <div class="form-row">
+          <div class="short">
+            <div>
+              <label>tenant id <span class="hint">lowercase + hyphens</span></label>
+              <input id="f-tenant-id" placeholder="organization-collections" pattern="^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$" required>
+            </div>
+            <div>
+              <label>agent id</label>
+              <input id="f-agent-id" placeholder="dispute-handler" pattern="^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$" required>
+            </div>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="short">
+            <div>
+              <label>team <span class="hint">optional</span></label>
+              <input id="f-team" placeholder="compliance">
+            </div>
+            <div>
+              <label>created by <span class="hint">email</span></label>
+              <input id="f-created-by" placeholder="you@company.com">
+            </div>
+          </div>
+        </div>
+      </fieldset>
+
+      <!-- Display -->
+      <fieldset>
+        <legend>display</legend>
+        <div class="form-row">
+          <label>name</label>
+          <input id="f-display-name" required>
+        </div>
+        <div class="form-row">
+          <label>description</label>
+          <input id="f-display-desc" required>
+        </div>
+        <div class="form-row">
+          <label>conversation starters</label>
+          <div id="f-starters" class="chips-input"></div>
+        </div>
+      </fieldset>
+
+      <!-- Instructions -->
+      <fieldset>
+        <legend>instructions (system prompt)</legend>
+        <div class="form-row">
+          <textarea id="f-instructions" minlength="20" maxlength="8000" required></textarea>
+        </div>
+      </fieldset>
+
+      <!-- Knowledge -->
+      <fieldset>
+        <legend>knowledge</legend>
+        <div class="form-row">
+          <label>collections <span class="hint">RAG allowlist</span></label>
+          <div id="f-collections" class="chips-input"></div>
+        </div>
+        <div class="form-row">
+          <label>scope</label>
+          <select id="f-knowledge-scope">
+            <option value="strict">strict (deny retrievals outside this list)</option>
+            <option value="loose">loose (audit, don't block)</option>
+          </select>
+        </div>
+      </fieldset>
+
+      <!-- Actions -->
+      <fieldset>
+        <legend>actions</legend>
+        <div id="f-actions" class="actions-list"></div>
+        <button type="button" class="btn" style="margin-top: 10px;" onclick="addActionRow()">+ add action</button>
+      </fieldset>
+
+      <!-- Guardrails -->
+      <fieldset>
+        <legend>guardrails</legend>
+        <div class="form-row">
+          <label>profile</label>
+          <select id="f-profile">
+            <option value="tier_general_business">tier_general_business</option>
+            <option value="tier_financial_regulated">tier_financial_regulated</option>
+            <option value="tier_fdcpa_regulated">tier_fdcpa_regulated</option>
+            <option value="tier_hipaa_regulated">tier_hipaa_regulated</option>
+            <option value="tier_unrestricted">tier_unrestricted</option>
+            <option value="tier_custom">tier_custom</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <div class="short">
+            <div><label>daily USD budget</label><input type="number" id="f-daily-budget" step="0.01" min="0" value="5.00"></div>
+            <div><label>rpm limit</label><input type="number" id="f-rpm" min="1" value="20"></div>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="short">
+            <div><label>max actions/session</label><input type="number" id="f-max-actions" min="1" max="200" value="10"></div>
+            <div><label>token budget/session</label><input type="number" id="f-token-budget" min="1000" max="2000000" value="50000"></div>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="short">
+            <div><label>temperature cap</label><input type="number" id="f-temp" min="0" max="2" step="0.1" value="0.3"></div>
+            <div><label>allowed models <span class="hint">comma-separated</span></label><input id="f-models" value="claude-sonnet-4-6"></div>
+          </div>
+        </div>
+      </fieldset>
+
+      <!-- Visibility -->
+      <fieldset>
+        <legend>visibility</legend>
+        <div class="form-row">
+          <label>scope</label>
+          <select id="f-visibility" onchange="toggleVisibilityFields()">
+            <option value="private">private — only me</option>
+            <option value="team">team — my team (requires team field)</option>
+            <option value="org">org — whole tenant (tier-2 approval)</option>
+            <option value="fleet">fleet — portfolio-wide (tier-3 approval)</option>
+          </select>
+        </div>
+      </fieldset>
+
+      <div class="form-footer">
+        <button type="button" class="btn" onclick="previewRuntime()" id="btn-preview">preview runtime</button>
+        <button type="button" class="btn" onclick="viewAudit()" id="btn-audit">audit</button>
+        <button type="button" class="btn danger" onclick="retireAgent()" id="btn-retire">retire</button>
+        <button type="button" class="btn" onclick="saveDraft()" id="btn-save">save draft</button>
+        <button type="button" class="btn primary" onclick="publishAgent()" id="btn-publish">publish</button>
+      </div>
+    </form>
+  </section>
+</div>
+
+<!-- Runtime-preview modal -->
+<div class="modal-bg" id="preview-modal" onclick="closeModal(event, 'preview-modal')">
+  <div class="modal">
+    <button class="btn modal-close" onclick="closeModal(null, 'preview-modal')">close</button>
+    <h3 id="preview-title">Runtime Preview</h3>
+    <div id="preview-body">loading…</div>
+  </div>
+</div>
+
+<!-- Audit modal -->
+<div class="modal-bg" id="audit-modal" onclick="closeModal(event, 'audit-modal')">
+  <div class="modal">
+    <button class="btn modal-close" onclick="closeModal(null, 'audit-modal')">close</button>
+    <h3>Audit Trail</h3>
+    <div id="audit-body">loading…</div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+// Shared state
+let _agents = [];
+let _actions = [];
+let _selected = null;
+
+// ---- Fetch helpers --------------------------------------------------------
+
+async function api(path, opts) {
+  const resp = await fetch("/governance" + path, {
+    credentials: "include",
+    headers: { "Content-Type": "application/json", ...(opts?.headers || {}) },
+    ...(opts || {}),
+  });
+  const text = await resp.text();
+  let body = null;
+  try { body = text ? JSON.parse(text) : null; } catch {}
+  if (!resp.ok) {
+    const msg = body?.detail || body?.error || ("HTTP " + resp.status);
+    throw new Error(msg);
+  }
+  return body;
+}
+
+function toast(msg, kind = "ok", ms = 2800) {
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.className = "toast open " + kind;
+  setTimeout(() => el.classList.remove("open"), ms);
+}
+
+function esc(s) {
+  if (s == null) return "";
+  return String(s).replace(/[&<>"']/g, c =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])
+  );
+}
+
+// ---- Agent list -----------------------------------------------------------
+
+async function loadAgents() {
+  const listEl = document.getElementById("agent-list");
+  try {
+    const r = await api("/api/v1/agents/?limit=200");
+    _agents = r.agents || [];
+    if (!_agents.length) {
+      listEl.innerHTML = '<div class="empty">No agents yet — click <strong>+ new agent</strong>.</div>';
+      return;
+    }
+    listEl.innerHTML = _agents.map((a, i) => {
+      const stateTag = a.status === "published"
+        ? `<span class="tag ok">published</span>`
+        : a.status === "retired"
+        ? `<span class="tag err">retired</span>`
+        : `<span class="tag warn">draft</span>`;
+      const runtimeTag = a.manifest?.visibility?.scope
+        ? `<span class="tag">${esc(a.manifest.visibility.scope)}</span>` : "";
+      const profileTag = a.manifest?.guardrails?.profile
+        ? `<span class="tag">${esc(a.manifest.guardrails.profile)}</span>` : "";
+      return `
+        <div class="agent-item" data-idx="${i}" onclick="selectAgent(${i})">
+          <div class="row">
+            <span class="name">${esc(a.manifest?.display?.name || a.agent_id)}</span>
+            <span class="tenant">v${a.version}</span>
+          </div>
+          <div class="tenant">${esc(a.tenant_id)} / ${esc(a.agent_id)}</div>
+          <div class="tags">${stateTag}${runtimeTag}${profileTag}</div>
+        </div>`;
+    }).join("");
+  } catch (e) {
+    listEl.innerHTML = `<div class="empty" style="color:#f87171">${esc(e.message)}</div>`;
+  }
+}
+
+async function loadActionCatalog() {
+  try {
+    const r = await api("/api/v1/actions/?limit=500");
+    _actions = r.actions || [];
+  } catch (e) {
+    _actions = [];
+    console.warn("action catalog load failed", e);
+  }
+}
+
+function selectAgent(idx) {
+  const a = _agents[idx];
+  if (!a) return;
+  _selected = a;
+  document.querySelectorAll(".agent-item").forEach((el, i) =>
+    el.classList.toggle("active", i === idx));
+  populateForm(a.manifest);
+  document.getElementById("form-empty").style.display = "none";
+  document.getElementById("agent-form").style.display = "grid";
+  document.getElementById("form-title").textContent =
+    `${a.manifest?.display?.name || a.agent_id} — v${a.version} (${a.status})`;
+  document.getElementById("btn-retire").style.display = (a.status === "retired") ? "none" : "";
+  document.getElementById("btn-audit").style.display = "";
+}
+
+function startNew() {
+  _selected = null;
+  populateForm(null);
+  document.getElementById("form-empty").style.display = "none";
+  document.getElementById("agent-form").style.display = "grid";
+  document.getElementById("form-title").textContent = "New Agent";
+  document.getElementById("btn-retire").style.display = "none";
+  document.getElementById("btn-audit").style.display = "none";
+}
+
+// ---- Chips inputs ---------------------------------------------------------
+
+function wireChips(containerId) {
+  const container = document.getElementById(containerId);
+  const add = (val) => {
+    val = (val || "").trim();
+    if (!val) return;
+    const chip = document.createElement("span");
+    chip.className = "chip";
+    chip.textContent = val;
+    const rm = document.createElement("button");
+    rm.type = "button";
+    rm.textContent = "×";
+    rm.onclick = () => chip.remove();
+    chip.appendChild(rm);
+    container.insertBefore(chip, input);
+  };
+  const input = document.createElement("input");
+  input.type = "text";
+  input.placeholder = "type and press enter…";
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      add(input.value);
+      input.value = "";
+    }
+  });
+  container.appendChild(input);
+  container._getValues = () => Array.from(container.querySelectorAll(".chip"))
+    .map(c => c.firstChild.textContent.trim()).filter(Boolean);
+  container._setValues = (arr) => {
+    container.querySelectorAll(".chip").forEach(c => c.remove());
+    (arr || []).forEach(add);
+  };
+}
+
+function setUpChipsInputs() {
+  wireChips("f-starters");
+  wireChips("f-collections");
+}
+
+// ---- Action repeater ------------------------------------------------------
+
+function addActionRow(pre) {
+  const parent = document.getElementById("f-actions");
+  const row = document.createElement("div");
+  row.className = "action-row";
+  const opts = _actions.map(a =>
+    `<option value="${esc(a.action_id)}">${esc(a.action_id)} (${esc(a.tenant_id)})</option>`).join("");
+  row.innerHTML = `
+    <select class="a-id"><option value="">— pick action —</option>${opts}</select>
+    <select class="a-scope">
+      <option value="read">read</option>
+      <option value="write">write</option>
+      <option value="admin">admin</option>
+    </select>
+    <select class="a-approval">
+      <option value="false">no approval</option>
+      <option value="true">needs approval</option>
+    </select>
+    <input class="a-target" placeholder="approval target" style="padding:7px 10px;font-size:12px;">
+    <button type="button" class="btn danger" onclick="this.parentElement.remove()">×</button>`;
+  parent.appendChild(row);
+  if (pre) {
+    row.querySelector(".a-id").value = pre.action_id || "";
+    row.querySelector(".a-scope").value = pre.scope || "read";
+    row.querySelector(".a-approval").value = pre.approval_required ? "true" : "false";
+    row.querySelector(".a-target").value = pre.approval_target || "";
+  }
+}
+
+function collectActions() {
+  const rows = document.querySelectorAll("#f-actions .action-row");
+  const out = [];
+  rows.forEach(r => {
+    const id = r.querySelector(".a-id").value.trim();
+    if (!id) return;
+    out.push({
+      action_id: id,
+      scope: r.querySelector(".a-scope").value,
+      approval_required: r.querySelector(".a-approval").value === "true",
+      approval_target: r.querySelector(".a-target").value.trim(),
+      approval_channel: "none",
+    });
+  });
+  return out;
+}
+
+// ---- Form serialization ---------------------------------------------------
+
+function populateForm(manifest) {
+  const m = manifest || {};
+  document.getElementById("f-tenant-id").value = m.tenant_id || "";
+  document.getElementById("f-agent-id").value = m.agent_id || "";
+  document.getElementById("f-team").value = m.team || "";
+  document.getElementById("f-created-by").value = m.created_by || "";
+  document.getElementById("f-display-name").value = m.display?.name || "";
+  document.getElementById("f-display-desc").value = m.display?.description || "";
+  document.getElementById("f-instructions").value = m.instructions || "";
+  document.getElementById("f-starters")._setValues(m.display?.conversation_starters || []);
+  document.getElementById("f-collections")._setValues(m.knowledge?.collections || []);
+  document.getElementById("f-knowledge-scope").value = m.knowledge?.scope || "strict";
+  document.getElementById("f-profile").value = m.guardrails?.profile || "tier_general_business";
+  document.getElementById("f-daily-budget").value = m.guardrails?.daily_usd_budget ?? 5;
+  document.getElementById("f-rpm").value = m.guardrails?.rpm_limit ?? 20;
+  document.getElementById("f-max-actions").value = m.guardrails?.max_actions_per_session ?? 10;
+  document.getElementById("f-token-budget").value = m.guardrails?.token_budget_per_session ?? 50000;
+  document.getElementById("f-temp").value = m.guardrails?.temperature_cap ?? 0.3;
+  document.getElementById("f-models").value = (m.guardrails?.allowed_models || ["claude-sonnet-4-6"]).join(",");
+  document.getElementById("f-visibility").value = m.visibility?.scope || "private";
+  // Actions
+  document.getElementById("f-actions").innerHTML = "";
+  (m.actions || []).forEach(a => addActionRow(a));
+}
+
+function collectManifest() {
+  const models = document.getElementById("f-models").value
+    .split(",").map(s => s.trim()).filter(Boolean);
+  return {
+    schema_version: "1.1",
+    agent_id: document.getElementById("f-agent-id").value.trim(),
+    tenant_id: document.getElementById("f-tenant-id").value.trim(),
+    created_by: document.getElementById("f-created-by").value.trim() || null,
+    team: document.getElementById("f-team").value.trim() || null,
+    display: {
+      name: document.getElementById("f-display-name").value.trim(),
+      description: document.getElementById("f-display-desc").value.trim(),
+      conversation_starters: document.getElementById("f-starters")._getValues(),
+    },
+    instructions: document.getElementById("f-instructions").value,
+    knowledge: {
+      collections: document.getElementById("f-collections")._getValues(),
+      scope: document.getElementById("f-knowledge-scope").value,
+    },
+    actions: collectActions(),
+    guardrails: {
+      profile: document.getElementById("f-profile").value,
+      daily_usd_budget: parseFloat(document.getElementById("f-daily-budget").value) || 0,
+      rpm_limit: parseInt(document.getElementById("f-rpm").value) || 20,
+      max_actions_per_session: parseInt(document.getElementById("f-max-actions").value) || 10,
+      token_budget_per_session: parseInt(document.getElementById("f-token-budget").value) || 50000,
+      temperature_cap: parseFloat(document.getElementById("f-temp").value) || 0.3,
+      allowed_models: models.length ? models : ["claude-sonnet-4-6"],
+    },
+    visibility: {
+      scope: document.getElementById("f-visibility").value,
+    },
+  };
+}
+
+// ---- CRUD actions ---------------------------------------------------------
+
+async function saveDraft() {
+  const manifest = collectManifest();
+  const exists = _agents.some(a =>
+    a.tenant_id === manifest.tenant_id && a.agent_id === manifest.agent_id);
+  try {
+    if (exists) {
+      await api(`/api/v1/agents/${encodeURIComponent(manifest.tenant_id)}/${encodeURIComponent(manifest.agent_id)}`, {
+        method: "PUT",
+        body: JSON.stringify({ manifest }),
+      });
+      toast("Agent updated");
+    } else {
+      await api("/api/v1/agents/", {
+        method: "POST",
+        body: JSON.stringify({ manifest }),
+      });
+      toast("Agent created");
+    }
+    await loadAgents();
+  } catch (e) {
+    toast("Save failed: " + e.message, "err", 5000);
+  }
+}
+
+async function publishAgent() {
+  const manifest = collectManifest();
+  try {
+    // Save first, then publish — single button click.
+    await saveDraft();
+    const r = await api(
+      `/api/v1/agents/${encodeURIComponent(manifest.tenant_id)}/${encodeURIComponent(manifest.agent_id)}/publish`,
+      { method: "POST" });
+    if (r.published_immediately) {
+      toast("Published + runtime provisioned (" + (r.runtime_sync_state || "?") + ")");
+    } else {
+      toast("Approval required: change_id=" + r.pending_change_id, "ok", 5000);
+    }
+    await loadAgents();
+  } catch (e) {
+    toast("Publish failed: " + e.message, "err", 5000);
+  }
+}
+
+async function retireAgent() {
+  if (!_selected) return;
+  if (!confirm(`Retire ${_selected.agent_id}? It will disappear from Open WebUI.`)) return;
+  try {
+    await api(
+      `/api/v1/agents/${encodeURIComponent(_selected.tenant_id)}/${encodeURIComponent(_selected.agent_id)}/retire`,
+      { method: "POST" });
+    toast("Retired");
+    await loadAgents();
+  } catch (e) {
+    toast("Retire failed: " + e.message, "err", 5000);
+  }
+}
+
+async function previewRuntime() {
+  const manifest = collectManifest();
+  const body = document.getElementById("preview-body");
+  document.getElementById("preview-modal").classList.add("open");
+  body.innerHTML = "loading…";
+  try {
+    // Need a saved agent to preview — fall back to showing the manifest
+    // the user has in the form right now.
+    if (_selected) {
+      const r = await api(
+        `/api/v1/agents/${encodeURIComponent(manifest.tenant_id)}/${encodeURIComponent(manifest.agent_id)}/runtime-preview`);
+      body.innerHTML = `
+        <h4 style="color:#94a3b8; margin-bottom: 6px;">LiteLLM Key Payload</h4>
+        <pre>${esc(JSON.stringify(r.litellm_key_payload, null, 2))}</pre>
+        <h4 style="color:#94a3b8; margin: 12px 0 6px;">OWUI Model Payload</h4>
+        <pre>${esc(JSON.stringify(r.owui_model_payload, null, 2))}</pre>
+        <h4 style="color:#94a3b8; margin: 12px 0 6px;">Current State</h4>
+        <pre>${esc(JSON.stringify(r.current_state, null, 2))}</pre>`;
+    } else {
+      body.innerHTML = `
+        <div style="color:#fbbf24; margin-bottom: 12px;">Not yet saved — showing the draft manifest:</div>
+        <pre>${esc(JSON.stringify(manifest, null, 2))}</pre>`;
+    }
+  } catch (e) {
+    body.innerHTML = `<div style="color:#f87171">${esc(e.message)}</div>`;
+  }
+}
+
+async function viewAudit() {
+  if (!_selected) return;
+  const body = document.getElementById("audit-body");
+  document.getElementById("audit-modal").classList.add("open");
+  body.innerHTML = "loading…";
+  try {
+    const r = await api(
+      `/api/v1/agents/${encodeURIComponent(_selected.tenant_id)}/${encodeURIComponent(_selected.agent_id)}/audit?limit=50`);
+    const entries = r.entries || [];
+    if (!entries.length) {
+      body.innerHTML = '<div class="empty">No audit entries.</div>';
+      return;
+    }
+    body.innerHTML = `
+      <table style="width:100%; font-size:12px;">
+        <thead><tr>
+          <th style="text-align:left; padding:6px;">seq</th>
+          <th style="text-align:left; padding:6px;">event</th>
+          <th style="text-align:left; padding:6px;">chain hash</th>
+          <th style="text-align:left; padding:6px;">created</th>
+        </tr></thead>
+        <tbody>
+          ${entries.map(e => `
+            <tr>
+              <td style="padding:6px; font-family:monospace;">${e.sequence}</td>
+              <td style="padding:6px;">${esc(e.event_type)}</td>
+              <td style="padding:6px; font-family:monospace; color:#64748b;">${esc((e.chain_hash || "").slice(0, 16))}…</td>
+              <td style="padding:6px; color:#94a3b8;">${esc(e.created_at || "")}</td>
+            </tr>`).join("")}
+        </tbody>
+      </table>`;
+  } catch (e) {
+    body.innerHTML = `<div style="color:#f87171">${esc(e.message)}</div>`;
+  }
+}
+
+function closeModal(ev, id) {
+  if (ev && ev.target.closest(".modal")) return;
+  document.getElementById(id).classList.remove("open");
+}
+
+function toggleVisibilityFields() {
+  // Placeholder — future tweaks for per-scope guidance could live here.
+}
+
+// ---- Boot -----------------------------------------------------------------
+
+async function boot() {
+  setUpChipsInputs();
+  await loadActionCatalog();
+  await loadAgents();
+}
+
+boot();
+</script>
+</body>
+</html>
