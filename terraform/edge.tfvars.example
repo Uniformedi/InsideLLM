@@ -1,0 +1,86 @@
+# =============================================================================
+# terraform.tfvars for the InsideLLM edge VM (P1.C)
+#
+# Target: 10.0.0.98/24  (VIP 10.0.0.99 owned by keepalived)
+# Role:   edge — front-door router; terminates TLS, validates OIDC, forwards
+#                to per-department backends based on OIDC group claim
+#
+# Copy to ../terraform.tfvars on the edge workstation (or pipe through
+# scripts/Render-Fleet.ps1 if using fleet.yaml), then run:
+#   terraform init
+#   terraform apply -var-file="../terraform.tfvars"
+# =============================================================================
+
+# ---- Hyper-V host (same as primary deploys) ---------------------------------
+hyperv_user     = ".\\Administrator"
+hyperv_password = "REPLACE_WITH_HOST_ADMIN_PASSWORD"
+hyperv_host     = "127.0.0.1"
+hyperv_port     = 5985
+
+# ---- VM identity + placement ------------------------------------------------
+vm_name             = "insidellm-edge"
+vm_hostname         = "insidellm-edge"
+vm_domain           = "local"                             # or "corp.yourco.com"
+vm_role             = "edge"                              # drives cloud-init branch
+
+vm_processor_count      = 2                               # edge is thin — nginx + oauth2-proxy + keepalived
+vm_memory_startup_bytes = 4294967296                      # 4 GB
+vm_disk_size_bytes      = 34359738368                     # 32 GB
+vm_path             = "C:\\HyperV\\VMs"
+vm_vhd_path         = "C:\\HyperV\\VHDs"
+ubuntu_vhdx_source  = "C:\\HyperV\\Images\\ubuntu-24.04-cloudimg-amd64.vhdx"
+
+# ---- Network (static; keepalived VIP assumes deterministic IPs) -------------
+vm_switch_name      = "InsideLLM"
+vm_switch_type      = "External"
+vm_switch_adapter   = "Ethernet"                          # adjust to your host NIC
+vm_static_ip        = "10.0.0.98/24"
+vm_gateway          = "10.0.0.1"
+vm_dns_servers      = ["10.0.0.9", "8.8.8.8"]             # primary VM's DNS first
+
+# ---- SSH ---------------------------------------------------------------------
+ssh_admin_user      = "insidellm"
+ssh_public_key_path = "~/.ssh/id_rsa.pub"
+
+# ---- Fleet wiring (REQUIRED for edge) ---------------------------------------
+fleet_primary_host  = "10.0.0.9"                          # points at the primary gov-hub
+fleet_virtual_ip    = "10.0.0.99"                         # keepalived VIP on the active edge
+edge_domain         = "insidellm.corp.example.com"        # FQDN for TLS CN + OIDC redirect
+edge_tls_source     = "self-signed"                       # self-signed | letsencrypt | custom
+
+# ---- SSO provider (edge needs OIDC to validate users before forwarding) ----
+sso_provider        = "azure_ad"                          # or "okta"
+azure_ad_client_id     = "REPLACE"
+azure_ad_client_secret = "REPLACE"
+azure_ad_tenant_id     = "REPLACE"
+
+# ---- API key (LiteLLM/Anthropic inherit from primary via per-request fwd) --
+# Edge does NOT talk to Anthropic directly; leave blank.
+anthropic_api_key   = ""
+
+# ---- Optional — mirror package pulls through the primary VM -----------------
+# Speeds up 2nd+ VM deploys by ~8 min each. Primary runs apt-cacher-ng + registry.
+apt_mirror_host     = "10.0.0.9"
+docker_mirror_host  = "10.0.0.9"
+
+# ---- Do NOT enable on the edge VM --------------------------------------------
+# The edge is intentionally thin. These modules would consume resources the
+# edge doesn't need and aren't exercised through an edge-role cloud-init:
+governance_hub_enable    = false
+policy_engine_enable     = false
+ollama_enable            = false
+chat_enable              = false
+ops_grafana_enable       = false
+ops_uptime_kuma_enable   = false
+guacamole_enable         = false
+ad_domain_join           = false
+workers_enable           = false
+keycloak_enable          = false
+n8n_enable               = false
+activepieces_enable      = false
+
+# ---- Admin contact (propagates to governance metadata) ----------------------
+ai_ethics_officer        = "Dan Medina"
+ai_ethics_officer_email  = "dan.medina@uniformedi.com"
+environment              = "production"
+owner                    = "Uniformedi"
