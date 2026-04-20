@@ -37,7 +37,7 @@ set in tfvars**.
 | `vm_switch_name` | `"InsideLLM"` | string | Name of the Hyper-V virtual switch |
 | `vm_switch_type` | `"External"` | string | Type of virtual switch: Internal or External |
 | `vm_switch_adapter` | `""` | string | Physical NIC name for External switch |
-| `ubuntu_vhdx_source` | `"C:\\HyperV\\Images\\ubuntu-24.04-cloudimg-amd64.vhdx"` | string | Path to Ubuntu 24.04 cloud image VHDX |
+| `base_vhdx_source` | `"C:\\HyperV\\Images\\debian-12-genericcloud-amd64.vhdx"` | string | Path to the base OS cloud image VHDX. Default: Debian 12 Bookworm. Legacy alias `ubuntu_vhdx_source` still accepted. |
 
 ## 2. Networking & Identity
 
@@ -46,9 +46,9 @@ set in tfvars**.
 | `vm_static_ip` | `""` | string | Static IP (CIDR, e.g. 192.168.1.100/24). Empty = DHCP |
 | `vm_gateway` | `""` | string | Default gateway for static IP config |
 | `vm_dns_servers` | `["8.8.8.8", "8.8.4.4"]` | list(string) | DNS servers for the VM |
-| `vm_hostname` | `"InsideLLM"` | string | Hostname for the Ubuntu VM |
+| `vm_hostname` | `"InsideLLM"` | string | Hostname for the Debian VM |
 | `vm_domain` | `"local"` | string | Domain name (FQDN and TLS cert) |
-| `ad_domain_join` | `false` | bool | Join the Ubuntu VM to the AD domain |
+| `ad_domain_join` | `false` | bool | Join the Debian VM to the AD domain |
 | `ad_join_user` | `""` | string | AD username with domain-join permission |
 | `ad_join_password` | `""` &mdash; secret, set in tfvars | string | Password for the AD join account |
 | `ad_join_ou` | `""` | string | OU for the computer account (empty = default) |
@@ -60,7 +60,7 @@ set in tfvars**.
 | `ldap_user_search_base` | `""` | string | Base DN for user lookups (empty = domain DC= chain) |
 | `cockpit_enable` | `true` | bool | Install Cockpit and expose at /cockpit/ |
 | `ssh_public_key_path` | `"~/.ssh/id_rsa.pub"` | string | SSH public key file on the Windows host |
-| `ssh_admin_user` | `"insidellm-admin"` | string | Admin username for the Ubuntu VM |
+| `ssh_admin_user` | `"insidellm-admin"` | string | Admin username for the Debian VM |
 
 ### Fleet / Edge
 

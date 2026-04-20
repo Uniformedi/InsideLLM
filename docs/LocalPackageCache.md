@@ -168,7 +168,7 @@ Measured on a Dell Precision 7920 host, 1 Gbps internet:
 
 | Step | Without mirror | With warmed mirror | Savings |
 |---|---|---|---|
-| `apt-get update && apt-get install ubuntu-desktop-minimal sssd realmd xrdp (…)` | ~12 min | ~90 s | ~10 min |
+| `apt-get update && apt-get install task-xfce-desktop sssd realmd xrdp (…)` | ~12 min | ~90 s | ~10 min |
 | `docker pull` of full Compose stack (~4 GB) | ~8 min | ~45 s | ~7 min |
 | **Total per 2nd+ VM deploy** | ~25 min | ~5 min | **~20 min** |
 

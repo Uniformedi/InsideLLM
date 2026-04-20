@@ -183,7 +183,7 @@
       <tr><td class="name"><code>vm_switch_name</code></td><td class="val"><code>"InsideLLM"</code></td><td class="type">string</td><td class="desc">Name of the Hyper-V virtual switch</td></tr>
       <tr><td class="name"><code>vm_switch_type</code></td><td class="val"><code>"External"</code></td><td class="type">string</td><td class="desc">Switch type: Internal or External</td></tr>
       <tr><td class="name"><code>vm_switch_adapter</code></td><td class="val"><code>""</code></td><td class="type">string</td><td class="desc">Physical NIC name for External switch</td></tr>
-      <tr><td class="name"><code>ubuntu_vhdx_source</code></td><td class="val"><code>"C:\\HyperV\\Images\\ubuntu-24.04-cloudimg-amd64.vhdx"</code></td><td class="type">string</td><td class="desc">Path to Ubuntu 24.04 cloud image VHDX</td></tr>
+      <tr><td class="name"><code>base_vhdx_source</code></td><td class="val"><code>"C:\\HyperV\\Images\\debian-12-genericcloud-amd64.vhdx"</code></td><td class="type">string</td><td class="desc">Path to the base OS cloud image VHDX. Default: Debian 12 Bookworm. Legacy alias <code>ubuntu_vhdx_source</code> still accepted.</td></tr>
     </tbody>
   </table>
 
@@ -195,9 +195,9 @@
       <tr><td class="name"><code>vm_static_ip</code></td><td class="val"><code>""</code></td><td class="type">string</td><td class="desc">Static IP (CIDR). Empty = DHCP</td></tr>
       <tr><td class="name"><code>vm_gateway</code></td><td class="val"><code>""</code></td><td class="type">string</td><td class="desc">Default gateway for static IP config</td></tr>
       <tr><td class="name"><code>vm_dns_servers</code></td><td class="val"><code>["8.8.8.8", "8.8.4.4"]</code></td><td class="type">list(string)</td><td class="desc">DNS servers for the VM</td></tr>
-      <tr><td class="name"><code>vm_hostname</code></td><td class="val"><code>"InsideLLM"</code></td><td class="type">string</td><td class="desc">Hostname for the Ubuntu VM</td></tr>
+      <tr><td class="name"><code>vm_hostname</code></td><td class="val"><code>"InsideLLM"</code></td><td class="type">string</td><td class="desc">Hostname for the Debian VM</td></tr>
       <tr><td class="name"><code>vm_domain</code></td><td class="val"><code>"local"</code></td><td class="type">string</td><td class="desc">Domain name (FQDN and TLS cert)</td></tr>
-      <tr><td class="name"><code>ad_domain_join</code></td><td class="val"><code>false</code></td><td class="type">bool</td><td class="desc">Join the Ubuntu VM to the AD domain</td></tr>
+      <tr><td class="name"><code>ad_domain_join</code></td><td class="val"><code>false</code></td><td class="type">bool</td><td class="desc">Join the Debian VM to the AD domain</td></tr>
       <tr><td class="name"><code>ad_join_user</code></td><td class="val"><code>""</code></td><td class="type">string</td><td class="desc">AD username with domain-join permission</td></tr>
       <tr><td class="name"><code>ad_join_password</code></td><td class="val"><code>""</code><span class="badge-secret">secret &mdash; set in tfvars</span></td><td class="type">string</td><td class="desc">Password for the AD join account</td></tr>
       <tr><td class="name"><code>ad_join_ou</code></td><td class="val"><code>""</code></td><td class="type">string</td><td class="desc">OU for the computer account</td></tr>
@@ -209,7 +209,7 @@
       <tr><td class="name"><code>ldap_user_search_base</code></td><td class="val"><code>""</code></td><td class="type">string</td><td class="desc">Base DN for user lookups</td></tr>
       <tr><td class="name"><code>cockpit_enable</code></td><td class="val"><code>true</code></td><td class="type">bool</td><td class="desc">Install Cockpit and expose at /cockpit/</td></tr>
       <tr><td class="name"><code>ssh_public_key_path</code></td><td class="val"><code>"~/.ssh/id_rsa.pub"</code></td><td class="type">string</td><td class="desc">SSH public key file on the Windows host</td></tr>
-      <tr><td class="name"><code>ssh_admin_user</code></td><td class="val"><code>"insidellm-admin"</code></td><td class="type">string</td><td class="desc">Admin username for the Ubuntu VM</td></tr>
+      <tr><td class="name"><code>ssh_admin_user</code></td><td class="val"><code>"insidellm-admin"</code></td><td class="type">string</td><td class="desc">Admin username for the Debian VM</td></tr>
     </tbody>
   </table>
 

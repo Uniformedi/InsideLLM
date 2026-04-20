@@ -7,7 +7,7 @@ per-department backend.
 
 **Prereqs:**
 - Primary VM (`10.0.0.9`) already green (see `TestPlan_V1.md`).
-- Ubuntu 24.04 cloud image staged on the Hyper-V host.
+- Debian 12 (Bookworm) cloud image staged on the Hyper-V host.
 - OIDC provider (Azure AD or Okta) with a tenant + app registration.
 - Time budget: ~20 minutes apply + smoke.
 

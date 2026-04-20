@@ -169,7 +169,7 @@ interaction — all without modifying the Claude API experience.
                          |          (Windows 11 Pro / Server)            |
                          |                                              |
                          |  +----------------------------------------+  |
-                         |  |         Ubuntu 24.04 LTS               |  |
+                         |  |         Debian 12 (Bookworm)           |  |
                          |  |         SCFW (pip wrapper)              |  |
                          |  |                                         |  |
 +----------+ HTTPS 443   |  |  +-----------------------------------+  |  |
@@ -390,7 +390,7 @@ organizations that want AI capabilities without cloud dependencies.
 |      | Creates VM + attaches cloud-init ISO       |
 |      v                                           |
 |  +--------------------------------------------+  |
-|  | Ubuntu 24.04 LTS VM                        |  |
+|  | Debian 12 (Bookworm) VM                    |  |
 |  |   - Gen 2 (UEFI + Secure Boot)            |  |
 |  |   - 8 vCPU, 32 GB RAM, 80 GB disk         |  |
 |  |   - Internal switch + NAT (isolated)       |  |

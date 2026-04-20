@@ -194,7 +194,7 @@
     </div>
 
     <div class="info-box" id="deployInfo">
-      <strong>Hyper-V (Terraform)</strong> deploys a fully isolated Ubuntu VM with static networking,
+      <strong>Hyper-V (Terraform)</strong> deploys a fully isolated Debian 12 VM with static networking,
       cloud-init provisioning, and infrastructure-as-code. Best for production environments.
     </div>
 
@@ -890,8 +890,8 @@
       <input type="text" id="vhdPath" value="C:\HyperV\VHDs">
     </div>
     <div class="field">
-      <label>Ubuntu VHDX Source</label>
-      <input type="text" id="ubuntuVhdx" value="C:\HyperV\Images\ubuntu-24.04-cloudimg-amd64.vhdx">
+      <label>Base VHDX Source (default: Debian 12 Bookworm)</label>
+      <input type="text" id="baseVhdx" value="C:\HyperV\Images\debian-12-genericcloud-amd64.vhdx">
     </div>
 
     <div class="row">
@@ -1020,7 +1020,7 @@ function selectDeploy(path, evt) {
   const hvFields = document.getElementById('hypervNetworkFields');
 
   if (path === 'wsl2') {
-    info.innerHTML = '<strong>WSL2</strong> is the fastest way to get started. It runs Ubuntu 24.04 inside Windows with native GPU support. No Terraform, Hyper-V, or separate VM needed.';
+    info.innerHTML = '<strong>WSL2</strong> is the fastest way to get started. It runs Debian 12 (Bookworm) inside Windows with native GPU support. No Terraform, Hyper-V, or separate VM needed.';
     hvFields.style.display = 'none';
     document.getElementById('adDomainJoinSection').style.display = 'none';
     document.getElementById('ollamaSeparateVmRow').style.display = 'none';
@@ -1557,7 +1557,7 @@ vm_path              = "${v('vmPath').replace(/\\/g, '\\\\')}"
 vm_vhd_path          = "${v('vhdPath').replace(/\\/g, '\\\\')}"
 vm_hostname          = "${v('hostname')}"
 vm_domain            = "${v('domain')}"
-ubuntu_vhdx_source   = "${v('ubuntuVhdx').replace(/\\/g, '\\\\')}"
+base_vhdx_source     = "${v('baseVhdx').replace(/\\/g, '\\\\')}"
 
 # Network
 vm_switch_name    = "InsideLLM"
@@ -1825,7 +1825,7 @@ function generateNextSteps() {
       <li>Save the downloaded <code>terraform.tfvars</code> to the <code>terraform\\</code> folder in the project directory</li>
       <li>Open <strong>PowerShell as Administrator</strong> and run:<br>
         <code>.\\scripts\\SetupInstall.ps1</code><br>
-        <em>(enables Hyper-V, downloads Ubuntu image, configures WinRM, then automatically runs terraform init &rarr; plan &rarr; apply)</em></li>
+        <em>(enables Hyper-V, downloads Debian 12 image, configures WinRM, then automatically runs terraform init &rarr; plan &rarr; apply)</em></li>
       <li>If prompted, <strong>reboot</strong> and re-run scripts\\SetupInstall.ps1</li>
       <li>Optionally set up port forwarding:<br>
         <code>.\\scripts\\Port-Forward-InsideLLM.ps1</code></li>

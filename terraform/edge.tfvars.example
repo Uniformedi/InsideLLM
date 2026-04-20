@@ -28,7 +28,7 @@ vm_memory_startup_bytes = 4294967296                      # 4 GB
 vm_disk_size_bytes      = 34359738368                     # 32 GB
 vm_path             = "C:\\HyperV\\VMs"
 vm_vhd_path         = "C:\\HyperV\\VHDs"
-ubuntu_vhdx_source  = "C:\\HyperV\\Images\\ubuntu-24.04-cloudimg-amd64.vhdx"
+base_vhdx_source    = "C:\\HyperV\\Images\\debian-12-genericcloud-amd64.vhdx"
 
 # ---- Network (static; keepalived VIP assumes deterministic IPs) -------------
 vm_switch_name      = "InsideLLM"

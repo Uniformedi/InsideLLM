@@ -1,9 +1,9 @@
 # InsideLLM at Organization — 5-Year Annual Cost Forecast
 
 **Prepared by:** Uniformedi LLC
-**Date:** 2026-04-16 (rev. 2026-04-19: RHEL 9 guest OS, labor breakout)
+**Date:** 2026-04-16 (rev. 2026-04-20: Debian 12 guest OS default, RHEL 9 as regulated-tenant add-on)
 **Platform version:** 3.1
-**Guest OS:** Red Hat Enterprise Linux 9 (this revision; supersedes Ubuntu 24.04 baseline)
+**Guest OS:** Debian 12 (Bookworm) — default; RHEL 9 available as a paid add-on for tenants with a specific Red Hat mandate. Supersedes both the earlier Ubuntu 24.04 baseline and the RHEL-9-default revision.
 **Currency:** USD, nominal (excludes inflation unless noted)
 **Horizon:** Year 1 (2026) through Year 5 (2030)
 
