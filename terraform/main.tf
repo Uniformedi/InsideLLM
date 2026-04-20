@@ -591,6 +591,10 @@ locals {
     platform_version                   = trimspace(file("${path.module}/../VERSION"))
     governance_hub_instance_id         = var.vm_name
     governance_hub_instance_name       = var.governance_hub_instance_name != "" ? var.governance_hub_instance_name : var.vm_name
+    # Canonical sessions (Phase 3.3) — consumed by sessions-bridge-pipeline.py
+    # env in the open-webui container.
+    session_security_tier              = var.session_security_tier
+    session_data_region                = var.session_data_region
     governance_hub_sync_schedule       = var.governance_hub_sync_schedule
     governance_hub_supervisor_emails   = var.governance_hub_supervisor_emails
     governance_hub_advisor_model       = var.governance_hub_advisor_model
@@ -727,6 +731,9 @@ locals {
     policy_engine_fail_mode    = var.policy_engine_fail_mode
     opa_zip_b64                = var.policy_engine_enable ? filebase64(data.archive_file.opa_policies[0].output_path) : ""
     opa_policy_pipeline_py     = var.policy_engine_enable ? file("${path.module}/../configs/open-webui/opa-policy-pipeline.py") : ""
+    sessions_bridge_pipeline_py = local.effective_governance_hub_enable ? file("${path.module}/../configs/open-webui/sessions-bridge-pipeline.py") : ""
+    session_security_tier      = var.session_security_tier
+    session_data_region        = var.session_data_region
     ollama_enable              = var.ollama_enable && !var.ollama_separate_vm
     ad_domain_join             = var.ad_domain_join
     ad_join_user               = var.ad_join_user

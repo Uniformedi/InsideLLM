@@ -160,6 +160,10 @@ async def rbac_middleware(request: Request, call_next):
     - Safe methods (GET/HEAD/OPTIONS): require 'view'.
     - Mutations: require 'admin' (approve/reject override to 'approver'
       is enforced explicitly in the changes router via require_approver).
+    - Service-to-service: an Authorization bearer token matching the
+      existing LITELLM_MASTER_KEY is accepted as admin-equivalent. Used by
+      in-cluster callers (OWUI sessions bridge, LiteLLM cost callback)
+      running behind the same trust boundary. No new secret to manage.
     """
     from starlette.responses import JSONResponse
 
@@ -170,6 +174,19 @@ async def rbac_middleware(request: Request, call_next):
     path = request.url.path
     if _is_exempt(path):
         return await call_next(request)
+
+    # Service-to-service bypass: trusted internal callers present the
+    # LITELLM_MASTER_KEY as a bearer token. Must be non-empty to avoid
+    # accidental empty-string matches when auth isn't configured.
+    if settings.litellm_master_key:
+        auth_header = request.headers.get("authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header[7:].strip()
+            if token and token == settings.litellm_master_key:
+                request.state.user_email = "service:internal"
+                request.state.user_id = "service:internal"
+                request.state.user_roles = [ROLE_ADMIN, ROLE_VIEW]
+                return await call_next(request)
 
     roles = get_roles_from_request(request)
     if not roles:

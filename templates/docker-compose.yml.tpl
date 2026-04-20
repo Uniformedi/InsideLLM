@@ -225,6 +225,22 @@ services:
       OAUTH_SCOPES: "openid email profile"
 %{ endif }
 %{ endif }
+%{ if governance_hub_enable ~}
+      # Canonical sessions bridge (Phase 3.3). Consumed by
+      # sessions-bridge-pipeline.py to bind every OWUI chat to a
+      # canonical session in governance-hub and stamp session_id into
+      # request metadata for LiteLLM cost attribution.
+      INSIDELLM_GOVHUB_URL: "http://governance-hub:8090"
+      INSIDELLM_TENANT_ID: "${governance_hub_instance_id}"
+      INSIDELLM_DEFAULT_TIER: "${session_security_tier}"
+      INSIDELLM_DATA_REGION: "${session_data_region}"
+      # Service-to-service bearer — reuses LITELLM_MASTER_KEY so there's
+      # no extra secret to provision. Governance-hub's rbac_middleware
+      # accepts this token as admin-equivalent when admin_auth_mode != "none".
+      # Phase 4.x: replace with a dedicated OWUI service-account token
+      # obtained via Keycloak client_credentials + audience restriction.
+      INSIDELLM_GOVHUB_TOKEN: "$${LITELLM_MASTER_KEY}"
+%{ endif ~}
     volumes:
       - /opt/InsideLLM/data/open-webui:/app/backend/data
       - /opt/InsideLLM/pipelines:/app/backend/pipelines

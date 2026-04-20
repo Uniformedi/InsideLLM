@@ -388,6 +388,18 @@ write_files:
     owner: root:root
     content: |
       ${indent(6, data_connector_tool_py)}
+
+  # --- Canonical Sessions Bridge (Phase 3.3) ---
+  # Filter-pipeline that binds every OWUI chat to a canonical session in
+  # governance-hub. On first inbound it calls POST /api/v1/sessions and
+  # stamps the session_id into request.metadata so LiteLLM cost callbacks
+  # attribute tokens/cost per session. Fails open by default — chat survives
+  # a governance-hub outage; reconciliation picks up orphaned chats later.
+  - path: /opt/InsideLLM/pipelines/sessions-bridge-pipeline.py
+    permissions: "0644"
+    owner: root:root
+    content: |
+      ${indent(6, sessions_bridge_pipeline_py)}
 %{ endif ~}
 
 %{ if keycloak_enable ~}
