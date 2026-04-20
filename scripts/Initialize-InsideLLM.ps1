@@ -6,7 +6,7 @@
 .DESCRIPTION
     This script performs the foundational setup required before deploying
     the InsideLLM application stack:
-      1. Install/verify WSL2 and import the Ubuntu 24.04 distro
+      1. Install/verify WSL2 and import the Debian 12 (Bookworm) distro
       2. Install/verify Docker Engine inside WSL2
       3. Install Supply Chain Firewall (SCFW) as a pip wrapper
       4. Generate or deploy TLS certificates
@@ -124,18 +124,18 @@ $hasDistro = $distros | Where-Object { $_.Trim().Replace("`0","") -eq $WslDistro
 if (-not $hasDistro) {
     Write-Warn "Creating '$WslDistroName' WSL2 distro (this may take a few minutes)..."
 
-    # Download Ubuntu 24.04 rootfs (cloud image root tarball, works with wsl --import)
-    $rootfsUrl = "https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64-root.tar.xz"
-    $rootfsPath = Join-Path $env:TEMP "ubuntu-noble-wsl-rootfs.tar.xz"
+    # Download Debian 12 (Bookworm) rootfs — WSL-compatible nocloud build.
+    $rootfsUrl = "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-nocloud-amd64.tar.xz"
+    $rootfsPath = Join-Path $env:TEMP "debian-bookworm-wsl-rootfs.tar.xz"
 
     if (-not (Test-Path $rootfsPath)) {
-        Write-Host "  Downloading Ubuntu 24.04 rootfs..."
+        Write-Host "  Downloading Debian 12 rootfs..."
         $ProgressPreference = 'SilentlyContinue'
         Invoke-WebRequest -Uri $rootfsUrl -OutFile $rootfsPath -UseBasicParsing
         $ProgressPreference = 'Continue'
-        Write-Ok "Ubuntu 24.04 rootfs downloaded"
+        Write-Ok "Debian 12 rootfs downloaded"
     } else {
-        Write-Ok "Ubuntu 24.04 rootfs already cached"
+        Write-Ok "Debian 12 rootfs already cached"
     }
 
     # Create install directory

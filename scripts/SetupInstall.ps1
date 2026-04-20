@@ -7,7 +7,7 @@
     This script prepares the host, verifies prerequisites, and runs Terraform:
     1. Enables Hyper-V if not already enabled
     2. Configures WinRM for Terraform's Hyper-V provider
-    3. Downloads the Ubuntu 24.04 cloud image (skips if recent VHDX exists)
+    3. Downloads the Debian 12 (Bookworm) generic cloud image (skips if recent VHDX exists)
     4. Converts it to VHDX format for Hyper-V Gen2 VMs
     5. Installs genisoimage in WSL for cloud-init ISO creation
     6. Verifies all prerequisites (Terraform, SSH key)
@@ -163,13 +163,16 @@ Write-Step "Creating directory structure"
 }
 
 # =============================================================================
-# Step 4: Download Ubuntu 24.04 Cloud Image
+# Step 4: Download Debian 12 (Bookworm) Generic Cloud Image
 # =============================================================================
-Write-Step "Ubuntu 24.04 Cloud Image"
+Write-Step "Debian 12 (Bookworm) Cloud Image"
 
-$ubuntuUrl = "https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img"
-$imgPath   = Join-Path $ImageDir "ubuntu-24.04-cloudimg-amd64.img"
-$vhdxPath  = Join-Path $ImageDir "ubuntu-24.04-cloudimg-amd64.vhdx"
+# Debian Cloud's "genericcloud" image is the hardware-agnostic build suitable
+# for Hyper-V. The "generic" image also works; genericcloud is smaller and
+# strips out non-cloud kernel modules we don't need.
+$debianUrl = "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-genericcloud-amd64.qcow2"
+$imgPath   = Join-Path $ImageDir "debian-12-genericcloud-amd64.qcow2"
+$vhdxPath  = Join-Path $ImageDir "debian-12-genericcloud-amd64.vhdx"
 
 # Skip download+conversion if VHDX exists and was created/modified in the last 7 days
 $vhdxRecent = $false
@@ -185,10 +188,10 @@ if (($SkipImageDownload -or $vhdxRecent) -and (Test-Path $vhdxPath)) {
     Write-Ok "VHDX already exists at $vhdxPath$ageMsg - skipping download and conversion"
 } else {
     if (-not (Test-Path $imgPath)) {
-        Write-Host "  Downloading Ubuntu 24.04 cloud image (~700MB)..."
-        Write-Host "  From: $ubuntuUrl"
+        Write-Host "  Downloading Debian 12 genericcloud image (~350MB)..."
+        Write-Host "  From: $debianUrl"
         $ProgressPreference = 'SilentlyContinue'
-        Invoke-WebRequest -Uri $ubuntuUrl -OutFile $imgPath -UseBasicParsing
+        Invoke-WebRequest -Uri $debianUrl -OutFile $imgPath -UseBasicParsing
         $ProgressPreference = 'Continue'
         Write-Ok "Downloaded to $imgPath"
     } else {

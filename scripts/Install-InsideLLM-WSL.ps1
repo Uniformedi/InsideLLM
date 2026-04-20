@@ -1,11 +1,11 @@
 #Requires -RunAsAdministrator
 <#
 .SYNOPSIS
-    Deploy InsideLLM on WSL2 Ubuntu 24.04 (no Terraform or Hyper-V required).
+    Deploy InsideLLM on WSL2 Debian 12 (Bookworm) (no Terraform or Hyper-V required).
 
 .DESCRIPTION
     This script installs and configures the full InsideLLM stack inside WSL2:
-      - WSL2 with Ubuntu 24.04
+      - WSL2 with Debian 12 (Bookworm)
       - Docker Engine inside WSL2
       - PostgreSQL, Redis, LiteLLM, Open WebUI, Nginx, optionally Ollama
       - TLS certificates (self-signed or user-provided)
@@ -283,18 +283,20 @@ $hasDistro = $distros | Where-Object { $_.Trim().Replace("`0","") -eq $WslDistro
 if (-not $hasDistro) {
     Write-Warn "Creating '$WslDistroName' WSL2 distro (this may take a few minutes)..."
 
-    # Download Ubuntu 24.04 rootfs (cloud image root tarball, works with wsl --import)
-    $rootfsUrl = "https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64-root.tar.xz"
-    $rootfsPath = Join-Path $env:TEMP "ubuntu-noble-wsl-rootfs.tar.xz"
+    # Download Debian 12 (Bookworm) rootfs. Debian publishes a WSL-compatible
+    # root tarball under cloud.debian.org/images/cloud/; this works with
+    # `wsl --import` identically to the Ubuntu cloudimg rootfs.
+    $rootfsUrl = "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-nocloud-amd64.tar.xz"
+    $rootfsPath = Join-Path $env:TEMP "debian-bookworm-wsl-rootfs.tar.xz"
 
     if (-not (Test-Path $rootfsPath)) {
-        Write-Host "  Downloading Ubuntu 24.04 rootfs..."
+        Write-Host "  Downloading Debian 12 rootfs..."
         $ProgressPreference = 'SilentlyContinue'
         Invoke-WebRequest -Uri $rootfsUrl -OutFile $rootfsPath -UseBasicParsing
         $ProgressPreference = 'Continue'
-        Write-Ok "Ubuntu 24.04 rootfs downloaded"
+        Write-Ok "Debian 12 rootfs downloaded"
     } else {
-        Write-Ok "Ubuntu 24.04 rootfs already cached"
+        Write-Ok "Debian 12 rootfs already cached"
     }
 
     # Create install directory
