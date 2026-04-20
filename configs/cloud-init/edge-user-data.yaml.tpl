@@ -1,6 +1,6 @@
 #cloud-config
 # =============================================================================
-# Cloud-init: Ubuntu 24.04 provisioning for InsideLLM Edge Router VM
+# Cloud-init: Debian 12 (Bookworm) provisioning for InsideLLM Edge Router VM
 # -----------------------------------------------------------------------------
 # Role: vm_role = "edge". This VM is intentionally thin — it only runs three
 # containers (oauth2-proxy, openresty, keepalived) and forwards to department
@@ -220,8 +220,8 @@ write_files:
 runcmd:
   # --- Install Docker Engine -----------------------------------------------
   - |
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" > /etc/apt/sources.list.d/docker.list
+    curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" > /etc/apt/sources.list.d/docker.list
     apt-get update
     apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
     systemctl enable docker

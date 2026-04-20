@@ -1400,6 +1400,12 @@ log "    First-user signup on the sign-in page — becomes the admin."
 log "    Catalog entries use backend.type=activepieces_trigger; same HMAC"
 log "    envelope as n8n (secret = ACTIVEPIECES_WEBHOOK_SECRET)"
 %{ endif ~}
+%{ if desktop_enable ~}
+log "  XFCE Desktop (xrdp): rdp://$VM_IP:3389"
+log "    Reachable via Guacamole: https://$VM_IP/remote/"
+log "    Login: ${ssh_admin_user} + xrdp_password from /opt/InsideLLM/.env"
+log "    Theme: Greybird-Dark + Papirus-Dark (session starts xfce4-session)"
+%{ endif ~}
 %{ if claude_code_enable ~}
 log ""
 log "  Claude Code CLI installed for ${ssh_admin_user}."

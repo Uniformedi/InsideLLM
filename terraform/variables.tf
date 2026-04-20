@@ -111,10 +111,18 @@ variable "vm_switch_adapter" {
   default     = ""
 }
 
-variable "ubuntu_vhdx_source" {
-  description = "Path to the Ubuntu 24.04 cloud image VHDX on the Hyper-V host (created by SetupInstall.ps1)"
+variable "base_vhdx_source" {
+  description = "Path to the base OS cloud image VHDX on the Hyper-V host (created by SetupInstall.ps1). Default: Debian 12 Bookworm generic cloud image."
   type        = string
-  default     = "C:\\HyperV\\Images\\ubuntu-24.04-cloudimg-amd64.vhdx"
+  default     = "C:\\HyperV\\Images\\debian-12-genericcloud-amd64.vhdx"
+}
+
+# Legacy alias — keeps older terraform.tfvars working. Remove once all
+# environments have migrated to `base_vhdx_source`.
+variable "ubuntu_vhdx_source" {
+  description = "Deprecated alias for base_vhdx_source. Set base_vhdx_source instead."
+  type        = string
+  default     = ""
 }
 
 # =============================================================================
@@ -1075,6 +1083,15 @@ variable "claude_code_enable" {
   description = "Install Claude Code CLI for the admin user on this VM. Auto-skipped for vm_role=edge|voice|storage. Default true."
   type        = bool
   default     = true
+}
+
+# XFCE desktop + xrdp for Guacamole-friendly remote access. Off by default
+# so headless VMs stay headless. Turn on for operator workstations / jump
+# hosts where a browser-based Linux desktop via Guacamole is wanted.
+variable "desktop_enable" {
+  description = "Install XFCE desktop + xrdp on this VM. Enables Guacamole RDP access via port 3389. Default false."
+  type        = bool
+  default     = false
 }
 
 # -----------------------------------------------------------------------------

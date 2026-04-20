@@ -50,9 +50,20 @@ packages:
   - unzip
   - git
   - genisoimage
-  # Ubuntu Desktop Experience
-  - ubuntu-desktop-minimal
+%{ if desktop_enable ~}
+  # --- XFCE desktop + xrdp (Guacamole-friendly). Gated on desktop_enable. --
+  # Skip recommends to keep the install lean; add `xfce4-goodies` manually if
+  # operators want the full bundle. dbus-x11 + policykit-1-gnome prevent
+  # session-startup hell on xrdp logins.
+  - task-xfce-desktop
   - xrdp
+  - xorgxrdp
+  - xfce4-terminal
+  - dbus-x11
+  - policykit-1-gnome
+  - greybird-gtk-theme
+  - papirus-icon-theme
+%{ endif ~}
 %{ if ad_domain_join ~}
   # Active Directory domain join
   - realmd
@@ -585,8 +596,8 @@ runcmd:
 
   # --- Install Docker Engine ---
   - |
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" > /etc/apt/sources.list.d/docker.list
+    curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" > /etc/apt/sources.list.d/docker.list
     apt-get update
     apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
     systemctl enable docker
@@ -627,8 +638,15 @@ runcmd:
     crontab "$CRON_TMP"
     rm -f "$CRON_TMP"
 
-  # --- Configure xrdp for Remote Desktop ---
+%{ if desktop_enable ~}
+  # --- Configure xrdp + XFCE for Guacamole-friendly Remote Desktop --------
+  # Notes:
+  #   * xrdp on Debian can't read /etc/ssl/private/ssl-cert-snakeoil.key by
+  #     default; `xrdp` user needs to be in `ssl-cert` group.
+  #   * ~/.xsession must start xfce4-session or xrdp falls back to a broken
+  #     default Xsession that tries GNOME and fails to a black screen.
   - |
+    adduser xrdp ssl-cert 2>/dev/null || true
     systemctl enable xrdp
     systemctl start xrdp
     # Allow the admin user to log in via RDP
@@ -636,6 +654,25 @@ runcmd:
     # Set a password for RDP login (SSH key-only user needs one for xrdp)
     echo "${ssh_admin_user}:${xrdp_password}" | chpasswd
     sed -i 's/^lock_passwd: true/lock_passwd: false/' /etc/cloud/cloud.cfg.d/*.cfg 2>/dev/null || true
+    # ~/.xsession — force XFCE as the RDP session target
+    XSESS=/home/${ssh_admin_user}/.xsession
+    echo 'xfce4-session' > "$XSESS"
+    chown ${ssh_admin_user}:${ssh_admin_user} "$XSESS"
+    chmod 644 "$XSESS"
+    # Default theme: Greybird-Dark + Papirus-Dark (modern look via xrdp)
+    XFCONF_DIR=/home/${ssh_admin_user}/.config/xfce4/xfconf/xfce-perchannel-xml
+    mkdir -p "$XFCONF_DIR"
+    cat > "$XFCONF_DIR/xsettings.xml" <<'XSETTINGS'
+    <?xml version="1.0" encoding="UTF-8"?>
+    <channel name="xsettings" version="1.0">
+      <property name="Net" type="empty">
+        <property name="ThemeName" type="string" value="Greybird-dark"/>
+        <property name="IconThemeName" type="string" value="Papirus-Dark"/>
+      </property>
+    </channel>
+    XSETTINGS
+    chown -R ${ssh_admin_user}:${ssh_admin_user} /home/${ssh_admin_user}/.config
+%{ endif ~}
 
   # --- Configure UFW Firewall ---
   - |
@@ -644,7 +681,9 @@ runcmd:
     ufw allow ssh
     ufw allow 80/tcp
     ufw allow 443/tcp
+%{ if desktop_enable ~}
     ufw allow 3389/tcp comment "xRDP"
+%{ endif ~}
     ufw allow 4000/tcp comment "LiteLLM Admin"
     ufw allow 5050/tcp comment "pgAdmin"
 %{ if ollama_enable ~}

@@ -140,7 +140,9 @@ vm_path              = "${replace(var.vm_path, "\\", "\\\\")}"
 vm_vhd_path          = "${replace(var.vm_vhd_path, "\\", "\\\\")}"
 vm_hostname          = "${var.vm_hostname}"
 vm_domain            = "${var.vm_domain}"
-ubuntu_vhdx_source   = "${replace(var.ubuntu_vhdx_source, "\\", "\\\\")}"
+base_vhdx_source     = "${replace(local.effective_base_vhdx_source, "\\", "\\\\")}"
+# legacy alias emitted for back-compat with tfvars files that still set ubuntu_vhdx_source
+ubuntu_vhdx_source   = "${replace(local.effective_base_vhdx_source, "\\", "\\\\")}"
 
 # Network
 vm_switch_name    = "${var.vm_switch_name}"
@@ -421,6 +423,10 @@ locals {
 
   # Per-VM Claude Code CLI — skip the bare-bones roles that don't host humans.
   effective_claude_code_enable = var.claude_code_enable && !contains(["edge", "voice", "storage"], var.vm_role)
+
+  # Base VHDX source — prefer the new `base_vhdx_source` variable; fall back to
+  # the legacy `ubuntu_vhdx_source` for environments that haven't migrated yet.
+  effective_base_vhdx_source = var.ubuntu_vhdx_source != "" ? var.ubuntu_vhdx_source : var.base_vhdx_source
 
   # Stream B — role-aware remote logging.
   # Promtail ships logs either to a local Loki (primary) or across the fleet to
@@ -703,6 +709,7 @@ locals {
     setup_html                 = file("${path.module}/../html/Setup.html")
     deployment_tfvars_b64      = base64encode(local.deployment_tfvars)
     xrdp_password              = local.xrdp_password
+    desktop_enable             = var.desktop_enable
     docforge_enable            = local.effective_docforge_enable
     docforge_zip_b64           = local.effective_docforge_enable ? filebase64(data.archive_file.docforge[0].output_path) : ""
     docforge_tool_py           = local.effective_docforge_enable ? file("${path.module}/../configs/open-webui/docforge-tool.py") : ""
@@ -794,6 +801,7 @@ locals {
       apt_mirror_host        = var.apt_mirror_host
       docker_mirror_host     = var.docker_mirror_host
       claude_code_enable     = local.effective_claude_code_enable
+      desktop_enable         = var.desktop_enable
       ssh_admin_user         = var.ssh_admin_user
       vm_role                = var.vm_role
       department             = var.department
@@ -801,6 +809,7 @@ locals {
       keycloak_realm_name    = var.keycloak_realm_name
       n8n_enable             = var.n8n_enable
       activepieces_enable    = var.activepieces_enable
+      desktop_enable         = var.desktop_enable
       fleet_primary_host     = var.fleet_primary_host
     })
   })
@@ -918,7 +927,7 @@ resource "null_resource" "prepare_vm_disk" {
   triggers = {
     vm_name            = var.vm_name
     vhd_path           = var.vm_vhd_path
-    ubuntu_vhdx_source = var.ubuntu_vhdx_source
+    ubuntu_vhdx_source = local.effective_base_vhdx_source
     disk_size          = var.vm_disk_size_bytes
   }
 
@@ -940,7 +949,7 @@ resource "null_resource" "prepare_vm_disk" {
         Remove-Item -Path $destVhdx -Force
       }
       Write-Host "Copying Ubuntu cloud image to $destVhdx ..."
-      Copy-Item -Path "${var.ubuntu_vhdx_source}" -Destination $destVhdx -Force
+      Copy-Item -Path "${local.effective_base_vhdx_source}" -Destination $destVhdx -Force
 
       # Resize to target size
       Write-Host "Resizing disk to ${var.vm_disk_size_bytes / 1073741824} GB ..."
@@ -1140,7 +1149,7 @@ resource "null_resource" "prepare_ollama_vm_disk" {
       New-Item -ItemType Directory -Force -Path "${var.vm_vhd_path}"
       $destVhdx = Join-Path "${var.vm_vhd_path}" "${local.ollama_vm_name}-boot.vhdx"
       if (-not (Test-Path $destVhdx)) {
-        Copy-Item -Path "${var.ubuntu_vhdx_source}" -Destination $destVhdx
+        Copy-Item -Path "${local.effective_base_vhdx_source}" -Destination $destVhdx
         Resize-VHD -Path $destVhdx -SizeBytes ${var.ollama_vm_disk_size_bytes}
         Write-Host "Ollama VM boot disk created: $destVhdx"
       } else {
