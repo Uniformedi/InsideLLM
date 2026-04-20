@@ -80,6 +80,10 @@ services:
 %{ endif ~}
 %{ if governance_hub_enable ~}
       GOVERNANCE_HUB_URL: "http://governance-hub:8090"
+      # Canonical sessions (Phase 3.3) — consumed by session_cost.py
+      # success callback. LITELLM_MASTER_KEY is already in this env;
+      # the callback reads it directly.
+      INSIDELLM_GOVHUB_URL: "http://governance-hub:8090"
 %{ endif ~}
       # --- DLP Guardrail (Layer 2 — gateway-level, covers all clients) ---
       DLP_ENABLED: "${dlp_enabled}"

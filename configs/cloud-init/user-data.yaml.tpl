@@ -116,6 +116,19 @@ write_files:
     content: |
       ${indent(6, dlp_guardrail_py)}
 
+%{ if governance_hub_enable ~}
+  # --- LiteLLM Session Cost Callback (Phase 3.3) ---
+  # Attributes every successful LLM call's token usage + cost to the
+  # canonical session the OWUI sessions-bridge pipeline stamped into
+  # request metadata. POSTs to governance-hub /api/v1/sessions/{id}/cost.
+  # Authenticates via LITELLM_MASTER_KEY (service-to-service bearer).
+  - path: /opt/InsideLLM/litellm-callbacks/session_cost.py
+    permissions: "0644"
+    owner: root:root
+    content: |
+      ${indent(6, session_cost_py)}
+%{ endif ~}
+
   # --- Nginx Config ---
   - path: /opt/InsideLLM/nginx/nginx.conf
     permissions: "0644"

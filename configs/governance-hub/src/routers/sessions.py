@@ -344,6 +344,41 @@ async def close_session(
     return {"session_id": str(sid), "state": "closed"}
 
 
+class CostRecord(BaseModel):
+    prompt_tokens: int = Field(default=0, ge=0)
+    completion_tokens: int = Field(default=0, ge=0)
+    total_tokens: int = Field(default=0, ge=0)
+    cost_usd: float = Field(default=0.0, ge=0.0)
+    model: str = "unknown"
+    latency_ms: int = Field(default=0, ge=0)
+    error: bool = False
+
+
+@router.post("/{session_id}/cost", dependencies=[require_view])
+async def record_cost(session_id: str, body: CostRecord) -> dict[str, Any]:
+    """Internal endpoint called by LiteLLM's session_cost success callback.
+
+    Trusted service-to-service call (admitted by rbac_middleware via the
+    LITELLM_MASTER_KEY bearer token). Idempotency is best-effort — the
+    caller does not retry on success.
+    """
+    sid = _parse_session_id(session_id)
+    async with AsyncSessionLocal() as db:
+        await svc.record_cost(
+            db,
+            session_id=sid,
+            prompt_tokens=body.prompt_tokens,
+            completion_tokens=body.completion_tokens,
+            total_tokens=body.total_tokens,
+            cost_usd=body.cost_usd,
+            model=body.model,
+            latency_ms=body.latency_ms,
+            error=body.error,
+        )
+        await db.commit()
+    return {"session_id": str(sid), "recorded": True}
+
+
 @router.get("/{session_id}/events", dependencies=[require_view])
 async def get_session_events(
     session_id: str,

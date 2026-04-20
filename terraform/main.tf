@@ -493,6 +493,7 @@ locals {
     sso_enabled               = var.sso_provider != "none"
     sso_group_mapping_enabled = var.sso_provider != "none" && length(var.sso_group_mapping) > 0
     sso_group_field           = var.sso_group_field
+    governance_hub_enable     = local.effective_governance_hub_enable
   })
 }
 
@@ -698,6 +699,7 @@ locals {
     humility_callback_py       = file("${path.module}/../configs/litellm/callbacks/humility_prompt.py")
     humility_guardrail_py      = file("${path.module}/../configs/litellm/callbacks/humility_guardrail.py")
     dlp_guardrail_py           = file("${path.module}/../configs/litellm/callbacks/dlp_guardrail.py")
+    session_cost_py            = local.effective_governance_hub_enable ? file("${path.module}/../configs/litellm/callbacks/session_cost.py") : ""
     setup_html                 = file("${path.module}/../html/Setup.html")
     deployment_tfvars_b64      = base64encode(local.deployment_tfvars)
     xrdp_password              = local.xrdp_password

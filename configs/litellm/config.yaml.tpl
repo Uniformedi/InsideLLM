@@ -102,7 +102,10 @@ litellm_settings:
   drop_params: true
 
   # Enable dynamic rate limiting + Humility (prompt + guardrail) + DLP guardrail
-  callbacks: ["dynamic_rate_limiter_v3", "callbacks.humility_prompt.proxy_handler_instance", "callbacks.humility_guardrail.proxy_handler_instance", "callbacks.dlp_guardrail.proxy_handler_instance"]
+  # + canonical session cost attribution (Phase 3.3). session_cost runs only when
+  # governance-hub is deployed — otherwise the callback file isn't written and
+  # loading it would error.
+  callbacks: ["dynamic_rate_limiter_v3", "callbacks.humility_prompt.proxy_handler_instance", "callbacks.humility_guardrail.proxy_handler_instance", "callbacks.dlp_guardrail.proxy_handler_instance"%{ if governance_hub_enable }, "callbacks.session_cost.proxy_handler_instance"%{ endif }]
   custom_callback_path: "/app/callbacks"
 
   # Count total tokens for rate limit enforcement

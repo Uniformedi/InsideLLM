@@ -518,6 +518,77 @@ async def create_session(
 
 
 # ---------------------------------------------------------------------------
+# Cost attribution (LiteLLM success callback target)
+# ---------------------------------------------------------------------------
+
+
+async def record_cost(
+    db: AsyncSession,
+    *,
+    session_id: uuid.UUID,
+    prompt_tokens: int,
+    completion_tokens: int,
+    total_tokens: int,
+    cost_usd: float,
+    model: str,
+    latency_ms: int,
+    error: bool = False,
+) -> None:
+    """Attribute LiteLLM usage to a canonical session.
+
+    Idempotency: each call emits a new cost event; session totals are
+    incremented atomically under the session's advisory lock. LiteLLM
+    retries are rare (proxy does not retry on success hook), but if they
+    happen the net effect is an over-count caught by the reconciler.
+    """
+    await _lock_session(db, session_id)
+
+    row = (
+        await db.execute(
+            text("SELECT tenant_id FROM sessions WHERE session_id = :sid FOR UPDATE"),
+            {"sid": str(session_id)},
+        )
+    ).first()
+    if row is None:
+        return  # unknown session — likely a chat without the bridge; ignore
+
+    await db.execute(
+        text(
+            """
+            UPDATE sessions
+               SET total_tokens  = total_tokens  + :tok,
+                   total_cost_usd = total_cost_usd + :cost
+             WHERE session_id = :sid
+            """
+        ),
+        {
+            "sid": str(session_id),
+            "tok": max(0, int(total_tokens or 0)),
+            "cost": max(0.0, float(cost_usd or 0.0)),
+        },
+    )
+
+    await append_session_event(
+        db,
+        session_id=session_id,
+        tenant_id=row.tenant_id,
+        event_type="session.cost_recorded" if not error else "session.call_failed",
+        actor_type="system",
+        actor_sub=None,
+        surface=None,
+        payload_metadata={
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "total_tokens": total_tokens,
+            "cost_usd": cost_usd,
+            "model": model,
+            "latency_ms": latency_ms,
+            "error": bool(error),
+        },
+    )
+
+
+# ---------------------------------------------------------------------------
 # Retention expiry + tombstone
 # ---------------------------------------------------------------------------
 
