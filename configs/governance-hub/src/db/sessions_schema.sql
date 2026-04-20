@@ -292,6 +292,46 @@ CREATE INDEX IF NOT EXISTS session_cost_agent_idx  ON session_cost (agent_manife
 
 
 -- -----------------------------------------------------------------------------
+-- session_events NOTIFY trigger — feeds the in-process SessionEventsBus
+-- -----------------------------------------------------------------------------
+-- Emits a Postgres NOTIFY on every session_events insert with a minimal
+-- payload (session_id, tenant_id, event_seq, event_id, event_type,
+-- self_hash, surface, actor_sub, actor_type, created_at). The
+-- governance-hub bus fans this out to per-session SSE subscribers so
+-- adapters and the PWA see events as they land with no polling.
+--
+-- NOTIFY payload is capped at 8000 bytes by Postgres — we intentionally
+-- do NOT include payload_metadata (can be arbitrarily large). Clients
+-- fetch full event bodies via GET /api/v1/sessions/{id}/events.
+
+CREATE OR REPLACE FUNCTION _session_events_notify() RETURNS TRIGGER AS $$
+DECLARE
+  msg text;
+BEGIN
+  msg := json_build_object(
+    'session_id',  NEW.session_id,
+    'tenant_id',   NEW.tenant_id,
+    'event_seq',   NEW.event_seq,
+    'event_id',    NEW.event_id,
+    'event_type',  NEW.event_type,
+    'self_hash',   NEW.self_hash,
+    'surface',     NEW.surface,
+    'actor_sub',   NEW.actor_sub,
+    'actor_type',  NEW.actor_type,
+    'created_at',  NEW.created_at
+  )::text;
+  PERFORM pg_notify('session_events', msg);
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS session_events_notify ON session_events;
+CREATE TRIGGER session_events_notify
+  AFTER INSERT ON session_events
+  FOR EACH ROW EXECUTE FUNCTION _session_events_notify();
+
+
+-- -----------------------------------------------------------------------------
 -- updated_at trigger
 -- -----------------------------------------------------------------------------
 

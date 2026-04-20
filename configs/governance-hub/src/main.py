@@ -286,6 +286,23 @@ async def startup():
     except Exception as e:
         logger.warning(f"Agent column migration skipped: {e}")
 
+    # Canonical sessions schema (Phase 3.3). Raw DDL file — not managed by
+    # SQLAlchemy ORM because the chain, CHECK constraints, and NOTIFY
+    # trigger are hand-authored. File is idempotent (IF NOT EXISTS, guarded
+    # enum creation, CREATE OR REPLACE FUNCTION, DROP TRIGGER IF EXISTS).
+    try:
+        from pathlib import Path as _P
+        _schema_path = _P(__file__).resolve().parent / "db" / "sessions_schema.sql"
+        if _schema_path.exists():
+            _sql = _schema_path.read_text(encoding="utf-8")
+            async with engine.begin() as conn:
+                await conn.execute(text(_sql))
+            logger.info("Canonical sessions schema applied")
+        else:
+            logger.warning(f"sessions_schema.sql not found at {_schema_path}")
+    except Exception as e:
+        logger.error(f"Canonical sessions schema apply failed: {e}")
+
     # Seed default vendor catalog + contribution types (idempotent)
     try:
         from .db.local_db import AsyncSessionLocal
@@ -403,6 +420,16 @@ async def startup():
             logger.error(f"Failed to schedule keycloak identity sync: {e}")
 
 
+    # Sessions events bus — listens on Postgres NOTIFY channel 'session_events'
+    # and fans out to per-session SSE subscribers. Starting it fails soft if
+    # asyncpg or the DATABASE_URL isn't available; SSE then degrades to
+    # backlog-only (still correct, just not live).
+    try:
+        from .services.session_events_bus import bus as session_events_bus
+        await session_events_bus.start()
+    except Exception as e:
+        logger.error(f"session_events_bus failed to start: {e}")
+
     # Sessions retention expiry — nightly walk over expired sessions,
     # emit tombstones, and trigger cryptographic erasure. Hash chain
     # preserved; tombstones survive destruction as proof of prior existence.
@@ -436,3 +463,8 @@ async def startup():
 @app.on_event("shutdown")
 async def shutdown():
     scheduler.shutdown(wait=False)
+    try:
+        from .services.session_events_bus import bus as session_events_bus
+        await session_events_bus.stop()
+    except Exception as e:
+        logger.debug(f"session_events_bus stop: {e}")

@@ -17,13 +17,17 @@ import logging
 import uuid
 from typing import Any
 
+import asyncio
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 
 from ..db.local_db import AsyncSessionLocal
 from ..services import sessions_service as svc
 from ..services.rbac import require_admin, require_view
+from ..services.session_events_bus import bus as session_events_bus, format_comment, format_sse
 
 logger = logging.getLogger("governance-hub.sessions.router")
 
@@ -377,6 +381,124 @@ async def record_cost(session_id: str, body: CostRecord) -> dict[str, Any]:
         )
         await db.commit()
     return {"session_id": str(sid), "recorded": True}
+
+
+_SSE_HEARTBEAT_SECONDS = 15.0
+
+
+@router.get("/{session_id}/events/stream", dependencies=[require_view])
+async def stream_session_events(
+    session_id: str,
+    request: Request,
+    after_seq: int = Query(0, ge=0),
+) -> StreamingResponse:
+    """Server-Sent Events stream of session_events for this session.
+
+    On open:
+      1. Reads the session's tenant_id (required for cross-tenant isolation)
+      2. Replays any events with event_seq > after_seq from the DB
+      3. Subscribes to the in-process bus and forwards new events
+
+    Clients resume on reconnect by passing `?after_seq=<last_seen>`. An
+    overflow sentinel becomes an SSE `event: overflow` frame so the client
+    knows to reload backlog.
+    """
+    sid = _parse_session_id(session_id)
+
+    async with AsyncSessionLocal() as db:
+        tenant_row = (
+            await db.execute(
+                text("SELECT tenant_id FROM sessions WHERE session_id = :sid"),
+                {"sid": str(sid)},
+            )
+        ).first()
+    if tenant_row is None:
+        raise HTTPException(status_code=404, detail="session not found")
+    tenant_id = tenant_row.tenant_id
+
+    async def _event_gen():
+        last_seq = after_seq
+
+        # 1) Initial backlog from DB (lets clients resume without polling).
+        async with AsyncSessionLocal() as db:
+            rows = (
+                await db.execute(
+                    text(
+                        """
+                        SELECT event_id, event_seq, event_type, actor_sub,
+                               actor_type, surface, self_hash, created_at
+                          FROM session_events
+                         WHERE session_id = :sid AND event_seq > :after
+                         ORDER BY event_seq ASC
+                         LIMIT 500
+                        """
+                    ),
+                    {"sid": str(sid), "after": after_seq},
+                )
+            ).all()
+        for r in rows:
+            yield format_sse(
+                {
+                    "session_id": str(sid),
+                    "tenant_id": tenant_id,
+                    "event_id": str(r.event_id),
+                    "event_seq": r.event_seq,
+                    "event_type": r.event_type,
+                    "actor_sub": r.actor_sub,
+                    "actor_type": r.actor_type,
+                    "surface": r.surface,
+                    "self_hash": r.self_hash,
+                    "created_at": r.created_at.isoformat(),
+                    "source": "backlog",
+                }
+            )
+            last_seq = r.event_seq
+
+        # 2) Subscribe for live events.
+        sub = await session_events_bus.subscribe(
+            tenant_id=tenant_id, session_id=str(sid)
+        )
+        try:
+            # Initial heartbeat so the client sees the stream is open.
+            yield format_comment("ready")
+
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    event = await asyncio.wait_for(
+                        sub.queue.get(), timeout=_SSE_HEARTBEAT_SECONDS
+                    )
+                except asyncio.TimeoutError:
+                    yield format_comment("heartbeat")
+                    continue
+
+                if event.get("__overflow__"):
+                    # Tell the client to reload backlog from last_seq.
+                    yield (
+                        b"event: overflow\n"
+                        + format_sse({"after_seq": last_seq})
+                    )
+                    continue
+
+                # Drop anything out-of-order / duplicate that might slip in.
+                seq = int(event.get("event_seq") or 0)
+                if seq <= last_seq:
+                    continue
+                last_seq = seq
+
+                yield format_sse({**event, "source": "live"})
+        finally:
+            await session_events_bus.unsubscribe(sub)
+
+    headers = {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache, no-transform",
+        "Connection": "keep-alive",
+        # nginx-specific: disable response buffering for this stream.
+        "X-Accel-Buffering": "no",
+    }
+    return StreamingResponse(_event_gen(), headers=headers, media_type="text/event-stream")
 
 
 @router.get("/{session_id}/events", dependencies=[require_view])
