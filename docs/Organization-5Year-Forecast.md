@@ -185,8 +185,6 @@ RHEL subscriptions: 2 × Standard ($799 each = $1,598 ≈ $1,600) in Y1–Y2; 2 
 
 **5-year Scenario A labor total:** $227,500 (25% of 5-yr TCO of $913,700). Labor is a larger share in Y1–Y2 but becomes fixed-cost noise by Y5 as Anthropic API scales linearly with users. RHEL adds $11,000 to the 5-year TCO vs the Ubuntu baseline (+1.2%).
 
-Note: Scenario A table above in the executive summary ($56k Y1 etc.) used a slightly tighter variant; the more conservative column here including nominal support-contract ramp is the one we recommend for budget planning.
-
 ### 4.3 Capacity headroom
 
 - Y1–Y2 (50–100 users): P7920 runs at <25% load, very comfortable.
