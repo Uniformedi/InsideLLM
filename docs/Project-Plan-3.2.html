@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>InsideLLM 3.2 — Project Plan · Parent Organization 2026-05-12</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --bg-elev: #161b2c;
+    --bg-elev-2: #1f2740;
+    --border: #2a3349;
+    --border-soft: #1c2238;
+    --text: #e2e8f0;
+    --text-strong: #f8fafc;
+    --muted: #94a3b8;
+    --indigo: #6366f1;
+    --indigo-soft: rgba(99, 102, 241, 0.12);
+    --emerald: #10b981;
+    --emerald-soft: rgba(16, 185, 129, 0.12);
+    --amber: #f59e0b;
+    --amber-soft: rgba(245, 158, 11, 0.12);
+    --red: #ef4444;
+    --red-soft: rgba(239, 68, 68, 0.12);
+    --cyan: #06b6d4;
+    --cyan-soft: rgba(6, 182, 212, 0.12);
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
+    font-size: 14px;
+    line-height: 1.55;
+  }
+  .container { max-width: 1280px; margin: 0 auto; padding: 32px 24px 80px; }
+  header {
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 24px;
+    margin-bottom: 32px;
+  }
+  header .title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  h1 {
+    color: var(--text-strong);
+    font-size: 28px;
+    font-weight: 600;
+    margin: 0;
+    letter-spacing: -0.02em;
+  }
+  .version-pill {
+    display: inline-block;
+    padding: 4px 10px;
+    background: var(--indigo-soft);
+    color: var(--indigo);
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', 'Menlo', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    border: 1px solid var(--indigo);
+  }
+  .subtitle { color: var(--muted); margin: 8px 0 0; font-size: 15px; }
+  .meta-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin-top: 20px;
+  }
+  .meta-card {
+    background: var(--bg-elev);
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    padding: 12px 14px;
+  }
+  .meta-card .label {
+    color: var(--muted);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 4px;
+  }
+  .meta-card .value {
+    color: var(--text-strong);
+    font-size: 18px;
+    font-weight: 600;
+    font-family: 'JetBrains Mono', 'Menlo', monospace;
+  }
+  .meta-card.danger .value { color: var(--red); }
+  .meta-card.warn .value { color: var(--amber); }
+  .meta-card.ok .value { color: var(--emerald); }
+  h2 {
+    color: var(--text-strong);
+    font-size: 20px;
+    font-weight: 600;
+    margin: 48px 0 8px;
+    letter-spacing: -0.01em;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  h2 .anchor {
+    color: var(--muted);
+    font-weight: 400;
+    font-size: 14px;
+    margin-left: 8px;
+  }
+  h3 {
+    color: var(--text-strong);
+    font-size: 16px;
+    font-weight: 600;
+    margin: 28px 0 8px;
+  }
+  p { margin: 8px 0; color: var(--text); }
+  .lead { color: var(--muted); margin-bottom: 16px; }
+  .panel {
+    background: var(--bg-elev);
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    padding: 20px;
+    margin: 16px 0;
+  }
+  .panel.indigo { border-left: 3px solid var(--indigo); }
+  .panel.amber { border-left: 3px solid var(--amber); }
+  .panel.red { border-left: 3px solid var(--red); }
+  .panel.emerald { border-left: 3px solid var(--emerald); }
+  .panel.cyan { border-left: 3px solid var(--cyan); }
+  .decision-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+    gap: 16px;
+    margin: 16px 0;
+  }
+  .decision-card {
+    background: var(--bg-elev);
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    padding: 18px;
+  }
+  .decision-card.locked { border-left: 3px solid var(--emerald); }
+  .decision-card .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    background: var(--emerald-soft);
+    color: var(--emerald);
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 8px;
+  }
+  .decision-card h4 {
+    margin: 0 0 8px;
+    color: var(--text-strong);
+    font-size: 15px;
+  }
+  .decision-card .reason {
+    color: var(--muted);
+    font-size: 13px;
+    margin-top: 8px;
+  }
+  .mermaid-host {
+    background: #0d1320;
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    padding: 24px;
+    margin: 16px 0;
+    overflow-x: auto;
+  }
+  .mermaid { font-family: 'JetBrains Mono', 'Menlo', monospace; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+    font-size: 13px;
+  }
+  th, td {
+    border-bottom: 1px solid var(--border-soft);
+    padding: 10px 12px;
+    text-align: left;
+    vertical-align: top;
+  }
+  th {
+    color: var(--muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    background: var(--bg-elev);
+  }
+  td code, td .id-pill {
+    font-family: 'JetBrains Mono', 'Menlo', monospace;
+    font-size: 12px;
+    background: var(--bg-elev-2);
+    padding: 2px 6px;
+    border-radius: 3px;
+    color: var(--cyan);
+  }
+  .status-pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .status-pill.pending { background: var(--bg-elev-2); color: var(--muted); }
+  .status-pill.in-progress { background: var(--amber-soft); color: var(--amber); }
+  .status-pill.completed { background: var(--emerald-soft); color: var(--emerald); }
+  .status-pill.blocker { background: var(--red-soft); color: var(--red); }
+  .status-pill.locked { background: var(--emerald-soft); color: var(--emerald); }
+  .priority-pill {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+  .priority-pill.p0 { background: var(--red-soft); color: var(--red); }
+  .priority-pill.p1 { background: var(--amber-soft); color: var(--amber); }
+  .priority-pill.p2 { background: var(--cyan-soft); color: var(--cyan); }
+  ul, ol { padding-left: 22px; }
+  li { margin: 4px 0; }
+  .risk-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 14px;
+    margin-top: 12px;
+  }
+  .risk-card {
+    background: var(--bg-elev);
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    padding: 14px 16px;
+    border-left: 3px solid var(--amber);
+  }
+  .risk-card.high { border-left-color: var(--red); }
+  .risk-card.low { border-left-color: var(--cyan); }
+  .risk-card .risk-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+  .risk-card .risk-title strong {
+    color: var(--text-strong);
+    font-size: 14px;
+  }
+  .risk-card .risk-meta {
+    color: var(--muted);
+    font-size: 11px;
+    margin-bottom: 6px;
+  }
+  .risk-card p { font-size: 13px; margin: 4px 0; }
+  .risk-card .mitigation {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--border-soft);
+    color: var(--text);
+    font-size: 12px;
+  }
+  .risk-card .mitigation::before {
+    content: 'Mitigation: ';
+    color: var(--muted);
+    font-weight: 600;
+  }
+  .legend {
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+    margin: 8px 0 16px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .legend .swatch {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+  .progress-bar {
+    width: 100%;
+    height: 8px;
+    background: var(--bg-elev-2);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-top: 8px;
+  }
+  .progress-bar .fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--indigo), var(--cyan));
+    transition: width 0.3s;
+  }
+  footer {
+    margin-top: 64px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border-soft);
+    color: var(--muted);
+    font-size: 12px;
+    text-align: center;
+  }
+  .pill-row { margin: 8px 0; display: flex; flex-wrap: wrap; gap: 6px; }
+  .tag {
+    display: inline-block;
+    padding: 2px 8px;
+    background: var(--bg-elev-2);
+    color: var(--muted);
+    border-radius: 3px;
+    font-size: 11px;
+    font-family: 'JetBrains Mono', 'Menlo', monospace;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <div class="title-row">
+    <h1>InsideLLM 3.2 — Project Plan</h1>
+    <span class="version-pill">3.1.0 → 3.2.0</span>
+  </div>
+  <p class="subtitle">Activepieces workflow service · Workflow Pattern Library · Visual Agent Designer<br>
+  Anchored to the Parent Organization customer demo on <strong>2026-05-12</strong>.</p>
+
+  <div class="meta-grid">
+    <div class="meta-card">
+      <div class="label">Today</div>
+      <div class="value">2026-04-19</div>
+    </div>
+    <div class="meta-card warn">
+      <div class="label">Parent Organization Demo</div>
+      <div class="value">2026-05-12</div>
+    </div>
+    <div class="meta-card warn">
+      <div class="label">Working Days</div>
+      <div class="value">17</div>
+    </div>
+    <div class="meta-card">
+      <div class="label">Phases</div>
+      <div class="value">4 + roadmap</div>
+    </div>
+    <div class="meta-card ok">
+      <div class="label">Decisions Locked</div>
+      <div class="value">A3 + B1</div>
+    </div>
+    <div class="meta-card">
+      <div class="label">Phase 1 Tasks</div>
+      <div class="value">8</div>
+    </div>
+  </div>
+
+  <div class="progress-bar"><div class="fill" style="width: 5%"></div></div>
+  <p class="subtitle" style="font-size: 12px; margin-top: 6px;">Overall progress · ~5% (planning complete, drafts reviewed, decisions locked)</p>
+</header>
+
+<!-- ===== DECISIONS LOCKED ===== -->
+<h2>Decisions Locked <span class="anchor">— before any code lands</span></h2>
+<p class="lead">Two architectural decisions were locked. They shape every phase below.</p>
+
+<div class="decision-grid">
+  <div class="decision-card locked">
+    <span class="badge">Decision A · Locked</span>
+    <h4>A3 — Hybrid visual surface</h4>
+    <p><strong>Form-based designer</strong> in Governance Hub at <code>/governance/agents/new</code> for compliance-authored agent manifests; <strong>Activepieces visual editor</strong> at <code>/workflow/</code> for ops-authored workflow patterns.</p>
+    <div class="reason"><strong>Why:</strong> Manifests are flat policy documents, not DAGs. Different users, different surfaces. Agent designer matches the existing <code>agent_manifest.schema.json</code> exactly; Activepieces earns its keep without parallel UI work.</div>
+  </div>
+  <div class="decision-card locked">
+    <span class="badge">Decision B · Locked</span>
+    <h4>B1 — Defer Managed Agents to 3.3</h4>
+    <p>InsideLLM 3.2 ships <strong>without</strong> Anthropic Managed Agents support. 3.3 will add a <code>runtime: managed_agents</code> manifest field using a custom-tools-only pattern so every tool call round-trips through OPA/DLP.</p>
+    <div class="reason"><strong>Why:</strong> Managed Agents runs the agent loop on Anthropic's orchestration layer, bypassing LiteLLM/OPA/DLP. Shipping it in 3.2 would dilute the compliance narrative for the Parent Organization demo.</div>
+  </div>
+</div>
+
+<!-- ===== CRITICAL PATH (PERT) ===== -->
+<h2>Critical Path <span class="anchor">— PERT-style network</span></h2>
+<p class="lead">Phase 1 unblocks everything. Phase 2 (Visual Designer) is the longest pole; Phases 3 and 4 run in parallel with Phase 2 sub-streams. The red path is the critical path to demo.</p>
+
+<div class="legend">
+  <span><span class="swatch" style="background:#ef4444"></span>Critical path</span>
+  <span><span class="swatch" style="background:#6366f1"></span>Parallel work</span>
+  <span><span class="swatch" style="background:#10b981"></span>Milestone / gate</span>
+  <span><span class="swatch" style="background:#94a3b8"></span>Future (3.3+)</span>
+</div>
+
+<div class="mermaid-host">
+<pre class="mermaid">
+flowchart LR
+  Start((Today<br/>2026-04-18)):::milestone --> P1
+  P1[Phase 1<br/>Unblock blockers<br/>5d]:::critical --> P2B[Phase 2A<br/>Designer Backend<br/>3d]:::critical
+  P1 --> P3[Phase 3<br/>Pattern Library<br/>5d]:::parallel
+  P2B --> P2F[Phase 2B<br/>Designer Frontend<br/>7d]:::critical
+  P2B --> P4[Phase 4<br/>Governed Workflow<br/>5d]:::parallel
+  P3 --> Merge1{Integration<br/>gate}:::milestone
+  P4 --> Merge1
+  P2F --> Merge1
+  Merge1 --> Prep[Demo prep<br/>4d]:::critical
+  Prep --> Demo((Parent Organization Demo<br/>2026-05-12)):::critical
+  Demo -.-> P5[Phase 5 — 3.3<br/>Managed Agents<br/>future]:::future
+
+  classDef critical fill:#3b1118,stroke:#ef4444,color:#fca5a5,stroke-width:2px;
+  classDef parallel fill:#1c1f3d,stroke:#6366f1,color:#c7d2fe,stroke-width:1.5px;
+  classDef milestone fill:#06281f,stroke:#10b981,color:#a7f3d0,stroke-width:2px;
+  classDef future fill:#1f2740,stroke:#475569,color:#94a3b8,stroke-width:1px,stroke-dasharray: 4 3;
+</pre>
+</div>
+
+<div class="panel amber">
+  <strong>Critical-path warning.</strong> Phase 1 (5d) + Phase 2A backend (3d) + Phase 2B frontend (7d) + Demo prep (4d) = <strong>19 working days</strong>. We have <strong>17</strong>. Phase 2B must start while Phase 2A completes its last endpoint (overlap day −1), and frontend scope must be the <em>MVP</em> defined in §Phase 2 — no live OPA preview, no dry-run UI in v1. See <a href="#risks">Risks</a> for the contingency plan.
+</div>
+
+<!-- ===== GANTT TIMELINE ===== -->
+<h2>Timeline <span class="anchor">— Gantt</span></h2>
+<p class="lead">All dates working-day-aligned (Mon–Fri). Weekends excluded. Work begins Monday 2026-04-20.</p>
+
+<div class="mermaid-host">
+<pre class="mermaid">
+gantt
+  title InsideLLM 3.2 — Phase Schedule
+  dateFormat  YYYY-MM-DD
+  excludes    weekends
+  axisFormat  %m-%d
+
+  section Phase 1 — Unblock
+  Pin Activepieces image           :p11, 2026-04-20, 1d
+  Split AP / LiteLLM keys          :p12, after p11, 1d
+  LiteLLM virtual key bootstrap    :crit, p13, after p12, 2d
+  Postgres init SQL                :crit, p14, after p13, 1d
+  Settings wired to pattern svc    :p15, after p14, 1d
+  Pattern library migration        :p16, after p15, 1d
+  Complete SearchHit.distance      :p17, after p16, 1d
+  VERSION bump + CHANGELOG         :milestone, p18, after p17, 0d
+
+  section Phase 2A — Designer Backend
+  Manifest schema introspection ep :p2a1, after p17, 1d
+  Actions catalog endpoint         :p2a2, after p2a1, 1d
+  Dry-run / OPA preview endpoint   :crit, p2a3, after p2a2, 1d
+
+  section Phase 3 — Pattern Library
+  Apply Phase 1 fixes              :p31, after p17, 1d
+  Seed corpus (2,184 patterns)     :p32, after p31, 1d
+  Wire Pattern Advisor tool        :p33, after p32, 1d
+  Pattern → Activepieces import    :p34, after p33, 2d
+
+  section Phase 2B — Designer Frontend
+  Form scaffolding + sections      :crit, p2b1, after p2a3, 2d
+  Knowledge / actions pickers      :crit, p2b2, after p2b1, 2d
+  Schema validation + YAML I/O     :crit, p2b3, after p2b2, 2d
+  Preview pane (read-only v1)      :crit, p2b4, after p2b3, 1d
+
+  section Phase 4 — Governed Workflow
+  insidellm-agent AP piece         :p41, after p2a3, 2d
+  AP exec → audit mirror webhook   :p42, after p41, 2d
+  Grafana AP dashboard + OPA HTTP  :p43, after p42, 1d
+
+  section Demo Prep
+  Integration smoke + bug bash     :crit, prep1, after p2b4, 2d
+  Walkthrough rehearsal            :crit, prep2, after prep1, 2d
+  Parent Organization demo                     :milestone, demo, 2026-05-12, 0d
+
+  section Roadmap (3.3)
+  Managed Agents custom-tools spec :roadmap1, 2026-05-13, 5d
+  Prototype dispute-handler        :roadmap2, after roadmap1, 5d
+</pre>
+</div>
+
+<!-- ===== ARCHITECTURE FLOW ===== -->
+<h2>Component Architecture <span class="anchor">— how 3.2 wires together</span></h2>
+<p class="lead">New 3.2 components are highlighted. All LLM traffic still funnels through LiteLLM so DLP, OPA, and Humility apply uniformly to Open WebUI users, Activepieces flows, and Visual Designer dry-runs.</p>
+
+<div class="mermaid-host">
+<pre class="mermaid">
+flowchart TB
+  subgraph Users["👤 User Surfaces"]
+    direction LR
+    OWUI[Open WebUI<br/>chat / RAG]:::existing
+    VAD[Visual Agent Designer<br/>/governance/agents/new]:::new
+    AP[Activepieces<br/>/workflow/]:::new
+    PA[Pattern Advisor<br/>OWUI tool]:::new
+  end
+
+  subgraph Gateway["🛡️ LLM Gateway"]
+    direction TB
+    LITE[LiteLLM<br/>budgets · virtual keys]:::existing
+    DLP[DLP Guardrail<br/>callback]:::existing
+    HUM[Humility Guardrail<br/>SAIVAS]:::existing
+  end
+
+  subgraph Gov["📋 Governance Layer"]
+    direction TB
+    GH[Governance Hub<br/>FastAPI]:::existing
+    AGENTS[Agents API<br/>+ designer endpoints]:::new
+    PAT[Patterns API<br/>+ pgvector search]:::new
+    OPA[OPA<br/>Humility + industry]:::existing
+    AUDIT[Hash-chained Audit]:::existing
+  end
+
+  subgraph Data["🗄️ Data"]
+    direction LR
+    PG[(Postgres 16<br/>+ pgvector)]:::data
+    REDIS[(Redis<br/>queues · rate limits)]:::data
+    OLLAMA[Ollama<br/>nomic-embed-text]:::data
+  end
+
+  OWUI ---&gt; LITE
+  PA -.search.-&gt; PAT
+  VAD ---&gt; AGENTS
+  AP --LLM steps---&gt; LITE
+  AP --workflow steps--&gt; OPA
+
+  LITE ---&gt; DLP
+  DLP ---&gt; HUM
+  HUM ---&gt; OPA
+  OPA --decision--&gt; LITE
+  LITE --on allow--&gt; CLAUDE[Anthropic API]:::external
+
+  AGENTS --&gt; OPA
+  AGENTS --&gt; PG
+  PAT --&gt; PG
+  PAT --embed--&gt; OLLAMA
+  GH --&gt; AUDIT
+  AUDIT --&gt; PG
+  LITE --&gt; PG
+  AP --&gt; PG
+  AP --&gt; REDIS
+
+  classDef new fill:#1f2052,stroke:#6366f1,color:#c7d2fe,stroke-width:2px;
+  classDef existing fill:#0f1f1c,stroke:#10b981,color:#a7f3d0;
+  classDef data fill:#1f1d3a,stroke:#06b6d4,color:#a5f3fc;
+  classDef external fill:#2a2233,stroke:#a78bfa,color:#ddd6fe;
+</pre>
+</div>
+
+<!-- ===== SANKEY: TRAFFIC FLOW ===== -->
+<h2>Request Flow <span class="anchor">— Sankey</span></h2>
+<p class="lead">Hypothetical 100-request day post-3.2. Every path through DLP and OPA is enforced; "denied" / "redacted" outcomes flow to audit. Numbers are illustrative — they exist to show that <em>nothing</em> bypasses the governance gates.</p>
+
+<div class="mermaid-host">
+<pre class="mermaid">
+sankey-beta
+
+User,Open WebUI,40
+User,Activepieces flow,25
+User,Visual Designer dry-run,15
+User,Pattern Advisor tool,20
+Open WebUI,LiteLLM,40
+Activepieces flow,LiteLLM,25
+Visual Designer dry-run,LiteLLM,15
+Pattern Advisor tool,Governance Hub,20
+LiteLLM,DLP scan,80
+DLP scan,Humility check,75
+DLP scan,Redacted (audited),5
+Humility check,OPA decision,75
+Humility check,Refused (audited),0
+OPA decision,Anthropic API,68
+OPA decision,Denied (audited),7
+Anthropic API,User response,68
+Governance Hub,Pattern hit,18
+Governance Hub,No match,2
+</pre>
+</div>
+
+<!-- ===== PHASE 1 DETAIL ===== -->
+<h2>Phase 1 — Unblock Drafts <span class="anchor">2026-04-20 → 2026-04-30 · 5 working days</span></h2>
+<p class="lead">Seven merge-blockers from the code review, plus a VERSION bump. Targets the existing draft tree at <code>~/Documents/Projects/n8nempire/insidellm-drafts/</code>. Every fix lands as an "INSERT AT anchor" snippet so the InsideLLM tree is touched non-destructively.</p>
+
+<table>
+  <thead>
+    <tr><th style="width: 40px;">#</th><th>Task</th><th style="width: 100px;">Priority</th><th style="width: 100px;">Status</th><th style="width: 80px;">Days</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>1.1</td><td>Pin Activepieces image tag (replace <code>:latest</code>)</td><td><span class="priority-pill p0">Blocker</span></td><td><span class="status-pill pending">Pending</span></td><td>1</td></tr>
+    <tr><td>1.2</td><td>Split AP admin key from LiteLLM virtual key (separate <code>random_password</code> resources)</td><td><span class="priority-pill p0">Blocker</span></td><td><span class="status-pill pending">Pending</span></td><td>1</td></tr>
+    <tr><td>1.3</td><td>Bootstrap LiteLLM virtual key for Activepieces (<code>null_resource</code> + <code>POST /admin/keys</code>)</td><td><span class="priority-pill p0">Blocker</span></td><td><span class="status-pill pending">Pending</span></td><td>2</td></tr>
+    <tr><td>1.4</td><td>Real Postgres init SQL (mount <code>/docker-entrypoint-initdb.d/</code>; create AP DB + pgvector ext)</td><td><span class="priority-pill p0">Blocker</span></td><td><span class="status-pill pending">Pending</span></td><td>1</td></tr>
+    <tr><td>1.5</td><td>Wire <code>patterns_*</code> Settings into <code>pattern_service.py</code> (remove module-level constants)</td><td><span class="priority-pill p1">High</span></td><td><span class="status-pill pending">Pending</span></td><td>1</td></tr>
+    <tr><td>1.6</td><td>Manual SQL migration <code>004_pattern_library.sql</code> + add <code>pgvector==0.3.6</code> to requirements</td><td><span class="priority-pill p0">Blocker</span></td><td><span class="status-pill pending">Pending</span></td><td>1</td></tr>
+    <tr><td>1.7</td><td>Complete <code>SearchHit.distance</code> plumbing (return <code>(row, distance)</code> tuples; add <code>mode</code> field)</td><td><span class="priority-pill p1">High</span></td><td><span class="status-pill pending">Pending</span></td><td>1</td></tr>
+    <tr><td>1.8</td><td>Bump <code>/VERSION</code> to <code>3.2.0</code>; create <code>CHANGELOG.md</code></td><td><span class="priority-pill p2">Med</span></td><td><span class="status-pill pending">Pending</span></td><td>0.5</td></tr>
+  </tbody>
+</table>
+
+<!-- ===== PHASE 2 DETAIL ===== -->
+<h2>Phase 2 — Visual Agent Designer <span class="anchor">2026-04-29 → 2026-05-08 · 10 working days · MVP scope</span></h2>
+<p class="lead">Form-based designer matching <code>agent_manifest.schema.json</code> v1.1. Section cards: <em>Display · Instructions · Knowledge · Actions · Guardrails · Visibility</em>. Live schema validation, YAML import/export, publish via existing <code>POST /api/v1/agents</code>. Preview pane is <strong>read-only v1</strong> — full OPA dry-run lands in 3.2.1.</p>
+
+<h3>Phase 2A — Backend (governance-hub) · 3 days</h3>
+<table>
+  <thead><tr><th style="width: 60px;">ID</th><th>Endpoint</th><th>Purpose</th></tr></thead>
+  <tbody>
+    <tr><td><code>2A.1</code></td><td><code>GET /api/v1/agents/schema</code></td><td>Return the v1.1 manifest JSON Schema for in-browser validation. Cached, ETag'd.</td></tr>
+    <tr><td><code>2A.2</code></td><td><code>GET /api/v1/agents/actions-catalog</code></td><td>List registered <code>action_id</code>s with <code>scope</code>, <code>description</code>, <code>requires_approval</code>. Powers autocomplete.</td></tr>
+    <tr><td><code>2A.3</code></td><td><code>POST /api/v1/agents/dry-run</code></td><td>Validate a draft manifest, render the OPA decision envelope for a sample input, list which guardrail layers fire. No side effects, no audit entry.</td></tr>
+  </tbody>
+</table>
+
+<h3>Phase 2B — Frontend (governance-hub React panel) · 7 days</h3>
+<table>
+  <thead><tr><th style="width: 60px;">ID</th><th>Component</th><th>What ships</th></tr></thead>
+  <tbody>
+    <tr><td><code>2B.1</code></td><td>Form scaffold</td><td>Section cards (Display / Instructions / Knowledge / Actions / Guardrails / Visibility) bound to a manifest object. Reactive form using React Hook Form + Zod (schema derived from the JSON Schema endpoint).</td></tr>
+    <tr><td><code>2B.2</code></td><td>Knowledge picker</td><td>Multi-select bound to existing knowledge collections API. Shows collection size + last-updated.</td></tr>
+    <tr><td><code>2B.3</code></td><td>Actions table</td><td>Add/remove rows; <code>action_id</code> autocomplete from §2A.2; toggle <code>approval_required</code>; pick <code>approval_target</code> + <code>approval_channel</code>; visual badge for write-scoped actions.</td></tr>
+    <tr><td><code>2B.4</code></td><td>Schema validation + YAML I/O</td><td>Live errors next to fields (per JSON Schema). "Load YAML" file picker. "Export YAML" download.</td></tr>
+    <tr><td><code>2B.5</code></td><td>Preview pane</td><td>Read-only summary: instructions word count, action flow diagram (mermaid), guardrail profile resolved fields, visibility scope + which approval tier fires on publish.</td></tr>
+    <tr><td><code>2B.6</code></td><td>Publish flow</td><td>"Save draft" / "Publish" buttons → <code>POST /api/v1/agents</code>. Visibility ≥ <code>org</code> creates a <code>governance_changes</code> proposal; visibility ≤ <code>team</code> publishes immediately.</td></tr>
+  </tbody>
+</table>
+
+<!-- ===== PHASE 3 DETAIL ===== -->
+<h2>Phase 3 — Pattern Library Integration <span class="anchor">2026-04-29 → 2026-05-05 · 5 working days · parallel to Phase 2</span></h2>
+<table>
+  <thead><tr><th style="width: 60px;">ID</th><th>Task</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td><code>3.1</code></td><td>Apply Phase 1.5 + 1.6 + 1.7 fixes to draft</td><td>Settings wiring, migration, distance plumbing</td></tr>
+    <tr><td><code>3.2</code></td><td>Seed 2,184 n8nempire patterns into <code>governance_workflow_patterns</code></td><td>Idempotent — <code>seed_patterns_once()</code> at startup</td></tr>
+    <tr><td><code>3.3</code></td><td>Register Pattern Advisor tool in Open WebUI</td><td>Service-account user with <code>view</code> RBAC on patterns API</td></tr>
+    <tr><td><code>3.4</code></td><td>"Import pattern → Activepieces" button on pattern detail</td><td>Calls AP REST API to seed a new flow from pattern's source JSON</td></tr>
+    <tr><td><code>3.5</code></td><td>Pattern parser tests (5+ real n8nempire MDs incl. malformed)</td><td>Deferred to 3.2.1 if time-pressed</td></tr>
+  </tbody>
+</table>
+
+<!-- ===== PHASE 4 DETAIL ===== -->
+<h2>Phase 4 — Governed Workflow Execution <span class="anchor">2026-05-04 → 2026-05-08 · 5 working days · parallel to Phase 2B</span></h2>
+<p class="lead">Closes the OPA-bypass leak called out in the code review: non-LLM workflow steps (HTTP, DB, file ops) are unguarded by default. Two mitigations and observability.</p>
+<table>
+  <thead><tr><th style="width: 60px;">ID</th><th>Task</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td><code>4.1</code></td><td>Custom <code>insidellm-agent</code> Activepieces piece</td><td>Calls a Governance Hub agent by ID; inherits its guardrail profile. Lets workflow authors invoke governed agents.</td></tr>
+    <tr><td><code>4.2</code></td><td>Activepieces execution events → Governance Hub audit webhook</td><td>Workflow runs land in the hash-chained audit trail; unified compliance reporting.</td></tr>
+    <tr><td><code>4.3</code></td><td>Grafana dashboard for Activepieces (queue depth, exec time, error rate)</td><td>Mirrors DocForge / Governance Hub dashboards</td></tr>
+    <tr><td><code>4.4</code></td><td>OPA policy for non-LLM workflow steps (HTTP-out allowlist, DB-write denylist)</td><td>Minimum viable; full policy lands in 3.3</td></tr>
+  </tbody>
+</table>
+
+<!-- ===== PHASE 5 ROADMAP ===== -->
+<h2>Phase 5 — Managed Agents Runtime <span class="anchor">3.3 roadmap · post-Parent Organization</span></h2>
+<p class="lead">Architecturally compatible with InsideLLM's posture <strong>only if</strong> all agent tools are custom (client-side) so each tool call round-trips through the orchestrator → OPA → DLP before execution. Built-in <code>bash</code> / <code>read</code> / <code>write</code> / <code>code_execution</code> tools cannot be used without a perimeter exception.</p>
+<div class="panel cyan">
+  <strong>Spec preview.</strong> Add <code>runtime: managed_agents</code> + <code>custom_tools_only: true</code> to the manifest schema. Governance Hub gets a session orchestrator (SSE consumer + custom-tool dispatcher). Each tool dispatch passes through OPA before executing locally; result returns to the Anthropic-hosted session as <code>user.custom_tool_result</code>. Vault credentials for any third-party APIs stay host-side. Prototype lands with the <code>dispute-handler</code> agent.
+</div>
+
+<!-- ===== RISKS ===== -->
+<h2 id="risks">Risks &amp; Contingencies</h2>
+<div class="risk-grid">
+  <div class="risk-card high">
+    <div class="risk-title"><strong>R1 · Phase 2B frontend overruns</strong> <span class="status-pill blocker">High</span></div>
+    <div class="risk-meta">Likelihood: medium · Impact: demo slip</div>
+    <p>7d frontend budget assumes a single React engineer at full velocity. Any blocker (auth wiring, schema-to-form generator) cascades into demo prep.</p>
+    <div class="mitigation">If <code>2B.4</code> isn't shippable by 2026-05-04, freeze the designer at "form-only authoring + YAML I/O." Demo it as a draft, walk Parent Organization through the dispute-handler manifest in raw form. Land <code>2B.5</code> + <code>2B.6</code> in 3.2.1 two weeks later.</div>
+  </div>
+  <div class="risk-card high">
+    <div class="risk-title"><strong>R2 · LiteLLM virtual key bootstrap idempotency</strong> <span class="status-pill blocker">High</span></div>
+    <div class="risk-meta">Likelihood: medium · Impact: AP unable to call LLMs</div>
+    <p><code>null_resource</code> running <code>POST /admin/keys</code> on every <code>terraform apply</code> creates duplicate keys, eventually exhausting LiteLLM's per-org key cap.</p>
+    <div class="mitigation">Use <code>POST /admin/keys</code> with a deterministic <code>key_alias</code> ("activepieces-vkey") and PUT semantics (delete-then-create on rotate). Stash the response in a Terraform-managed file via <code>local_sensitive_file</code>; <code>triggers</code> include the password hash so re-runs only fire on rotate.</div>
+  </div>
+  <div class="risk-card">
+    <div class="risk-title"><strong>R3 · pgvector extension not authorized in Postgres role</strong> <span class="status-pill in-progress">Med</span></div>
+    <div class="risk-meta">Likelihood: low (we control the DB) · Impact: pattern library DOA</div>
+    <p><code>CREATE EXTENSION vector</code> requires superuser or membership in the trusted-extensions list.</p>
+    <div class="mitigation">The InsideLLM <code>litellm</code> Postgres role is a superuser per the existing compose. Verify on first apply; if not, run the <code>CREATE EXTENSION</code> as <code>postgres</code> in the init SQL (which always has full privs).</div>
+  </div>
+  <div class="risk-card">
+    <div class="risk-title"><strong>R4 · n8nempire corpus license unclear</strong> <span class="status-pill in-progress">Med</span></div>
+    <div class="risk-meta">Likelihood: low (commercial purchase) · Impact: redistribution claim</div>
+    <p>Patterns ship inside the InsideLLM image to customer deployments. Need explicit redistribution rights from n8nempire vendor.</p>
+    <div class="mitigation">Email vendor before merge. If unclear, ship pattern library <em>empty</em>; customer ingests their own corpus via <code>POST /api/v1/patterns/ingest</code>.</div>
+  </div>
+  <div class="risk-card low">
+    <div class="risk-title"><strong>R5 · Activepieces healthcheck endpoint changed</strong> <span class="status-pill pending">Low</span></div>
+    <div class="risk-meta">Likelihood: low · Impact: container marked unhealthy, depends_on chain breaks</div>
+    <p>Draft uses <code>/api/v1/flags</code>. Pinning the image tag (Phase 1.1) locks the API surface — verify endpoint exists in the pinned version.</p>
+    <div class="mitigation">During Phase 1.1, smoke-test the pinned tag locally and confirm <code>/api/v1/flags</code> returns 200. If gone, switch to <code>/api/v1/health</code> or whatever the pinned version exposes.</div>
+  </div>
+  <div class="risk-card low">
+    <div class="risk-title"><strong>R6 · OPA bypass on non-LLM AP steps</strong> <span class="status-pill pending">Accepted (3.2)</span></div>
+    <div class="risk-meta">Likelihood: high · Impact: governance gap</div>
+    <p>Workflow steps that hit external HTTP endpoints, write to DBs, or run code do not pass through OPA in 3.2 unless they call the <code>insidellm-agent</code> piece (4.1) or a deliberate <code>governance.check</code> step.</p>
+    <div class="mitigation">Phase 4.4 adds a minimal HTTP-out allowlist. Document the boundary in the 3.2 release notes. Full step-level OPA enforcement lands in 3.3 alongside Managed Agents.</div>
+  </div>
+</div>
+
+<!-- ===== DELIVERABLES ===== -->
+<h2>Deliverables Checklist</h2>
+<div class="panel">
+<ul>
+  <li><strong>Code:</strong> 8 Phase 1 fixes applied to <code>~/Documents/Projects/n8nempire/insidellm-drafts/</code> (corrected drop-in tree, ready to apply to InsideLLM)</li>
+  <li><strong>Code:</strong> 3 new endpoints in <code>configs/governance-hub/src/routers/agents.py</code> (Phase 2A)</li>
+  <li><strong>Code:</strong> New <code>configs/governance-hub/web/agent-designer/</code> React app (Phase 2B)</li>
+  <li><strong>Code:</strong> <code>configs/activepieces-pieces/insidellm-agent/</code> custom piece (Phase 4.1)</li>
+  <li><strong>Config:</strong> Grafana dashboard JSON for Activepieces (Phase 4.3)</li>
+  <li><strong>Config:</strong> OPA policy for non-LLM workflow steps (Phase 4.4)</li>
+  <li><strong>Data:</strong> 2,184 patterns ingested into <code>governance_workflow_patterns</code> (Phase 3.2)</li>
+  <li><strong>Docs:</strong> <code>docs/CHANGELOG.md</code> with 3.2 entry; updated <code>docs/PARENT-ORGANIZATION-DEMO-RUNBOOK.md</code></li>
+  <li><strong>Tests:</strong> Pattern parser unit tests, designer roundtrip tests, AP piece integration test</li>
+</ul>
+</div>
+
+<!-- ===== NEXT ACTION ===== -->
+<h2>Immediate Next Action</h2>
+<div class="panel emerald">
+  <strong>Start Phase 1.1</strong> (pin Activepieces image tag) → 1.2 (split keys) → 1.3 (LiteLLM bootstrap). Tasks 1.1 and 1.2 are quick wins; 1.3 is the highest-risk Phase-1 item (R2) and gates the whole Activepieces integration. Drafts land in the existing <code>n8nempire/insidellm-drafts/</code> tree; the InsideLLM source tree stays untouched until Dan applies them.
+</div>
+
+<footer>
+  Generated 2026-04-19 · InsideLLM 3.2 planning · Decisions A3 + B1 locked<br>
+  Source plan + this file: <code>~/Documents/Projects/InsideLLM/docs/Project-Plan-3.2.html</code>
+</footer>
+
+</div>
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'dark',
+    themeVariables: {
+      darkMode: true,
+      background: '#0d1320',
+      primaryColor: '#1f2052',
+      primaryTextColor: '#e2e8f0',
+      primaryBorderColor: '#6366f1',
+      lineColor: '#6366f1',
+      secondaryColor: '#0f1f1c',
+      tertiaryColor: '#1f1d3a',
+      fontFamily: 'JetBrains Mono, Menlo, monospace',
+    },
+    flowchart: {
+      htmlLabels: true,
+      curve: 'basis',
+    },
+    gantt: {
+      barHeight: 20,
+      barGap: 4,
+      topPadding: 60,
+      sidePadding: 80,
+      gridLineStartPadding: 30,
+      fontSize: 12,
+    },
+    sankey: {
+      width: 1100,
+      height: 500,
+      linkColor: 'gradient',
+      nodeAlignment: 'justify',
+    },
+  });
+</script>
+</body>
+</html>
