@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>InsideLLM — Test Plan V1</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    background: #0a0e1a;
+    color: #e2e8f0;
+    min-height: 100vh;
+    padding: 32px 24px 80px;
+    line-height: 1.55;
+  }
+  main { max-width: 960px; margin: 0 auto; }
+  header {
+    margin-bottom: 28px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid #2a3650;
+  }
+  header h1 {
+    font-family: "SF Mono", Consolas, monospace;
+    font-size: 24px;
+    color: #22d3ee;
+    letter-spacing: -0.5px;
+    margin-bottom: 6px;
+  }
+  header .sub { color: #64748b; font-size: 13px; }
+  header .meta {
+    display: flex; gap: 14px; flex-wrap: wrap; margin-top: 14px;
+    font-size: 12px;
+  }
+  header .meta span {
+    padding: 3px 10px;
+    background: #111827;
+    border: 1px solid #2a3650;
+    border-radius: 4px;
+    color: #94a3b8;
+    font-family: "SF Mono", Consolas, monospace;
+  }
+  header .meta strong { color: #22d3ee; }
+
+  h2 {
+    font-size: 17px;
+    color: #22d3ee;
+    margin: 36px 0 12px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #1e293b;
+    font-family: "SF Mono", Consolas, monospace;
+  }
+  h3 {
+    font-size: 14px;
+    color: #e2e8f0;
+    margin: 20px 0 8px;
+    font-weight: 600;
+  }
+  p { margin: 10px 0; color: #cbd5e1; font-size: 14px; }
+  p.lead {
+    font-size: 15px;
+    color: #e2e8f0;
+  }
+  ul, ol { margin: 10px 0 14px 22px; color: #cbd5e1; font-size: 14px; }
+  li { margin: 4px 0; }
+  strong { color: #e2e8f0; }
+  em { color: #94a3b8; }
+  a { color: #22d3ee; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code {
+    background: #111827;
+    border: 1px solid #1e293b;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-family: "SF Mono", Consolas, monospace;
+    font-size: 12px;
+    color: #fbbf24;
+  }
+  pre {
+    background: #000;
+    color: #cbd5e1;
+    padding: 14px 16px;
+    border-radius: 8px;
+    border: 1px solid #1e293b;
+    font-family: "SF Mono", Consolas, monospace;
+    font-size: 12px;
+    overflow-x: auto;
+    margin: 12px 0;
+    line-height: 1.5;
+  }
+  pre code {
+    background: transparent;
+    border: none;
+    padding: 0;
+    color: inherit;
+    font-size: inherit;
+  }
+  blockquote {
+    border-left: 3px solid #f87171;
+    background: rgba(248, 113, 113, 0.06);
+    padding: 10px 14px;
+    margin: 14px 0;
+    color: #fca5a5;
+    font-size: 13px;
+  }
+  blockquote strong { color: #f87171; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0;
+    font-size: 13px;
+  }
+  th, td {
+    text-align: left;
+    padding: 9px 12px;
+    border-bottom: 1px solid #1e293b;
+  }
+  th {
+    color: #94a3b8;
+    font-weight: 500;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    background: #111827;
+  }
+  td { color: #cbd5e1; }
+  td code { font-size: 11px; }
+
+  .step {
+    background: #111827;
+    border: 1px solid #2a3650;
+    border-radius: 8px;
+    padding: 4px 16px 14px;
+    margin: 14px 0;
+  }
+  .step h3 { color: #22d3ee; margin-top: 12px; }
+
+  .check-list { list-style: none; padding-left: 0; }
+  .check-list li {
+    padding: 6px 10px 6px 28px;
+    border-bottom: 1px solid #1e293b;
+    position: relative;
+  }
+  .check-list li::before {
+    content: "☐";
+    position: absolute;
+    left: 6px; top: 6px;
+    color: #22d3ee;
+    font-size: 14px;
+    font-family: "SF Mono", Consolas, monospace;
+  }
+
+  .tag-ok { color: #22d3ee; }
+  .tag-warn { color: #fbbf24; }
+  .tag-err { color: #f87171; }
+  hr { border: 0; border-top: 1px solid #2a3650; margin: 28px 0; }
+  footer {
+    margin-top: 60px;
+    padding-top: 16px;
+    border-top: 1px solid #2a3650;
+    color: #64748b;
+    font-size: 12px;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<main>
+
+<header>
+  <h1>InsideLLM — Test Plan V1</h1>
+  <div class="sub">Apply + smoke-test the 16 platform commits against 10.0.0.9 before the Parent Organization demo.</div>
+  <div class="meta">
+    <span><strong>Scope:</strong> P0 → P4.1 + drift guard</span>
+    <span><strong>Target:</strong> insidellm-mgmt (10.0.0.9)</span>
+    <span><strong>Time:</strong> ~20 min green / ~45 min w/ triage</span>
+    <span><strong>Head:</strong> fc0be1d (P3.2)</span>
+  </div>
+</header>
+
+<p class="lead">
+  Run in order. Each section is independent enough to stop on failure and
+  triage without losing earlier progress. The sign-off checklist at the
+  bottom is the success criterion.
+</p>
+
+<!-- ============================================================ -->
+<h2>0. Pre-flight (your workstation)</h2>
+<p>Confirm everything's pushed. Nothing on the VM should be ahead of origin.</p>
+<pre><code>cd C:\Users\dmedina\Documents\Projects\InsideLLM
+git status              # must be clean
+git log --oneline -5    # verify fc0be1d (P3.2) is tip
+git push                # if the remote is behind</code></pre>
+
+<!-- ============================================================ -->
+<h2>1. Land code on 10.0.0.9</h2>
+<pre><code>ssh insidellm-mgmt
+cd /opt/InsideLLM       # (OR wherever the repo lives on the VM)
+
+# Safety: back up .env before anything touches Terraform
+sudo cp /opt/InsideLLM/.env /opt/InsideLLM/.env.backup.$(date +%F)
+
+# Pull the 16 new commits
+git fetch origin
+git log --oneline HEAD..origin/master   # review what's coming in
+git pull origin master</code></pre>
+
+<!-- ============================================================ -->
+<h2>2. Pick opt-ins in terraform.tfvars</h2>
+<p><strong>Conservative smoke run</strong> — enable only the things that make the demo narrative meaningful:</p>
+<pre><code># Already on — leave alone
+governance_hub_enable          = true
+policy_engine_enable           = true
+chat_enable                    = true   # if already true
+
+# NEW — turn on to validate
+workers_enable                 = true   # unblocks the Dispute Handler
+keycloak_enable                = true   # SSO story
+keycloak_govhub_client_secret  = "REPLACE_openssl_rand_hex_32"
+keycloak_owui_client_secret    = "REPLACE_openssl_rand_hex_32"
+keycloak_litellm_client_secret = "REPLACE_openssl_rand_hex_32"
+
+# LEAVE OFF for first pass — add later if time permits
+n8n_enable                     = false
+activepieces_enable            = false</code></pre>
+<p>Generate the secrets:</p>
+<pre><code>for v in govhub owui litellm; do
+  echo "keycloak_${v}_client_secret = \"$(openssl rand -hex 32)\""
+done</code></pre>
+
+<!-- ============================================================ -->
+<h2>3. Apply</h2>
+<pre><code>cd /opt/InsideLLM/terraform
+terraform plan -var-file="../terraform.tfvars" -out tfplan 2>&amp;1 | tee /tmp/plan.log</code></pre>
+<p>Review the plan. Expect recreates on <code>docker_compose.yml</code>, <code>.env</code>, cloud-init, possibly the VM itself.</p>
+<blockquote>
+  <strong>If Terraform wants to REPLACE the VM — STOP.</strong> That destroys state. The intent is in-place updates to the config files + <code>docker compose up -d</code>.
+</blockquote>
+<pre><code>terraform apply tfplan</code></pre>
+<p>Post-deploy takes ~4–6 minutes. Tail it:</p>
+<pre><code>sudo tail -f /var/log/InsideLLM-deploy.log
+# Wait for: "Inside LLM — READY"</code></pre>
+
+<!-- ============================================================ -->
+<h2>4. Smoke tests (simplest → end-to-end)</h2>
+
+<div class="step">
+  <h3>4a. Containers healthy</h3>
+<pre><code>docker ps --format '{{.Names}}\t{{.Status}}' | grep -v healthy
+# Expect empty output (everything healthy)
+# — or at most watchtower on a crash loop (cosmetic)</code></pre>
+</div>
+
+<div class="step">
+  <h3>4b. Gov-Hub alive + new tables created</h3>
+<pre><code>KEY=$(grep -E '^LITELLM_MASTER_KEY=' /opt/InsideLLM/.env | cut -d= -f2-)
+curl -sk https://10.0.0.9/governance/health | jq
+docker exec insidellm-postgres psql -U litellm -d litellm \
+  -c "\dt governance_*" | grep -E "agents|actions|identity"
+# Expect: governance_agents, governance_actions, governance_identity_*</code></pre>
+</div>
+
+<div class="step">
+  <h3>4c. Core catalog auto-seeded <em>(P1.3 + P3.1 + P3.2 + P3.3)</em></h3>
+<pre><code>curl -sk -u insidellm-admin:$KEY \
+  https://10.0.0.9/governance/api/v1/actions/?tenant_id=core | jq '.total'
+# Expect ≥20 actions across the 7 wrapper files</code></pre>
+</div>
+
+<div class="step">
+  <h3>4d. Portfolio dashboard <em>(P4.1)</em></h3>
+  <p>Open <a href="https://10.0.0.9/governance/portfolio">https://10.0.0.9/governance/portfolio</a> in a browser — or curl the JSON:</p>
+<pre><code>curl -sk -u insidellm-admin:$KEY \
+  https://10.0.0.9/governance/api/v1/portfolio/overview | jq</code></pre>
+</div>
+
+<div class="step">
+  <h3>4e. Agent Builder UI <em>(P1.5)</em></h3>
+  <p>Open <a href="https://10.0.0.9/governance/agents">https://10.0.0.9/governance/agents</a>.</p>
+  <ul>
+    <li>Sign in.</li>
+    <li>Click <strong>+ new agent</strong>, fill the form.</li>
+    <li>Publish to a <code>team</code> scope.</li>
+    <li>Watch <code>runtime_sync_state</code> flip to <span class="tag-ok">provisioned</span> in the UI.</li>
+  </ul>
+</div>
+
+<div class="step">
+  <h3>4f. Dispute Handler end-to-end <em>(P1.6)</em></h3>
+<pre><code># Seed it
+bash /opt/InsideLLM/scripts/seed-dispute-handler.sh
+
+# Verify
+curl -sk -u insidellm-admin:$KEY \
+  https://10.0.0.9/governance/api/v1/agents/organization-collections/dispute-handler | \
+  jq '.status, .runtime_sync_state'
+# Expect: "published", "provisioned"</code></pre>
+  <p>Then: open <a href="https://10.0.0.9/">https://10.0.0.9/</a> (Open WebUI), model picker → <strong>Dispute Handler</strong>. Run one turn against <code>HH000001</code> and confirm the agent calls <code>lookup_account</code>.</p>
+</div>
+
+<div class="step">
+  <h3>4g. Keycloak <em>(P1.B)</em></h3>
+  <p><a href="https://10.0.0.9/keycloak/">https://10.0.0.9/keycloak/</a> — login: <code>insidellm-admin</code> / <code>&lt;LITELLM_MASTER_KEY&gt;</code>. Switch to the <code>insidellm</code> realm and confirm the three groups (<code>InsideLLM-View</code>, <code>InsideLLM-Admin</code>, <code>InsideLLM-Approve</code>).</p>
+<pre><code>curl -sk -u insidellm-admin:$KEY \
+  https://10.0.0.9/governance/api/v1/identity/whoami | jq
+# Expect: {"ok": true, "realm": "insidellm", ...}
+
+curl -sk -u insidellm-admin:$KEY \
+  https://10.0.0.9/governance/api/v1/identity/sync/status | jq '.runs[0]'
+# Expect: most recent run with status=success</code></pre>
+</div>
+
+<div class="step">
+  <h3>4h. DLP sidecar + notifications <em>(P2.1)</em></h3>
+<pre><code># Dry-run scan (no webhook needed)
+curl -sk -u insidellm-admin:$KEY -X POST \
+  https://10.0.0.9/governance/api/v1/notifications/scan \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"Customer SSN 123-45-6789 disputed account 12345678"}' | jq
+# Expect: hit_count &gt;= 2, has_critical=true,
+#         sha12 fingerprints (no raw match)</code></pre>
+</div>
+
+<!-- ============================================================ -->
+<h2>5. If something breaks</h2>
+<table>
+  <thead>
+    <tr><th>Symptom</th><th>Likely cause</th><th>Fast check</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>governance-hub</code> unhealthy</td>
+      <td>PyYAML or Celery missing</td>
+      <td><code>docker logs insidellm-governance-hub --tail 50</code> — look for <code>ModuleNotFoundError</code></td>
+    </tr>
+    <tr>
+      <td>Agent publish fails with "0 columns" error</td>
+      <td>Column migration didn't run</td>
+      <td><code>docker exec insidellm-postgres psql -U litellm -d litellm -c "\d governance_agents"</code> — check for <code>runtime_sync_state</code> column</td>
+    </tr>
+    <tr>
+      <td>Keycloak won't start</td>
+      <td>Postgres race</td>
+      <td><code>docker logs insidellm-keycloak --tail 100</code>; usually resolves on retry</td>
+    </tr>
+    <tr>
+      <td><code>/governance/portfolio</code> empty</td>
+      <td>Central DB empty</td>
+      <td>Expected on fresh deploy — populate with <code>POST /governance/api/v1/sync/run</code></td>
+    </tr>
+    <tr>
+      <td>OWUI shows no Dispute Handler</td>
+      <td>Translator partial-provisioned</td>
+      <td><code>POST .../agents/organization-collections/dispute-handler/sync</code> (idempotent retry)</td>
+    </tr>
+    <tr>
+      <td>Anything else</td>
+      <td>—</td>
+      <td><code>/var/log/InsideLLM-deploy.log</code> + <code>docker logs insidellm-&lt;service&gt; --tail 100</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ============================================================ -->
+<h2>6. Rollback if needed</h2>
+<p>Nuclear option — return to the last green tag before these 16 commits:</p>
+<pre><code>cd /opt/InsideLLM
+git log --oneline | head -20            # find the last commit before d80dc9c
+git checkout &lt;sha&gt;                      # detached HEAD is fine for smoke
+cd terraform
+terraform apply -var-file="../terraform.tfvars"
+# Takes ~4 min to roll back</code></pre>
+
+<!-- ============================================================ -->
+<h2>Sign-off checklist</h2>
+<p>Mark each row ✅ before calling the validation complete:</p>
+<ul class="check-list">
+  <li><strong>4a.</strong> Every container healthy</li>
+  <li><strong>4b.</strong> <code>governance_agents</code>, <code>governance_actions</code>, <code>governance_identity_*</code> present</li>
+  <li><strong>4c.</strong> ≥20 core catalog actions seeded</li>
+  <li><strong>4d.</strong> Portfolio dashboard loads</li>
+  <li><strong>4e.</strong> Agent created + published via UI</li>
+  <li><strong>4f.</strong> Dispute Handler responds correctly to HH000001</li>
+  <li><strong>4g.</strong> Keycloak whoami + sync green</li>
+  <li><strong>4h.</strong> DLP scan returns redacted fingerprints (no raw match)</li>
+</ul>
+<p>When all eight rows are checked, the stack is <strong class="tag-ok">Parent Organization-demo-ready</strong>.</p>
+
+<footer>
+  InsideLLM · Test Plan V1 · Source: <code>docs/TestPlan_V1.md</code>
+</footer>
+
+</main>
+</body>
+</html>
