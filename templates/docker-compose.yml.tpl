@@ -573,6 +573,10 @@ services:
       # Name must match the `hmac_secret_env` value in catalog entries.
       N8N_WEBHOOK_SECRET: "$${N8N_WEBHOOK_SECRET}"
 %{ endif ~}
+%{ if activepieces_enable ~}
+      # Activepieces webhook HMAC — same shape as n8n so flows are portable.
+      ACTIVEPIECES_WEBHOOK_SECRET: "$${ACTIVEPIECES_WEBHOOK_SECRET}"
+%{ endif ~}
       # P2.1 — Teams/Slack notification webhooks. Empty by default; set in
       # /opt/InsideLLM/.env (and thus docker compose env) or via
       # settings_overrides to activate. DLP sidecar runs in-path regardless.
@@ -963,6 +967,90 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+    networks:
+      - insidellm-internal
+
+%{ endif ~}
+%{ if activepieces_enable ~}
+  # -------------------------------------------------------------------------
+  # Activepieces DB init — creates a dedicated `${activepieces_db_name}`
+  # database inside the shared insidellm-postgres (same pattern as n8n).
+  # -------------------------------------------------------------------------
+  activepieces-db-init:
+    image: postgres:16-alpine
+    container_name: insidellm-activepieces-db-init
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: "$${POSTGRES_PASSWORD}"
+    entrypoint:
+      - sh
+      - -c
+      - |
+        psql -h postgres -U litellm -d litellm -tc "SELECT 1 FROM pg_database WHERE datname='${activepieces_db_name}'" | grep -q 1 || \
+        psql -h postgres -U litellm -d litellm -c "CREATE DATABASE ${activepieces_db_name} OWNER litellm"
+    networks:
+      - insidellm-internal
+
+  # -------------------------------------------------------------------------
+  # Activepieces — MIT-licensed alternative to n8n (P3.2). Same action-catalog
+  # slot, different backend: catalog entries set backend.type=activepieces_trigger
+  # and the gov-hub dispatcher posts signed payloads to the flow's webhook.
+  #
+  # Editor served behind nginx at /activepieces/. AP_FRONTEND_URL mirrors the
+  # external path so generated webhook URLs point at the right host.
+  # -------------------------------------------------------------------------
+  activepieces:
+    image: activepieces/activepieces:${activepieces_version}
+    container_name: insidellm-activepieces
+    restart: always
+    depends_on:
+      activepieces-db-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    environment:
+      AP_ENGINE_EXECUTABLE_PATH: dist/packages/engine/main.js
+      AP_ENVIRONMENT: prod
+      AP_EXECUTION_MODE: UNSANDBOXED
+      AP_POSTGRES_HOST: postgres
+      AP_POSTGRES_PORT: "5432"
+      AP_POSTGRES_DATABASE: "${activepieces_db_name}"
+      AP_POSTGRES_USERNAME: litellm
+      AP_POSTGRES_PASSWORD: "$${POSTGRES_PASSWORD}"
+      AP_POSTGRES_SSL_CA: ""
+      AP_REDIS_HOST: redis
+      AP_REDIS_PORT: "6379"
+      AP_REDIS_DB: "3"
+      AP_QUEUE_MODE: REDIS
+
+      # Encryption + signing — pinned to state-persisted secrets so
+      # stored credentials survive restart.
+      AP_ENCRYPTION_KEY: "$${AP_ENCRYPTION_KEY}"
+      AP_JWT_SECRET: "$${AP_JWT_SECRET}"
+
+      # Outbound webhook HMAC — dispatcher signs with this, flows verify.
+      AP_WEBHOOK_SECRET: "$${ACTIVEPIECES_WEBHOOK_SECRET}"
+
+      # External URL — nginx terminates TLS at / and forwards /activepieces/.
+      AP_FRONTEND_URL: "https://${server_name}/activepieces"
+
+      # Hardening for single-tenant self-host.
+      AP_SIGN_UP_ENABLED: "false"
+      AP_TELEMETRY_ENABLED: "false"
+      AP_EDITION: ce
+      AP_WEBHOOK_TIMEOUT_SECONDS: "30"
+      AP_TRIGGER_DEFAULT_POLL_INTERVAL: "5"
+    volumes:
+      - /opt/InsideLLM/data/activepieces:/var/lib/activepieces/local
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:80/api/v1/flags >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
     networks:
       - insidellm-internal
 

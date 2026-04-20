@@ -67,6 +67,11 @@ SUPPORTED_SYNC_HTTP = [
         lambda url: {"type": "n8n_webhook", "webhook_url": url},
         "sync",
     ),
+    (
+        "activepieces_trigger",
+        lambda url: {"type": "activepieces_trigger", "trigger_url": url},
+        "sync",
+    ),
 ]
 
 CELERY_BACKEND = (
@@ -81,10 +86,9 @@ CELERY_BACKEND = (
 )
 
 NOT_IMPLEMENTED_BACKENDS = [
-    # These fail with a predictable error until their P3.2 / future
-    # implementations land. Parity contract applies regardless.
-    ("activepieces_trigger", {"type": "activepieces_trigger", "trigger_url": "http://ap/hook"}),
-    ("mcp_tool",             {"type": "mcp_tool", "server": "svc", "tool_name": "probe"}),
+    # Fails with a predictable error until the future implementation
+    # lands. Parity contract applies regardless.
+    ("mcp_tool", {"type": "mcp_tool", "server": "svc", "tool_name": "probe"}),
 ]
 
 

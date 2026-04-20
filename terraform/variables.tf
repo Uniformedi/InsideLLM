@@ -1135,6 +1135,38 @@ variable "n8n_webhook_secret" {
   default     = ""
 }
 
+# -----------------------------------------------------------------------------
+# Activepieces tool factory — MIT-licensed n8n alternative (P3.2)
+# -----------------------------------------------------------------------------
+# Drops into the same action-catalog slot as n8n via backend.type =
+# activepieces_trigger. Shares local Postgres + Redis; dispatcher signs
+# outbound calls with the same HMAC envelope shape as n8n so workflows
+# can be ported across by swapping a URL.
+variable "activepieces_enable" {
+  description = "Deploy a local Activepieces workflow service. Default false (opt-in per tenant)."
+  type        = bool
+  default     = false
+}
+
+variable "activepieces_version" {
+  description = "Activepieces container image tag."
+  type        = string
+  default     = "0.56.0"
+}
+
+variable "activepieces_db_name" {
+  description = "Database name Activepieces uses inside insidellm-postgres."
+  type        = string
+  default     = "activepieces"
+}
+
+variable "activepieces_webhook_secret" {
+  description = "HMAC secret for Activepieces webhook signatures. Empty = auto-generated."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
 variable "keycloak_version" {
   description = "Keycloak container image tag (keep pinned for deterministic deploys)."
   type        = string
@@ -1178,4 +1210,125 @@ variable "keycloak_litellm_client_secret" {
   type        = string
   sensitive   = true
   default     = ""
+}
+
+# =============================================================================
+# CANONICAL SESSIONS (Phase 3.3+)
+# Declarative session tier + data residency drive retention, handoff policy,
+# mirror-promotion controls, push payload stripping, and cross-region fork
+# eligibility. See configs/opa/policies/sessions/*.rego for enforcement.
+# =============================================================================
+
+variable "session_security_tier" {
+  description = <<EOT
+Tenant default security tier for canonical sessions. Valid values:
+  T0 Ephemeral       24h retention; break-glass
+  T1 Public          30d; public catalog chat
+  T2 Standard        90d / 1y; internal ops
+  T3 Confidential    30d / 3y; contracts, IP, M&A
+  T4 Consumer-fin    60d / 7y; FDCPA/FCRA regulated (dispute-handler)
+  T5 Healthcare      30d / 6y; HIPAA
+  T6 Financial-svcs  30d / 7y; GLBA/SOX/17a-4 WORM
+  T7 High-security   7d; aggressive key rotation
+Agent manifests and session classification may only tighten (raise) the tier, never lower it.
+EOT
+  type        = string
+  default     = "T2"
+  validation {
+    condition     = contains(["T0", "T1", "T2", "T3", "T4", "T5", "T6", "T7"], var.session_security_tier)
+    error_message = "session_security_tier must be one of T0..T7."
+  }
+}
+
+variable "session_data_region" {
+  description = "Data residency region for this tenant stack. Used by sessions.residency OPA rule to gate cross-region federation."
+  type        = string
+  default     = "us-east"
+}
+
+variable "session_retention_floor_days_override" {
+  description = "Optional per-tenant override raising the tier floor (days). 0 = use tier default."
+  type        = number
+  default     = 0
+}
+
+variable "session_retention_cap_days" {
+  description = "Maximum days of cold retention before cryptographic erasure. 0 = use tier default."
+  type        = number
+  default     = 0
+}
+
+# -----------------------------------------------------------------------------
+# Progressive Web App + Web Push
+# -----------------------------------------------------------------------------
+
+variable "pwa_enable" {
+  description = "Enable the installable InsideLLM PWA (OWUI-embedded + governance-hub inbox)."
+  type        = bool
+  default     = true
+}
+
+variable "pwa_theme_color" {
+  description = "PWA manifest theme_color."
+  type        = string
+  default     = "#0b4f8c"
+}
+
+variable "pwa_background_color" {
+  description = "PWA manifest background_color (splash screen)."
+  type        = string
+  default     = "#ffffff"
+}
+
+variable "pwa_display" {
+  description = "PWA display mode: standalone | fullscreen | minimal-ui | browser."
+  type        = string
+  default     = "standalone"
+  validation {
+    condition     = contains(["standalone", "fullscreen", "minimal-ui", "browser"], var.pwa_display)
+    error_message = "pwa_display must be standalone, fullscreen, minimal-ui, or browser."
+  }
+}
+
+variable "pwa_tenant_name" {
+  description = "Display name for the installable PWA."
+  type        = string
+  default     = "InsideLLM"
+}
+
+variable "pwa_icon_512_path" {
+  description = "Path to the 512x512 PNG icon relative to templates/."
+  type        = string
+  default     = "pwa/icon-512.png"
+}
+
+variable "pwa_icon_192_path" {
+  description = "Path to the 192x192 PNG icon relative to templates/."
+  type        = string
+  default     = "pwa/icon-192.png"
+}
+
+variable "pwa_allowed_tiers" {
+  description = "Tiers permitted to register for Web Push on this tenant. See sessions/push.rego for payload stripping per tier."
+  type        = list(string)
+  default     = ["T1", "T2", "T3", "T4"]
+}
+
+variable "vapid_public_key" {
+  description = "Base64url-encoded VAPID public key for Web Push. Auto-generated on apply if empty."
+  type        = string
+  default     = ""
+}
+
+variable "vapid_private_key" {
+  description = "Base64url-encoded VAPID private key for Web Push. Auto-generated on apply if empty."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "vapid_subject" {
+  description = "VAPID subject (mailto: or https:) — contact point for push-endpoint abuse reports."
+  type        = string
+  default     = "mailto:ops@insidellm.local"
 }

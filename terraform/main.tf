@@ -85,6 +85,27 @@ resource "random_password" "n8n_webhook_secret" {
   special = false
 }
 
+# Activepieces requires two 32-char keys (encryption + JWT) and a webhook
+# HMAC. random_password persists in state, so re-applies keep existing
+# credentials decryptable.
+resource "random_password" "activepieces_encryption_key" {
+  count   = var.activepieces_enable ? 1 : 0
+  length  = 32
+  special = false
+}
+
+resource "random_password" "activepieces_jwt_secret" {
+  count   = var.activepieces_enable ? 1 : 0
+  length  = 32
+  special = false
+}
+
+resource "random_password" "activepieces_webhook_secret" {
+  count   = var.activepieces_enable && var.activepieces_webhook_secret == "" ? 1 : 0
+  length  = 48
+  special = false
+}
+
 locals {
   litellm_master_key    = var.litellm_master_key != "" ? var.litellm_master_key : "sk-${random_password.litellm_master_key[0].result}"
   litellm_salt_key      = var.litellm_salt_key != "" ? var.litellm_salt_key : random_password.litellm_salt_key[0].result
@@ -495,6 +516,9 @@ locals {
     guacamole_db_password  = local.guacamole_db_password
     fleet_edge_secret      = random_password.fleet_edge_secret.result
     n8n_webhook_secret     = var.n8n_webhook_secret != "" ? var.n8n_webhook_secret : (var.n8n_enable ? random_password.n8n_webhook_secret[0].result : "")
+    activepieces_encryption_key = var.activepieces_enable ? random_password.activepieces_encryption_key[0].result : ""
+    activepieces_jwt_secret     = var.activepieces_enable ? random_password.activepieces_jwt_secret[0].result : ""
+    activepieces_webhook_secret = var.activepieces_webhook_secret != "" ? var.activepieces_webhook_secret : (var.activepieces_enable ? random_password.activepieces_webhook_secret[0].result : "")
   })
 }
 
@@ -612,6 +636,11 @@ locals {
     n8n_version        = var.n8n_version
     n8n_db_name        = var.n8n_db_name
     n8n_webhook_secret = var.n8n_webhook_secret != "" ? var.n8n_webhook_secret : (var.n8n_enable ? random_password.n8n_webhook_secret[0].result : "")
+    # Activepieces per-tenant tool factory (P3.2) — n8n's MIT-licensed alternative.
+    activepieces_enable         = var.activepieces_enable
+    activepieces_version        = var.activepieces_version
+    activepieces_db_name        = var.activepieces_db_name
+    activepieces_webhook_secret = var.activepieces_webhook_secret != "" ? var.activepieces_webhook_secret : (var.activepieces_enable ? random_password.activepieces_webhook_secret[0].result : "")
   })
 }
 
@@ -632,6 +661,7 @@ locals {
     guacamole_enable       = local.effective_guacamole_enable
     keycloak_enable        = var.keycloak_enable
     n8n_enable             = var.n8n_enable
+    activepieces_enable    = var.activepieces_enable
     # Stream C — edge trust. When an incoming request carries X-User-Email
     # (claims edge-forwarded identity), backends require X-Edge-Secret to
     # match this value before honouring the claim.
@@ -761,6 +791,7 @@ locals {
       keycloak_enable        = var.keycloak_enable
       keycloak_realm_name    = var.keycloak_realm_name
       n8n_enable             = var.n8n_enable
+      activepieces_enable    = var.activepieces_enable
       fleet_primary_host     = var.fleet_primary_host
     })
   })

@@ -10,7 +10,7 @@ from sqlalchemy import text
 from .config import settings
 from .db.local_db import AsyncSessionLocal, SyncSessionLocal, engine
 from .db.models import Base
-from .routers import actions, ad_join, advisor, agents, agents_ui, audit, auth, changes, chat, config_snapshots, connectors, fleet, framework, hyperv, identity, keyword_templates, notifications, obligations, policies, portfolio, prompts, restore, schema, skills, sync, vendors
+from .routers import actions, ad_join, advisor, agents, agents_ui, audit, auth, changes, chat, config_snapshots, connectors, fleet, framework, hyperv, identity, keyword_templates, notifications, obligations, policies, portfolio, prompts, restore, schema, sessions, skills, sync, vendors
 from .services.config_service import capture_snapshot
 from .services.sync_service import collect_telemetry, export_to_central
 
@@ -68,6 +68,7 @@ app.include_router(actions.router)
 app.include_router(identity.router)
 app.include_router(portfolio.router)
 app.include_router(notifications.router)
+app.include_router(sessions.router)
 
 if settings.chat_enable:
     app.include_router(chat.router)
@@ -140,6 +141,10 @@ async def landing():
     <a href="/n8n/">
       <span class="icon" style="background:#ea4560">N8</span>
       <div><div class="label">Tool Factory (n8n)</div><div class="desc">Low-code webhook workflows that declarative agents call as catalog actions. Shown when n8n_enable=true.</div></div>
+    </a>
+    <a href="/activepieces/">
+      <span class="icon" style="background:#a855f7">AP</span>
+      <div><div class="label">Tool Factory (Activepieces)</div><div class="desc">MIT-licensed low-code workflow builder. Same action-catalog slot as n8n; backend.type=activepieces_trigger. Shown when activepieces_enable=true.</div></div>
     </a>
     <a href="/governance/policies">
       <span class="icon" style="background:#dc2626">OP</span>
@@ -396,6 +401,36 @@ async def startup():
             asyncio.create_task(_kc_job())
         except Exception as e:
             logger.error(f"Failed to schedule keycloak identity sync: {e}")
+
+
+    # Sessions retention expiry — nightly walk over expired sessions,
+    # emit tombstones, and trigger cryptographic erasure. Hash chain
+    # preserved; tombstones survive destruction as proof of prior existence.
+    try:
+        from .services.sessions_service import expire_cold_sessions
+
+        async def _retention_job():
+            try:
+                async with AsyncSessionLocal() as db:
+                    produced = await expire_cold_sessions(db)
+                    await db.commit()
+                    if produced:
+                        logger.info(f"sessions retention: produced {produced} tombstones")
+            except Exception as e:
+                logger.error(f"sessions retention run failed: {e}")
+
+        if not scheduler.running:
+            scheduler.start()
+        retention_trigger = CronTrigger.from_crontab("15 2 * * *")  # 02:15 daily
+        scheduler.add_job(
+            _retention_job,
+            retention_trigger,
+            id="sessions_retention_expiry",
+            replace_existing=True,
+        )
+        logger.info("Sessions retention expiry scheduled: 02:15 daily")
+    except Exception as e:
+        logger.error(f"Failed to schedule sessions retention: {e}")
 
 
 @app.on_event("shutdown")

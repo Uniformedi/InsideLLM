@@ -50,6 +50,16 @@ FLEET_EDGE_SECRET=${fleet_edge_secret}
 # Empty when n8n_enable=false.
 N8N_WEBHOOK_SECRET=${n8n_webhook_secret}
 
+# --- Activepieces secrets (P3.2) -------------------------------------------
+# AP_ENCRYPTION_KEY encrypts credentials in Activepieces' DB — stable
+# across re-applies or all stored creds become unreadable.
+# AP_JWT_SECRET signs editor session tokens.
+# ACTIVEPIECES_WEBHOOK_SECRET is the HMAC shared between gov-hub's
+# dispatcher and Activepieces Code-step verifiers.
+AP_ENCRYPTION_KEY=${activepieces_encryption_key}
+AP_JWT_SECRET=${activepieces_jwt_secret}
+ACTIVEPIECES_WEBHOOK_SECRET=${activepieces_webhook_secret}
+
 # --- Teams/Slack/email notification webhooks (P2.1) ------------------------
 # Empty by default. Paste the Incoming Webhook URL from Teams or Slack
 # here (or edit /opt/InsideLLM/.env on the VM) to activate outbound

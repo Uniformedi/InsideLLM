@@ -1,0 +1,41 @@
+# Activepieces-backed catalog actions (P3.2) — tenant_id: core
+#
+# Mirrors the n8n example contract so workflows are portable across the
+# two tool factories. Swap the URL to point at an Activepieces flow and
+# keep the HMAC verifier — the gov-hub dispatcher signs with the same
+# X-Insidellm-Signature envelope.
+
+schema_version: "1.0"
+actions:
+  - schema_version: "1.0"
+    action_id: activepieces_verify_signature_probe
+    tenant_id: core
+    display_name: "Activepieces Probe — Signature Verification"
+    description: "Smoke test for the Activepieces dispatcher path. Confirms HMAC + webhook round-trip."
+    category: other
+    backend:
+      type: activepieces_trigger
+      trigger_url: "http://activepieces:80/api/v1/webhooks/insidellm-probe"
+      hmac_secret_env: ACTIVEPIECES_WEBHOOK_SECRET
+    inputs:
+      probe_message:
+        type: string
+        required: false
+    outputs:
+      ok:
+        type: boolean
+      body:
+        type: object
+    guardrail_requirements:
+      minimum_guardrail_tier: tier_general_business
+      data_classes: []
+      requires_approval: false
+    audit:
+      log_inputs: true
+      log_outputs: true
+      redact_fields: []
+    rate_limit:
+      per_minute: 30
+      per_day: 500
+    maintainer: insidellm-core
+    version: "1.0.0"

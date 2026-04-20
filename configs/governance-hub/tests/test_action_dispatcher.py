@@ -354,7 +354,8 @@ async def test_n8n_http_error_bubbles_useful_message():
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("backend_dict", [
-    {"type": "activepieces_trigger", "trigger_url": "http://ap/hook/b"},
+    # activepieces_trigger moved to its own test suite via the parity matrix
+    # when P3.2 landed. mcp_tool is still pending implementation.
     {"type": "mcp_tool", "server": "svc", "tool_name": "x"},
 ])
 async def test_not_yet_implemented_backends_fail_explicitly(backend_dict):

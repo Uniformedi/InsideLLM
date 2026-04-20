@@ -405,6 +405,25 @@ http {
         }
 
 %{ endif ~}
+%{ if activepieces_enable ~}
+        # --- Activepieces (per-tenant tool factory, P3.2) ---
+        # Editor + webhook endpoints under /activepieces/. The container
+        # serves on :80 at root; we rewrite the external path to /.
+        location /activepieces/ {
+            proxy_pass http://activepieces:80/;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection $http_connection;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_buffering off;
+            proxy_read_timeout 3600s;
+            client_max_body_size 50m;
+        }
+
+%{ endif ~}
 %{ if n8n_enable ~}
         # --- n8n (per-tenant tool factory, P3.1) ---
         # Editor + webhook endpoints behind /n8n/. N8N_PATH=/n8n/ inside the

@@ -113,16 +113,19 @@ async def dispatch(
         return await _dispatch_n8n(
             entry, backend, inputs, http_timeout=http_timeout, **base_meta
         )
-    if isinstance(backend, (ActivepiecesBackend, MCPBackend)):
-        # P3.2 (activepieces) / future (mcp) will implement these; for now
-        # fail explicitly so catalog entries referencing them get a clear
-        # error rather than silently failing.
+    if isinstance(backend, ActivepiecesBackend):
+        return await _dispatch_activepieces(
+            entry, backend, inputs, http_timeout=http_timeout, **base_meta
+        )
+    if isinstance(backend, MCPBackend):
+        # MCP tool dispatch is future work — fail explicitly so catalog
+        # entries referencing it get a clear error rather than silently
+        # succeeding.
         return DispatchResult(
             ok=False,
             mode="sync",
             output=None,
-            error=f"backend type '{getattr(backend, 'type', '?')}' not yet implemented "
-                  f"(scheduled: P3.2 / future)",
+            error="backend type 'mcp_tool' not yet implemented (scheduled: future)",
             **base_meta,
         )
 
@@ -279,6 +282,81 @@ async def _dispatch_n8n(
                 mode="sync",
                 output=None,
                 error=f"n8n dispatch failed: {type(e).__name__}: {e}"[:500],
+                **meta,
+            )
+
+
+# ---------------------------------------------------------------------------
+# Activepieces trigger backend (P3.2)
+# ---------------------------------------------------------------------------
+
+
+async def _dispatch_activepieces(
+    entry: ActionCatalogEntry,
+    backend: ActivepiecesBackend,
+    inputs: dict[str, Any],
+    *,
+    http_timeout: float | None,
+    **meta: Any,
+) -> DispatchResult:
+    """POST to an Activepieces flow trigger URL with the same signed-JSON
+    envelope as n8n so workflows are portable: swap the URL in the action
+    catalog, keep the verifier (a Code step that recomputes the HMAC).
+
+    Secret env var defaults to ACTIVEPIECES_WEBHOOK_SECRET but
+    `backend.hmac_secret_env` overrides per-action.
+    """
+    import json
+    url = str(backend.trigger_url)
+    for k, v in (inputs or {}).items():
+        for token in ("{" + k + "}", "%7B" + k + "%7D"):
+            if token in url:
+                url = url.replace(token, str(v))
+
+    body_bytes = json.dumps(inputs or {}, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    headers = {
+        "Content-Type": "application/json",
+        "User-Agent": "insidellm-dispatcher/1.0",
+        "X-Insidellm-Tenant": entry.tenant_id or "core",
+        "X-Insidellm-Action": entry.action_id,
+    }
+
+    secret_env = backend.hmac_secret_env or "ACTIVEPIECES_WEBHOOK_SECRET"
+    secret = os.environ.get(secret_env, "")
+    if secret:
+        headers["X-Insidellm-Signature"] = _hmac_signature(secret, body_bytes)
+    elif secret_env:
+        logger.warning(
+            f"activepieces webhook dispatch without HMAC: env var {secret_env} unset "
+            f"(action={entry.action_id})"
+        )
+
+    timeout = http_timeout or 15.0
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        try:
+            resp = await client.post(url, content=body_bytes, headers=headers)
+            resp.raise_for_status()
+            output = resp.json() if resp.content else {}
+            return DispatchResult(
+                ok=True,
+                mode="sync",
+                output=output if isinstance(output, dict) else {"result": output},
+                **meta,
+            )
+        except httpx.HTTPStatusError as e:
+            return DispatchResult(
+                ok=False,
+                mode="sync",
+                output=None,
+                error=f"activepieces HTTP {e.response.status_code}: {_short_body(e.response)}",
+                **meta,
+            )
+        except Exception as e:
+            return DispatchResult(
+                ok=False,
+                mode="sync",
+                output=None,
+                error=f"activepieces dispatch failed: {type(e).__name__}: {e}"[:500],
                 **meta,
             )
 

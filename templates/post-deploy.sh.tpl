@@ -1394,6 +1394,12 @@ log "    Catalog entries use backend.type=n8n_webhook; dispatcher signs with"
 log "    X-Insidellm-Signature (HMAC-SHA256, secret = N8N_WEBHOOK_SECRET)"
 log "    Template workflow: configs/n8n/workflows/verify-signature.json"
 %{ endif ~}
+%{ if activepieces_enable ~}
+log "  Activepieces Tool Factory: https://$VM_IP/activepieces/"
+log "    First-user signup on the sign-in page — becomes the admin."
+log "    Catalog entries use backend.type=activepieces_trigger; same HMAC"
+log "    envelope as n8n (secret = ACTIVEPIECES_WEBHOOK_SECRET)"
+%{ endif ~}
 %{ if claude_code_enable ~}
 log ""
 log "  Claude Code CLI installed for ${ssh_admin_user}."
