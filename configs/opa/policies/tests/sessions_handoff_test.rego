@@ -51,7 +51,10 @@ test_allows_tenant_admin_override if {
     input_override := object.union(_base_input, {
         "actor": {"sub": "u-99", "roles": ["tenant-admin"]}
     })
-    count(handoff.deny_reasons with input as input_override) == 0
+    # Rego v1 requires the `with` modifier to bind at the rule-reference
+    # site, not inside a function call. Bind first, then count.
+    reasons := handoff.deny_reasons with input as input_override
+    count(reasons) == 0
 }
 
 test_denies_empty_reason if {
@@ -96,7 +99,8 @@ test_t4_with_reviewer_allowed if {
         "session": object.union(_base_input.session, {"security_tier": "T4"}),
         "target": object.union(_base_input.target, {"roles": ["reviewer"]}),
     })
-    count(handoff.deny_reasons with input as input_override) == 0
+    reasons := handoff.deny_reasons with input as input_override
+    count(reasons) == 0
 }
 
 test_t5_denies_offline_target if {

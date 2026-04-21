@@ -68,15 +68,15 @@ _tier_order := {
 # ---- Effective tier ---------------------------------------------------------
 
 effective_tier := t if {
-    candidates := [c |
-        c := input.session.security_tier
-    ] ++ [c |
-        c := input.manifest.min_security_tier
-        c != null
-    ] ++ [c |
-        c := input.classification.min_security_tier
-        c != null
+    # Collect declared-tier candidates from every source, drop nulls, pick
+    # the highest. Rego v1 doesn't accept `++` across comprehensions, so
+    # iterate a single source list instead.
+    sources := [
+        input.session.security_tier,
+        input.manifest.min_security_tier,
+        input.classification.min_security_tier,
     ]
+    candidates := [c | some c in sources; c != null]
     t := _tier_max(candidates)
 }
 
