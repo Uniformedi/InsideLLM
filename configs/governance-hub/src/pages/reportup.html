@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>InsideLLM — ReportUp Governance</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    background: #0a0e1a;
+    color: #e2e8f0;
+    min-height: 100vh;
+    padding: 24px;
+  }
+  main { max-width: 980px; margin: 0 auto; }
+  header {
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #2a3650;
+  }
+  header h1 {
+    color: #f472b6;
+    font-family: "SF Mono", Consolas, monospace;
+    font-size: 22px;
+    letter-spacing: -0.3px;
+  }
+  header .sub { color: #64748b; font-size: 13px; margin-top: 4px; }
+
+  .panel {
+    background: #1a2234;
+    border: 1px solid #2a3650;
+    border-radius: 10px;
+    padding: 18px 20px;
+    margin-bottom: 16px;
+  }
+  .panel h2 {
+    font-size: 12px;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 12px;
+    font-weight: 600;
+  }
+
+  /* Status banner */
+  .status {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-bottom: 16px;
+  }
+  .status.on { background: rgba(244,114,182,0.1); border: 1px solid rgba(244,114,182,0.4); }
+  .status.off { background: rgba(148,163,184,0.05); border: 1px solid #2a3650; }
+  .status .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .status.on .dot { background: #f472b6; box-shadow: 0 0 10px rgba(244,114,182,0.5); }
+  .status.off .dot { background: #64748b; }
+  .status .text { font-size: 13px; }
+  .status .mono { font-family: "SF Mono", Consolas, monospace; color: #cbd5e1; }
+
+  /* Form */
+  .form-grid { display: grid; gap: 14px; }
+  .form-row { display: grid; gap: 6px; }
+  .form-row label {
+    font-size: 11px;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 500;
+  }
+  .form-row label .hint { text-transform: none; letter-spacing: 0; color: #64748b; font-weight: 400; margin-left: 6px; }
+  .form-row input[type="text"],
+  .form-row input[type="url"],
+  .form-row input[type="number"],
+  .form-row input[type="password"],
+  .form-row textarea,
+  .form-row select {
+    background: #0a0e1a;
+    border: 1px solid #2a3650;
+    color: #e2e8f0;
+    padding: 9px 12px;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 13px;
+  }
+  .form-row input:focus, .form-row textarea:focus { outline: none; border-color: #f472b6; }
+  .form-row textarea { min-height: 90px; resize: vertical; font-family: "SF Mono", Consolas, monospace; font-size: 12px; }
+  .form-row .short { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  .checkboxes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px 16px; }
+  .checkboxes label {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 10px;
+    background: #0a0e1a;
+    border: 1px solid #2a3650;
+    border-radius: 6px;
+    font-size: 13px;
+    color: #cbd5e1;
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 400;
+    cursor: pointer;
+  }
+  .checkboxes label:hover { border-color: #f472b6; }
+  .checkboxes input[type="checkbox"] { accent-color: #f472b6; }
+
+  .btn {
+    background: #111827;
+    border: 1px solid #2a3650;
+    color: #cbd5e1;
+    padding: 8px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .btn:hover { border-color: #f472b6; color: #f472b6; }
+  .btn.primary { background: #f472b6; color: #0a0e1a; border-color: #f472b6; font-weight: 600; }
+  .btn.primary:hover { background: #ec4899; color: #0a0e1a; }
+  .btn.danger { color: #f87171; }
+  .btn.danger:hover { border-color: #f87171; }
+
+  .footer-actions {
+    display: flex; gap: 10px; justify-content: flex-end;
+    margin-top: 14px; padding-top: 14px;
+    border-top: 1px solid #2a3650;
+  }
+
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th, td { text-align: left; padding: 8px 10px; }
+  th { color: #94a3b8; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px;
+       font-size: 10px; border-bottom: 1px solid #2a3650; }
+  tbody tr { border-bottom: 1px solid #1e293b; }
+  td.num { font-family: "SF Mono", Consolas, monospace; text-align: right; color: #cbd5e1; }
+  td .pill {
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-family: "SF Mono", Consolas, monospace;
+  }
+  .pill.ok { background: rgba(34,211,238,0.1); color: #22d3ee; border: 1px solid rgba(34,211,238,0.3); }
+  .pill.warn { background: rgba(251,191,36,0.1); color: #fbbf24; border: 1px solid rgba(251,191,36,0.3); }
+  .pill.err { background: rgba(248,113,113,0.1); color: #f87171; border: 1px solid rgba(248,113,113,0.3); }
+
+  .empty { text-align: center; color: #64748b; padding: 20px; font-size: 13px; }
+  .toast { position: fixed; bottom: 24px; right: 24px; background: #1a2234; border: 1px solid #2a3650;
+           border-radius: 8px; padding: 12px 18px; font-size: 13px; min-width: 260px; z-index: 200; display: none; }
+  .toast.ok { border-color: #22d3ee; color: #22d3ee; }
+  .toast.err { border-color: #f87171; color: #f87171; }
+  .toast.open { display: block; }
+</style>
+</head>
+<body>
+<main>
+
+<header>
+  <h1>InsideLLM — ReportUp Governance</h1>
+  <div class="sub">Opt-in governance-data sharing with a named parent organization · tamper-evident via chain-hash continuity</div>
+</header>
+
+<div id="status-banner" class="status off">
+  <div class="dot"></div>
+  <div class="text" id="status-text">loading config…</div>
+</div>
+
+<!-- Config -->
+<section class="panel">
+  <h2>Configuration</h2>
+  <form id="cfg-form" class="form-grid" onsubmit="return false;">
+    <div class="form-row">
+      <label>Parent organization name <span class="hint">e.g. "Clarion Capital Partners"</span></label>
+      <input type="text" id="f-parent-name" maxlength="255">
+    </div>
+    <div class="form-row">
+      <label>Parent ingest endpoint <span class="hint">HTTPS URL where envelopes are POSTed</span></label>
+      <input type="url" id="f-parent-endpoint" placeholder="https://parent.example.com/reportup/ingest">
+    </div>
+
+    <div class="form-row">
+      <label>Share categories <span class="hint">each is independently toggleable</span></label>
+      <div class="checkboxes">
+        <label><input type="checkbox" id="f-audit-chain"> Audit chain <span class="hint">(tamper-evident)</span></label>
+        <label><input type="checkbox" id="f-telemetry"> Telemetry (last 30 rows)</label>
+        <label><input type="checkbox" id="f-agents"> Agent manifests</label>
+        <label><input type="checkbox" id="f-identity"> Identity roster (Keycloak)</label>
+        <label><input type="checkbox" id="f-policies"> Policy versions</label>
+        <label><input type="checkbox" id="f-change-proposals"> Change proposals</label>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="short">
+        <div><label>Cron schedule</label><input type="text" id="f-schedule" value="0 2 * * *"></div>
+        <div><label>Max records / run</label><input type="number" id="f-max-records" min="100" max="1000000" value="10000"></div>
+      </div>
+    </div>
+
+    <div class="footer-actions">
+      <button class="btn" onclick="showHmac()">set HMAC secret</button>
+      <button class="btn" onclick="onPreview()">preview dry-run</button>
+      <button class="btn primary" onclick="onSave()" id="btn-save">save config</button>
+      <button class="btn primary" onclick="onEnable()" id="btn-enable" style="display:none;">enable reportup</button>
+      <button class="btn danger" onclick="onDisable()" id="btn-disable" style="display:none;">disable reportup</button>
+    </div>
+  </form>
+</section>
+
+<!-- Attestation -->
+<section class="panel">
+  <h2>Compliance Officer Attestation</h2>
+  <div id="attest-note" style="font-size:13px; color:#cbd5e1; margin-bottom:12px;">
+    Enabling ReportUp or changing the parent organization requires a named
+    compliance officer's written consent. The attestation is appended to this
+    tenant's hash-chained audit log and is tamper-evident.
+  </div>
+  <form id="attest-form" class="form-grid" onsubmit="return false;">
+    <div class="form-row">
+      <div class="short">
+        <div><label>Attested by (email)</label><input type="text" id="a-attested-by"></div>
+        <div><label>Role</label><input type="text" id="a-attested-role" value="Compliance Officer"></div>
+      </div>
+    </div>
+    <div class="form-row">
+      <label>Attestation text <span class="hint">the exact words being signed; include parent name, scope, effective date</span></label>
+      <textarea id="a-attestation-text" placeholder="I, [name], [role] at [tenant], attest that I have reviewed the ReportUp configuration above (snapshot SHA …) and authorize InsideLLM to share the selected governance data with [parent]. Effective from [date]."></textarea>
+    </div>
+    <div class="footer-actions">
+      <button class="btn primary" onclick="onAttest()">record attestation</button>
+    </div>
+  </form>
+</section>
+
+<!-- Recent runs -->
+<section class="panel">
+  <h2>Recent sync runs</h2>
+  <div id="log-body">
+    <div class="empty">loading…</div>
+  </div>
+  <div class="footer-actions">
+    <button class="btn" onclick="loadAll()">refresh</button>
+    <button class="btn primary" onclick="onSendNow()" id="btn-send-now">send now</button>
+  </div>
+</section>
+
+<!-- Preview modal contents rendered inline -->
+<section class="panel" id="preview-panel" style="display:none;">
+  <h2>Dry-run preview</h2>
+  <pre id="preview-body" style="background:#000; color:#cbd5e1; padding:14px; border-radius:8px;
+    font-family:'SF Mono',Consolas,monospace; font-size:11px; overflow-x:auto; white-space:pre-wrap;
+    max-height:400px; overflow-y:auto;"></pre>
+</section>
+
+<div id="toast" class="toast"></div>
+
+<script>
+let _cfg = null;
+
+function esc(s) {
+  if (s == null) return "";
+  return String(s).replace(/[&<>"']/g, c => (
+    { "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]
+  ));
+}
+
+function toast(msg, kind = "ok") {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.className = "toast open " + kind;
+  setTimeout(() => t.classList.remove("open"), 3500);
+}
+
+async function api(path, opts) {
+  const resp = await fetch("/governance" + path, {
+    credentials: "include",
+    headers: { "Content-Type": "application/json", ...(opts?.headers || {}) },
+    ...(opts || {}),
+  });
+  const text = await resp.text();
+  let body = null;
+  try { body = text ? JSON.parse(text) : null; } catch {}
+  if (!resp.ok) {
+    const msg = body?.detail || body?.error || `HTTP ${resp.status}`;
+    throw new Error(msg);
+  }
+  return body;
+}
+
+function populateForm(cfg) {
+  _cfg = cfg;
+  document.getElementById("f-parent-name").value = cfg.parent_name || "";
+  document.getElementById("f-parent-endpoint").value = cfg.parent_endpoint || "";
+  document.getElementById("f-audit-chain").checked = cfg.share_audit_chain;
+  document.getElementById("f-telemetry").checked = cfg.share_telemetry;
+  document.getElementById("f-agents").checked = cfg.share_agents;
+  document.getElementById("f-identity").checked = cfg.share_identity;
+  document.getElementById("f-policies").checked = cfg.share_policies;
+  document.getElementById("f-change-proposals").checked = cfg.share_change_proposals;
+  document.getElementById("f-schedule").value = cfg.schedule_cron;
+  document.getElementById("f-max-records").value = cfg.max_records_per_run;
+
+  const banner = document.getElementById("status-banner");
+  const text = document.getElementById("status-text");
+  if (cfg.enabled) {
+    banner.className = "status on";
+    text.innerHTML = "Reporting to <strong>" + esc(cfg.parent_name || "(unnamed parent)") +
+      "</strong> · last shipped seq <span class='mono'>" + cfg.last_shipped_sequence + "</span>" +
+      (cfg.last_envelope_hash
+        ? " · last envelope <span class='mono'>" + cfg.last_envelope_hash.slice(0,12) + "…</span>"
+        : "");
+    document.getElementById("btn-enable").style.display = "none";
+    document.getElementById("btn-disable").style.display = "inline-block";
+  } else {
+    banner.className = "status off";
+    text.textContent = "ReportUp is disabled. Save config + record an attestation, then enable.";
+    document.getElementById("btn-enable").style.display = "inline-block";
+    document.getElementById("btn-disable").style.display = "none";
+  }
+}
+
+function collect() {
+  return {
+    parent_name: document.getElementById("f-parent-name").value.trim() || null,
+    parent_endpoint: document.getElementById("f-parent-endpoint").value.trim() || null,
+    share_audit_chain: document.getElementById("f-audit-chain").checked,
+    share_telemetry: document.getElementById("f-telemetry").checked,
+    share_agents: document.getElementById("f-agents").checked,
+    share_identity: document.getElementById("f-identity").checked,
+    share_policies: document.getElementById("f-policies").checked,
+    share_change_proposals: document.getElementById("f-change-proposals").checked,
+    schedule_cron: document.getElementById("f-schedule").value.trim(),
+    max_records_per_run: parseInt(document.getElementById("f-max-records").value) || 10000,
+  };
+}
+
+async function loadAll() {
+  try {
+    populateForm(await api("/api/v1/reportup/config"));
+  } catch (e) {
+    toast("config load: " + e.message, "err");
+  }
+  try {
+    const r = await api("/api/v1/reportup/log?limit=20");
+    const body = document.getElementById("log-body");
+    if (!r.runs.length) {
+      body.innerHTML = '<div class="empty">No runs yet.</div>';
+      return;
+    }
+    body.innerHTML = `<table><thead><tr>
+      <th>Started</th><th>Status</th><th>Envelope hash</th>
+      <th class="num">Audit</th><th class="num">Tele</th><th class="num">Agents</th>
+      <th class="num">Identity</th><th class="num">Duration</th><th>Ack</th>
+    </tr></thead><tbody>` + r.runs.map(x => {
+      const pill = x.status === "success" ? "ok"
+                  : x.status === "error" || x.status === "parent_rejected" ? "err"
+                  : "warn";
+      return `<tr>
+        <td>${esc(x.started_at)}</td>
+        <td><span class="pill ${pill}">${esc(x.status)}</span></td>
+        <td class="num" style="font-size:10px;">${esc((x.envelope_hash||"").slice(0,12))}${x.envelope_hash ? "…" : ""}</td>
+        <td class="num">${x.audit_entries_shipped}</td>
+        <td class="num">${x.telemetry_rows_shipped}</td>
+        <td class="num">${x.agents_shipped}</td>
+        <td class="num">${x.identity_rows_shipped}</td>
+        <td class="num">${x.duration_ms != null ? x.duration_ms + " ms" : "—"}</td>
+        <td>${esc(x.parent_ack_status || "—")}${x.parent_http_status ? " (" + x.parent_http_status + ")" : ""}</td>
+      </tr>`;
+    }).join("") + "</tbody></table>";
+  } catch (e) {
+    document.getElementById("log-body").innerHTML =
+      '<div class="empty" style="color:#f87171">' + esc(e.message) + '</div>';
+  }
+}
+
+async function onSave() {
+  try {
+    await api("/api/v1/reportup/config", { method: "PUT", body: JSON.stringify(collect()) });
+    toast("config saved");
+    await loadAll();
+  } catch (e) { toast("save: " + e.message, "err"); }
+}
+
+async function onEnable() {
+  try {
+    const payload = { ...collect(), enabled: true };
+    await api("/api/v1/reportup/config", { method: "PUT", body: JSON.stringify(payload) });
+    toast("enabled");
+    await loadAll();
+  } catch (e) {
+    // The 409 "attestation required" surfaces here — guide the user.
+    toast("enable failed: " + e.message.slice(0, 150), "err");
+  }
+}
+
+async function onDisable() {
+  if (!confirm("Disable ReportUp? The schedule will stop; the config is preserved.")) return;
+  try {
+    await api("/api/v1/reportup/config", {
+      method: "PUT", body: JSON.stringify({ enabled: false })
+    });
+    toast("disabled");
+    await loadAll();
+  } catch (e) { toast("disable: " + e.message, "err"); }
+}
+
+async function onAttest() {
+  const body = {
+    attested_by: document.getElementById("a-attested-by").value.trim(),
+    attested_role: document.getElementById("a-attested-role").value.trim(),
+    attestation_text: document.getElementById("a-attestation-text").value.trim(),
+  };
+  if (!body.attested_by || body.attestation_text.length < 30) {
+    toast("attested_by required + attestation_text needs ≥30 chars", "err");
+    return;
+  }
+  try {
+    const r = await api("/api/v1/reportup/attestation", {
+      method: "POST", body: JSON.stringify(body)
+    });
+    toast("attested (snapshot " + r.config_snapshot_sha.slice(0, 12) + "…)");
+    document.getElementById("a-attestation-text").value = "";
+  } catch (e) { toast("attest: " + e.message, "err"); }
+}
+
+async function onPreview() {
+  try {
+    const r = await api("/api/v1/reportup/preview", { method: "POST" });
+    document.getElementById("preview-body").textContent = JSON.stringify(r, null, 2);
+    document.getElementById("preview-panel").style.display = "block";
+    toast("preview generated — no data sent");
+  } catch (e) { toast("preview: " + e.message, "err"); }
+}
+
+async function onSendNow() {
+  if (!_cfg?.enabled) { toast("enable reportup first", "err"); return; }
+  if (!confirm("Send the next envelope to " + (_cfg.parent_name || "parent") + " now?")) return;
+  try {
+    const r = await api("/api/v1/reportup/send-now", { method: "POST" });
+    toast(r.ok ? ("sent · " + r.status) : ("failed: " + (r.error || r.status).slice(0,100)),
+          r.ok ? "ok" : "err");
+    await loadAll();
+  } catch (e) { toast("send: " + e.message, "err"); }
+}
+
+async function showHmac() {
+  const secret = prompt("Paste the shared HMAC secret (≥32 chars, hex recommended):");
+  if (!secret) return;
+  if (secret.length < 32) { toast("secret must be ≥32 chars", "err"); return; }
+  try {
+    const r = await api("/api/v1/reportup/hmac-secret", {
+      method: "POST", body: JSON.stringify({ secret })
+    });
+    toast("HMAC stored (sha12=" + r.secret_sha12 + ")");
+  } catch (e) { toast("hmac: " + e.message, "err"); }
+}
+
+loadAll();
+</script>
+</main>
+</body>
+</html>

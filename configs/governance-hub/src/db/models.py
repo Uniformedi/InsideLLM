@@ -554,3 +554,103 @@ class ActionCatalog(Base):
         UniqueConstraint("tenant_id", "action_id", name="uq_action_tenant_action_id"),
         Index("ix_action_tenant_backend", "tenant_id", "backend_type"),
     )
+
+
+# =============================================================================
+# ReportUp — opt-in governance-data sharing with a named parent organization.
+# Per-tenant configuration + per-run audit log + compliance-officer attestation.
+# Canonical spec: docs/ReportUp-Governance.md
+# =============================================================================
+
+
+class ReportUpConfig(Base):
+    """Single-row config (one per instance). Holds who we're sharing with,
+    how often, and what categories. HMAC secret kept separately in the
+    settings_overrides table (never returned from the API)."""
+    __tablename__ = "governance_reportup_config"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    enabled = Column(Boolean, default=False, nullable=False)
+
+    # Identity of the parent organization this instance reports to.
+    parent_name = Column(String(255))                    # e.g. "Clarion Capital Partners"
+    parent_endpoint = Column(String(500))                # HTTPS ingest URL
+    parent_public_key_pem = Column(Text)                 # optional — if set, encrypt payloads
+
+    # What to share — each flag independently toggleable.
+    share_audit_chain = Column(Boolean, default=True)
+    share_telemetry = Column(Boolean, default=True)
+    share_agents = Column(Boolean, default=False)
+    share_identity = Column(Boolean, default=False)
+    share_policies = Column(Boolean, default=False)
+    share_change_proposals = Column(Boolean, default=False)
+
+    # Cadence + size guardrails.
+    schedule_cron = Column(String(64), default="0 2 * * *")  # nightly 02:00
+    max_records_per_run = Column(Integer, default=10000)
+
+    # Chain-of-custody pointer: highest audit_chain sequence already shipped.
+    # Next run resumes at sequence > last_shipped_sequence.
+    last_shipped_sequence = Column(Integer, default=0)
+
+    # Hash of the last envelope we sent — parent uses this to verify no
+    # envelopes were dropped between runs. Copied into every new envelope
+    # as previous_envelope_hash.
+    last_envelope_hash = Column(String(64))
+
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_by = Column(String(255))
+
+
+class ReportUpAttestation(Base):
+    """Every config change (enable, change parent, change scope) requires a
+    named compliance officer's attestation. Stored append-only; audit chain
+    appends an event for every insert so the chain itself records consent."""
+    __tablename__ = "governance_reportup_attestations"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    attested_by = Column(String(255), nullable=False)       # email
+    attested_role = Column(String(100))                      # "Compliance Officer", "CTO"
+    attestation_text = Column(Text, nullable=False)          # full consent text signed
+    config_snapshot_json = Column("config_snapshot", JSONB, nullable=False, default=dict)
+    config_snapshot_sha = Column(String(64), nullable=False) # SHA-256 of snapshot
+    attested_at = Column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        Index("ix_reportup_attestations_attested_at", "attested_at"),
+    )
+
+
+class ReportUpLog(Base):
+    """One row per sync run. Records what we shipped, parent's ACK, and any error."""
+    __tablename__ = "governance_reportup_log"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    started_at = Column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
+    ended_at = Column(DateTime(timezone=True))
+    status = Column(String(32), default="running", index=True)   # running | success | error | parent_rejected
+
+    # Envelope identity.
+    envelope_hash = Column(String(64))                   # SHA-256 of this run's payload
+    previous_envelope_hash = Column(String(64))          # SHA of the envelope before this — continuity proof
+    sequence_from = Column(Integer)                      # audit_chain sequence start
+    sequence_to = Column(Integer)                        # audit_chain sequence end inclusive
+
+    # What was shipped (counts per category).
+    audit_entries_shipped = Column(Integer, default=0)
+    telemetry_rows_shipped = Column(Integer, default=0)
+    agents_shipped = Column(Integer, default=0)
+    identity_rows_shipped = Column(Integer, default=0)
+
+    # Parent's acknowledgement — we record their response verbatim.
+    parent_ack_status = Column(String(32))               # accepted | rejected | no_response
+    parent_ack_payload_json = Column("parent_ack_payload", JSONB)
+    parent_http_status = Column(Integer)
+    duration_ms = Column(Integer)
+    error_message = Column(Text)
+
+    __table_args__ = (
+        Index("ix_reportup_log_started", "started_at"),
+        Index("ix_reportup_log_status", "status"),
+    )

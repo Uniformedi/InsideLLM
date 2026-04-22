@@ -10,7 +10,7 @@ from sqlalchemy import text
 from .config import settings
 from .db.local_db import AsyncSessionLocal, SyncSessionLocal, engine
 from .db.models import Base
-from .routers import actions, ad_join, advisor, agents, agents_ui, audit, auth, changes, chat, config_snapshots, connectors, fleet, framework, hyperv, identity, keyword_templates, notifications, obligations, policies, portfolio, prompts, restore, schema, sessions, skills, sync, vendors
+from .routers import actions, ad_join, advisor, agents, agents_ui, audit, auth, changes, chat, config_snapshots, connectors, fleet, framework, hyperv, identity, keyword_templates, notifications, obligations, policies, portfolio, prompts, reportup, restore, schema, sessions, skills, sync, vendors
 from .services.config_service import capture_snapshot
 from .services.sync_service import collect_telemetry, export_to_central
 
@@ -69,6 +69,7 @@ app.include_router(identity.router)
 app.include_router(portfolio.router)
 app.include_router(notifications.router)
 app.include_router(sessions.router)
+app.include_router(reportup.router)
 
 if settings.chat_enable:
     app.include_router(chat.router)
@@ -129,6 +130,10 @@ async def landing():
     <a href="/governance/portfolio">
       <span class="icon" style="background:#22d3ee">PF</span>
       <div><div class="label">Portfolio Observability</div><div class="desc">Cross-tenant aggregate — every InsideLLM instance in your portfolio, one view. Spend, compliance, at-risk flags.</div></div>
+    </a>
+    <a href="/governance/reportup">
+      <span class="icon" style="background:#f472b6">RU</span>
+      <div><div class="label">ReportUp Governance</div><div class="desc">Opt-in data sharing with a named parent organization. Tamper-evident via chain-hash continuity; every config change is compliance-officer attested.</div></div>
     </a>
     <a href="/governance/agents">
       <span class="icon" style="background:#a78bfa">AG</span>
