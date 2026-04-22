@@ -1,0 +1,68 @@
+apiVersion: insidellm.dlp/v1
+kind: DLPPatternSet
+metadata:
+  id: collections-patterns
+  industry_pack: collections
+  description: >
+    DLP patterns specific to consumer debt collections. Applied in addition to
+    the platform-default PII set. Actions are BLOCK or REDACT depending on
+    the pattern's regulatory sensitivity.
+
+patterns:
+  - id: debtor_account_number
+    label: Debtor account number
+    category: pii
+    action: redact
+    regex: '\b(ACCT|ACC|DBT|A/C)[- ]?\d{6,12}\b'
+    description: Internal collections account identifier
+
+  - id: ssn_last4
+    label: SSN last-4
+    category: pii
+    action: redact
+    regex: '\b(last[ -]?four|last[ -]?4)[:\s]*\d{4}\b'
+
+  - id: ssn_full
+    label: Social Security Number (full)
+    category: pii
+    action: block
+    regex: '\b\d{3}-\d{2}-\d{4}\b'
+    reason: Full SSN never appears in collections comms; if present, block and alert.
+
+  - id: bankruptcy_case_id
+    label: Bankruptcy case identifier
+    category: legal
+    action: block
+    regex: '\b\d{2}-\d{5}\b'
+    reason: >
+      If a bankruptcy case exists, the account is in automatic stay (11 USC §362)
+      and collection communications are prohibited. Block and escalate.
+
+  - id: medical_collection_flag
+    label: Medical-collection mention
+    category: phi
+    action: redact
+    regex: '(?i)(medical debt|hospital bill|doctor\s+visit|copay|deductible|insurance claim)'
+    reason: Medical collections carry HIPAA exposure; redact and tag for supervisor review.
+
+  - id: garnishment_case
+    label: Garnishment case identifier
+    category: legal
+    action: redact
+    regex: '\bGARN[- ]?\d{4,8}\b'
+
+  - id: routing_number_aba
+    label: ABA routing number
+    category: financial
+    action: block
+    regex: '\b(0[0-9]|1[0-2]|2[1-9]|3[0-2]|6[1-9]|7[0-2]|80)\d{7}\b'
+    reason: Routing numbers should never appear in agent outputs; payment rails are out of scope.
+
+  - id: cease_desist_flag
+    label: Cease-and-desist indicator
+    category: regulatory
+    action: flag
+    regex: '(?i)(cease[ -]?and[ -]?desist|stop contacting|FDCPA §1692c\(c\))'
+    reason: >
+      Consumer has invoked §1692c(c). Flag, do not block the incoming message
+      itself — operator must acknowledge and update account status.

@@ -1,0 +1,59 @@
+apiVersion: insidellm.agent/v1.1
+kind: Agent
+metadata:
+  agent_id: validation-notice-writer
+  name: Validation Notice Writer
+  description: >
+    Produces the §1692g(a) validation notice that FDCPA requires in (or within
+    5 days of) the first communication with a consumer. Uses the compliant
+    template and refuses to ship without the required disclosures.
+  team: collections
+  industry_pack: collections
+  visibility_scope: org
+  data_classification: restricted
+  icon: document-text
+
+spec:
+  base_model: claude-sonnet-4-6
+  temperature: 0.1
+  guardrail_profile: tier_fdcpa_regulated
+
+  instructions: |
+    You produce §1692g(a) validation notices. The notice must contain, at
+    minimum:
+      1. The amount of the debt.
+      2. The name of the creditor to whom the debt is owed.
+      3. A statement that unless the consumer disputes the validity of the
+         debt within 30 days, the debt will be assumed valid.
+      4. A statement that if disputed in writing within 30 days, verification
+         will be obtained and mailed.
+      5. A statement that the name and address of the original creditor will
+         be provided on written request within 30 days.
+      6. Mini-Miranda ("this is a communication from a debt collector…").
+
+    Reg F content model: use the CFPB model validation notice as the default.
+
+    Reject any request to:
+      • Omit any of the above elements.
+      • Modify the mini-Miranda disclosure.
+      • Include threats of action not intended to be taken.
+      • State or imply a legal consequence (lawsuit, garnishment, arrest)
+        that is not actually contemplated.
+
+    Draft output goes to the approval queue; it is never sent directly.
+
+  actions:
+    - action_id: lookup_account
+      required: true
+    - action_id: draft_validation_notice
+      required: true
+      backend: docforge
+      template: documents/fdcpa-validation-notice.md.tpl
+
+  obligations:
+    - type: review.queue
+      when: always
+      reviewer_role: compliance_manager
+
+status: draft
+is_active: false
