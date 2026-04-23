@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>InsideLLM — Regulatory Compliance Map</title>
+<style>
+  :root {
+    --bg:#0a0e1a; --panel:#111827; --panel-2:#1a2234; --border:#2a3650;
+    --text:#e2e8f0; --text-muted:#94a3b8; --muted-deep:#64748b;
+    --cyan:#22d3ee; --green:#6ee7b7; --amber:#fcd34d; --red:#fca5a5;
+    --blue:#60a5fa; --purple:#a78bfa;
+    --font-mono:'Menlo','Consolas','Courier New',monospace;
+  }
+  @media print {
+    :root { --bg:#fff; --panel:#fff; --panel-2:#f5f5f5; --border:#ccc;
+            --text:#111; --text-muted:#555; --muted-deep:#777;
+            --cyan:#0369a1; --green:#065f46; --amber:#92400e; --red:#991b1b;
+            --blue:#1d4ed8; --purple:#6d28d9; }
+    body { font-size:10.5pt !important; max-width:none !important; padding:0 !important; }
+    .reg { page-break-inside:avoid; }
+    .noprint { display:none !important; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:32px; max-width:1000px; margin:0 auto;
+         font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg);
+         color:var(--text); line-height:1.55; font-size:14px; }
+  h1 { font-size:26px; color:var(--cyan); font-family:var(--font-mono);
+       letter-spacing:-0.01em; margin:0 0 4px; }
+  .lede { color:var(--text-muted); font-size:15px; max-width:760px; margin:0 0 8px; }
+  .meta { font-family:var(--font-mono); font-size:11px; color:var(--muted-deep);
+          text-transform:uppercase; letter-spacing:0.06em; margin-bottom:28px;
+          border-bottom:1px solid var(--border); padding-bottom:16px; }
+  .meta span { display:inline-block; margin-right:18px; }
+  .meta b { color:var(--cyan); }
+  h2 { font-size:19px; color:var(--cyan); font-family:var(--font-mono);
+       margin:36px 0 10px; padding-top:10px; border-top:1px solid var(--border); }
+  h3 { font-size:13px; color:var(--text-muted); margin:22px 0 8px;
+       font-family:var(--font-mono); text-transform:uppercase;
+       letter-spacing:0.08em; }
+  p { margin:0 0 12px; }
+  a { color:var(--blue); }
+  code { background:var(--panel-2); border:1px solid var(--border);
+         padding:1px 6px; border-radius:3px; font-family:var(--font-mono);
+         font-size:0.86em; color:var(--cyan); }
+  ul, ol { margin:0 0 12px 20px; padding:0; }
+  li { margin-bottom:6px; font-size:13px; }
+  table { width:100%; border-collapse:collapse; margin:12px 0;
+          background:var(--panel); border:1px solid var(--border); border-radius:6px; overflow:hidden; }
+  th, td { padding:10px 12px; text-align:left; border-bottom:1px solid var(--border);
+           font-size:13px; vertical-align:top; }
+  th { background:var(--panel-2); color:var(--cyan); font-weight:600;
+       font-size:11px; text-transform:uppercase; letter-spacing:0.05em; }
+  tr:last-child td { border-bottom:none; }
+  .summary { background:var(--panel-2); border:1px solid var(--border);
+             border-radius:6px; padding:16px 20px; margin-bottom:20px; }
+  .summary p { margin:0; }
+  .reg { background:var(--panel); border:1px solid var(--border); border-radius:6px;
+         padding:16px 20px; margin-bottom:14px; border-left:3px solid var(--cyan); }
+  .reg h4 { margin:0 0 4px; font-size:16px; color:var(--text); }
+  .reg .cite { font-family:var(--font-mono); font-size:11px; color:var(--muted-deep);
+               margin-bottom:10px; }
+  .reg .field { margin:8px 0; }
+  .reg .field b { font-family:var(--font-mono); font-size:10px; color:var(--cyan);
+                  text-transform:uppercase; letter-spacing:0.06em;
+                  display:block; margin-bottom:3px; font-weight:600; }
+  .reg .field ul { margin-top:4px; }
+  .reg.r-red { border-left-color:var(--amber); }
+  .reg.r-blue { border-left-color:var(--blue); }
+  .reg.r-green { border-left-color:var(--green); }
+  .reg.r-purple { border-left-color:var(--purple); }
+  .warn { background:#3f1d12; border:1px solid var(--amber); border-left:3px solid var(--amber);
+          border-radius:6px; padding:16px 20px; margin-bottom:14px; color:var(--text); }
+  .warn h4 { margin:0 0 8px; color:var(--amber); font-size:15px; }
+  .warn ul { margin:0 0 0 20px; }
+  nav.toc { background:var(--panel-2); border:1px solid var(--border);
+            border-radius:6px; padding:14px 18px; margin-bottom:24px; font-size:13px; }
+  nav.toc h4 { margin:0 0 6px; font-size:11px; color:var(--cyan);
+               text-transform:uppercase; letter-spacing:0.06em; font-family:var(--font-mono); }
+  nav.toc ol { margin:0 0 0 20px; columns:2; column-gap:24px; }
+  nav.toc a { text-decoration:none; color:var(--text-muted); }
+  nav.toc a:hover { color:var(--cyan); }
+  .footer { margin-top:48px; padding-top:16px; border-top:1px solid var(--border);
+            color:var(--muted-deep); font-size:11px; font-family:var(--font-mono); }
+</style>
+</head>
+<body>
+
+<h1>InsideLLM — Regulatory Compliance Map</h1>
+<p class="lede">How the platform enforces each in-scope regulation, which mechanism
+does the work, and what the platform does <b>not</b> claim.</p>
+
+<div class="meta">
+  <span>Version <b>3.1.0</b></span>
+  <span>Cataloged <b>2026-04-22</b></span>
+  <span>Classification <b>Internal / Uniformedi LLC</b></span>
+</div>
+
+<section class="summary">
+  <p><b>Design principle:</b> compliance is enforced by machine-readable policy,
+  not by prompt engineering. Every regulation below maps to one or more of four
+  concrete enforcement surfaces. Failures are logged to an immutable audit chain
+  and verifiable by the customer's auditor directly against the running system.</p>
+</section>
+
+<nav class="toc noprint">
+  <h4>Contents</h4>
+  <ol>
+    <li><a href="#mechanisms">Enforcement mechanisms</a></li>
+    <li><a href="#financial">Debt Collection &amp; Financial Services</a></li>
+    <li><a href="#healthcare">Healthcare</a></li>
+    <li><a href="#education">Education</a></li>
+    <li><a href="#payments">Payment Systems</a></li>
+    <li><a href="#cross">Cross-Cutting</a></li>
+    <li><a href="#frameworks">Voluntary Frameworks &amp; Standards</a></li>
+    <li><a href="#not-claimed">What we do NOT claim</a></li>
+    <li><a href="#verify">How to verify compliance claims</a></li>
+  </ol>
+</nav>
+
+<h2 id="mechanisms">Enforcement mechanisms</h2>
+
+<table>
+  <thead>
+    <tr><th>Mechanism</th><th>What it catches</th><th>Where it runs</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><b>DLP Gateway</b></td>
+      <td>PII, PHI, credentials, payment data, custom regex — inbound user messages and outbound assistant responses</td>
+      <td>LiteLLM callback <code>configs/litellm/callbacks/dlp_guardrail.py</code></td>
+    </tr>
+    <tr>
+      <td><b>OPA Policy Engine</b></td>
+      <td>Business-logic compliance: callback hours, validation windows, scope restrictions, consent requirements</td>
+      <td>Rego policy bundles in <code>configs/opa/policies/profiles/*</code></td>
+    </tr>
+    <tr>
+      <td><b>Humility Alignment</b></td>
+      <td>AI-generated content that violates SAIVAS baseline principles (mandatory, cannot be disabled)</td>
+      <td>4 layers: prompt injection, LiteLLM guardrail, OPA, OWUI pipeline</td>
+    </tr>
+    <tr>
+      <td><b>Hash-Chained Audit</b></td>
+      <td>Tamper-evident record of every request, denial, obligation, approval, and lifecycle event</td>
+      <td>Governance Hub; SHA-256 chain with verification endpoint</td>
+    </tr>
+    <tr>
+      <td><b>Approval Queue</b></td>
+      <td>Actions requiring human review before execution (e.g., <code>send_letter</code>)</td>
+      <td>Governance Hub change-management UI</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="financial">Debt Collection &amp; Financial Services</h2>
+
+<h3>Primary focus of InsideLLM's US Collections compliance story</h3>
+
+<div class="reg r-blue">
+  <h4>FDCPA — Fair Debt Collection Practices Act</h4>
+  <div class="cite">15 U.S.C. § 1692 et seq. · CFPB + state AG enforcement</div>
+  <div class="field"><b>Domain</b>Debt collection communications with consumers — time, place, frequency, tone restrictions; validation-notice obligations; false / misleading representations prohibited.</div>
+  <div class="field"><b>Applies to</b>Third-party debt collectors and, by several state laws, first-party creditors.</div>
+  <div class="field"><b>InsideLLM controls</b>
+    <ul>
+      <li>OPA bundle <code>configs/opa/policies/profiles/tier_fdcpa_regulated.rego</code> — denies calls/callbacks outside §1692c(a)(1) permitted hours (8:00–21:00 consumer-local); validation-window witness requirement</li>
+      <li>Approval-gated <code>send_letter</code> action — consumer-facing communication cannot execute without a human approver</li>
+      <li>Hash-chained audit captures every dispute handling action for CFPB data-request response</li>
+      <li>DLP scanning prevents disclosure of unrelated consumer data in multi-account contexts</li>
+    </ul>
+  </div>
+  <div class="field"><b>Limitations</b>Policy correctness depends on the customer's own action definitions and tenant configuration; InsideLLM enforces the policy the customer publishes.</div>
+</div>
+
+<div class="reg r-blue">
+  <h4>FCRA — Fair Credit Reporting Act</h4>
+  <div class="cite">15 U.S.C. § 1681 et seq. · CFPB + FTC enforcement</div>
+  <div class="field"><b>Domain</b>Consumer credit reporting accuracy; dispute rights; permissible purposes; re-investigation obligations.</div>
+  <div class="field"><b>InsideLLM controls</b>
+    <ul>
+      <li>Governance Framework controls documented in <code>AI_Governance_Framework.md</code> — tier-1 material decisions require human oversight and bias audits</li>
+      <li>Industry policy overlay available for credit-reporting-adjacent use cases</li>
+      <li>Full audit trail for every AI-driven decision that touches consumer credit data</li>
+    </ul>
+  </div>
+  <div class="field"><b>Limitations</b>InsideLLM does not itself report to CRAs; it enforces controls on AI systems that may inform reporting decisions.</div>
+</div>
+
+<div class="reg r-blue">
+  <h4>ECOA — Equal Credit Opportunity Act / Regulation B</h4>
+  <div class="cite">15 U.S.C. § 1691 et seq. · 12 CFR Part 1002</div>
+  <div class="field"><b>Domain</b>Prohibits credit discrimination on prohibited bases (race, color, religion, national origin, sex, marital status, age, receipt of public assistance).</div>
+  <div class="field"><b>InsideLLM controls</b>
+    <ul>
+      <li>Governance Framework requires bias audits for tier-1 (material consumer decision) AI applications</li>
+      <li>Hash-chained audit provides evidentiary record for disparate-impact analysis</li>
+      <li>OPA scope rules prevent AI agents from accessing prohibited-basis data fields unless explicitly authorized</li>
+    </ul>
+  </div>
+  <div class="field"><b>Limitations</b>Bias auditing is a process the customer performs against the audit record; platform provides data and controls, not the bias analysis itself.</div>
+</div>
+
+<div class="reg r-blue">
+  <h4>CFPB Regulation F</h4>
+  <div class="cite">12 CFR Part 1006 · CFPB enforcement</div>
+  <div class="field"><b>Domain</b>Implements FDCPA with specific limits on call frequency (7-in-7 rule), email/text consent, and validation-notice content.</div>
+  <div class="field"><b>InsideLLM controls</b>
+    <ul>
+      <li>OPA rules extending <code>tier_fdcpa_regulated</code> enforce call-frequency predicates</li>
+      <li>Consent-presence check before any text/email communication action fires</li>
+      <li>Validation-notice witness obligation in the OPA bundle</li>
+      <li>Hash-chained audit surfaces the 7-in-7 count over any window for CFPB examination</li>
+    </ul>
+  </div>
+</div>
+
+<div class="reg r-blue">
+  <h4>TCPA — Telephone Consumer Protection Act</h4>
+  <div class="cite">47 U.S.C. § 227 · FCC + FTC enforcement</div>
+  <div class="field"><b>Domain</b>Restrictions on calls to mobile numbers, autodialer use, pre-recorded messages, time-of-day limits, consent requirements.</div>
+  <div class="field"><b>InsideLLM controls</b>
+    <ul>
+      <li>OPA rule denies agent-scheduled calls without consent record present in input</li>
+      <li>Time-of-day predicates enforced by the same permitted-hours rule as FDCPA</li>
+      <li>Full audit trail of consent state at time of call scheduling</li>
+    </ul>
+  </div>
+</div>
+
+<div class="reg r-blue">
+  <h4>GLBA — Gramm-Leach-Bliley Act</h4>
+  <div class="cite">15 U.S.C. § 6801 et seq. · FTC + bank regulators</div>
+  <div class="field"><b>Domain</b>Financial institution customer-information privacy: Safeguards Rule (data security), Privacy Rule (disclosure limits), Pretexting Rule.</div>
+  <div class="field"><b>InsideLLM controls</b>
+    <ul>
+      <li>DLP blocks financial-data patterns (account numbers, SSNs) in outbound AI responses unless explicitly authorized</li>
+      <li>OPA scope rules enforce purpose-limited access to customer-information fields</li>
+      <li>Hash-chained audit supports Safeguards Rule incident-response documentation</li>
+      <li>Per-user SSO + rate limits enforce access-control elements of the Safeguards Rule</li>
+    </ul>
+  </div>
+  <div class="field"><b>Note</b>AI_Governance_Framework.md recognizes that the organization's existing GLBA compliance satisfies overlapping data-privacy obligations; AI-specific controls apply where GLBA does not address unique AI risks.</div>
+</div>
+
+<div class="reg r-blue">
+  <h4>SOX — Sarbanes-Oxley Act</h4>
+  <div class="cite">15 U.S.C. § 7241 et seq. · SEC enforcement</div>
+  <div class="field"><b>Domain</b>Internal controls over financial reporting; segregation of duties; audit trail retention.</div>
+  <div class="field"><b>InsideLLM controls</b>
+    <ul>
+      <li>OPA bundle <code>tier_financial_regulated</code> applies to financial-reporting-adjacent agents</li>
+      <li>Approval queue enforces segregation of duties — action initiator cannot be the same identity as the approver</li>
+      <li>Hash-chained audit provides the retention + tamper-evident log required by §302/§404</li>
+    </ul>
+  </div>
+  <div class="field"><b>Limitations</b>Platform does not substitute for SOX §404 assessment by management or attestation by the external auditor; it provides the control environment and the evidence.</div>
+</div>
+
+<h2 id="healthcare">Healthcare</h2>
+
+<div class="reg r-red">
+  <h4>HIPAA — Health Insurance Portability and Accountability Act</h4>
+  <div class="cite">45 CFR Parts 160, 162, 164 · HHS Office for Civil Rights enforcement</div>
+  <div class="field"><b>Domain</b>Protected Health Information (PHI) — minimum-necessary use, access controls, audit trails, breach notification, Business Associate Agreement (BAA) obligations.</div>
+  <div class="field"><b>Applies to</b>Covered entities (providers, payers, clearinghouses) and their Business Associates.</div>
+  <div class="field"><b>InsideLLM controls</b>
+    <ul>
+      <li>DLP blocks PHI patterns (medical record numbers, diagnoses, prescription data) on inbound and outbound traffic</li>
+      <li>OPA bundle <code>tier_hipaa_regulated</code> enforces minimum-necessary access per agent scope</li>
+      <li>Model metadata <code>baa_models</code> — only models under a BAA with the covered entity are callable for PHI-containing requests</li>
+      <li>Hash-chained audit satisfies §164.312(b) audit-control requirement</li>
+      <li>On-prem deployment means PHI never leaves the customer's network boundary when using Ollama</li>
+    </ul>
+  </div>
+  <div class="field"><b>Limitations</b>Customer is responsible for ensuring their model provider (Anthropic, OpenAI) has executed a BAA when PHI flows to cloud models. InsideLLM enforces the routing decision; it does not execute the BAA.</div>
+</div>
+
+<h2 id="education">Education</h2>
+
+<div class="reg r-green">
+  <h4>FERPA — Family Educational Rights and Privacy Act</h4>
+  <div class="cite">20 U.S.C. § 1232g · U.S. Department of Education</div>
+  <div class="field"><b>Domain</b>Student educational records — disclosure restrictions, consent requirements, directory-information exceptions.</div>
+  <div class="field"><b>InsideLLM controls</b>
+    <ul>
+      <li>OPA industry policy overlay for FERPA-covered agents</li>
+      <li>DLP can be configured with FERPA-specific patterns (student IDs, grades)</li>
+      <li>Audit trail supports disclosure-log obligations</li>
+    </ul>
+  </div>
+  <div class="field"><b>Limitations</b>Industry template is a starting point; institutional configuration of allowed collections and disclosure rules is the customer's responsibility.</div>
+</div>
+
+<h2 id="payments">Payment Systems</h2>
+
+<div class="reg r-purple">
+  <h4>PCI-DSS — Payment Card Industry Data Security Standard</h4>
+  <div class="cite">PCI Security Standards Council · contractually enforced by card networks</div>
+  <div class="field"><b>Domain</b>Cardholder data protection (not a law, but contractually binding on merchants and processors).</div>
+  <div class="field"><b>InsideLLM controls</b>
+    <ul>
+      <li>DLP detects and blocks/redacts payment card number patterns (PAN, CVV) in any direction</li>
+      <li>OPA rules can enforce that no agent may retrieve cardholder data from a knowledge collection</li>
+      <li>Network isolation (on-prem deployment) supports Requirement 1 (firewall configuration)</li>
+    </ul>
+  </div>
+  <div class="field"><b>Limitations</b>PCI-DSS compliance is a scope and process question for the overall cardholder-data environment; InsideLLM can be one component but does not of itself put an organization in scope for a Report on Compliance (RoC).</div>
+</div>
+
+<h2 id="cross">Cross-Cutting</h2>
+
+<div class="reg r-red">
+  <h4>FTC Act § 5 — Unfair or Deceptive Acts or Practices (UDAP)</h4>
+  <div class="cite">15 U.S.C. § 45 · Federal Trade Commission</div>
+  <div class="field"><b>Domain</b>Prohibits unfair or deceptive practices in commerce. FTC has applied this to AI-generated deceptive claims, dark patterns, and undisclosed automation.</div>
+  <div class="field"><b>InsideLLM controls</b>
+    <ul>
+      <li>Humility alignment requires that AI outputs disclose their AI nature when materially relevant</li>
+      <li>Governance framework documents the <code>AI-generated content</code> disclosure policy</li>
+      <li>Audit trail provides evidence of what was generated and when</li>
+      <li>DLP prevents AI from fabricating account-specific facts it does not have grounding for</li>
+    </ul>
+  </div>
+</div>
+
+<h2 id="frameworks">Voluntary Frameworks &amp; Standards</h2>
+
+<div class="reg r-green">
+  <h4>NIST AI Risk Management Framework (AI RMF 1.0)</h4>
+  <div class="cite">National Institute of Standards and Technology · voluntary</div>
+  <div class="field"><b>Domain</b>Govern · Map · Measure · Manage — a risk-based framework for AI system lifecycle governance.</div>
+  <div class="field"><b>Alignment</b>
+    <ul>
+      <li><b>Govern:</b> Governance Framework doc defines roles, AI Ethics Officer, materiality tiers</li>
+      <li><b>Map:</b> Tier classification (tier 1 material / tier 2 operational / tier 3 routine) maps AI context + impact</li>
+      <li><b>Measure:</b> Hash-chained audit + Langfuse telemetry provides measurement surface</li>
+      <li><b>Manage:</b> OPA enforcement, approval queues, and incident procedures provide management actions</li>
+    </ul>
+  </div>
+  <div class="field"><b>Note</b>Safe-harbor alignment documented; not a third-party certification.</div>
+</div>
+
+<div class="reg r-green">
+  <h4>ISO/IEC 42001:2023 — AI Management System</h4>
+  <div class="cite">International Organization for Standardization · voluntary · certifiable</div>
+  <div class="field"><b>Domain</b>Management system standard for responsible AI development and use; aligned with ISO/IEC 27001 structure.</div>
+  <div class="field"><b>Alignment</b>
+    <ul>
+      <li>Governance Hub + change management satisfy management-system process requirements</li>
+      <li>AI Governance Framework doc addresses policy, roles, risk assessment</li>
+      <li>Audit trail satisfies record-retention clauses</li>
+    </ul>
+  </div>
+  <div class="field"><b>Note</b>ISO/IEC 42001 certification by an accredited body is on the roadmap; current alignment is control-level, not audited.</div>
+</div>
+
+<h2 id="not-claimed">What we do NOT claim</h2>
+
+<div class="warn">
+  <h4>Be explicit about unheld certifications and open compliance questions</h4>
+  <ul>
+    <li><b>SOC 2 Type I / II</b> — not currently held; planned for next quarter.</li>
+    <li><b>HITRUST CSF</b> — not currently held; relevant for HIPAA-heavy customers.</li>
+    <li><b>ISO/IEC 27001</b> — not currently held.</li>
+    <li><b>ISO/IEC 42001</b> — control-level alignment only; no accredited certification.</li>
+    <li><b>FedRAMP Moderate / High</b> — not currently authorized; relevant for federal customers.</li>
+    <li><b>EU AI Act</b> — Uniformedi LLC has not published a formal conformity-assessment position. For high-risk AI systems deployed in the EU after the Act's 2026/2027 rollout, customers must perform their own conformity assessment; InsideLLM provides controls that would typically factor into such an assessment.</li>
+    <li><b>State AI laws</b> — CO SB24-205 (Colorado AI Act), CA AB-2013 (Generative AI Training Data Transparency), NYC Local Law 144 (automated employment decision tools), and others have entered force or will during 2025–2026. InsideLLM's controls assist compliance but do not of themselves establish it.</li>
+    <li><b>Sector-specific sub-regulations</b> — e.g., 23 NYCRR Part 500 (NY DFS cybersecurity), MA 201 CMR 17.00, Washington My Health My Data Act — customer must assess applicability.</li>
+  </ul>
+</div>
+
+<h2 id="verify">How to verify compliance claims</h2>
+
+<p>Every claim in this document is verifiable without vendor involvement:</p>
+
+<ol>
+  <li><b>Inspect OPA policy files</b> — read <code>configs/opa/policies/profiles/*.rego</code> directly. The files are the single source of truth. Test offline: <code>opa test ./configs/opa/policies/</code>.</li>
+  <li><b>Query the hash-chained audit</b> — <code>GET /governance/api/v1/audit/verify</code> walks the chain and reports any broken links. A customer auditor can run this against production.</li>
+  <li><b>Review DLP regex patterns</b> — <code>configs/litellm/callbacks/dlp_guardrail.py</code> plus <code>dlp_*</code> Terraform variables declare every pattern matched.</li>
+  <li><b>Review the Governance Framework</b> — <code>AI_Governance_Framework.md</code> documents the policy posture including the formal AI definition (15 U.S.C. § 9401), tier-based materiality, and regulatory mapping.</li>
+  <li><b>Verify model routing</b> — LiteLLM key metadata declares which models each agent key can call. For HIPAA / BAA cases, <code>baa_models</code> restricts routing at the gateway.</li>
+</ol>
+
+<p>If a claim here cannot be verified by the customer's auditor against running system state, it should not be in this document.</p>
+
+<div class="footer">
+  Uniformedi LLC · Regulatory compliance map · Last updated 2026-04-22 · Not legal advice; customer should consult counsel for jurisdiction-specific obligations
+</div>
+
+</body>
+</html>

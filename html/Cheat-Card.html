@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>InsideLLM — Cheat Card</title>
+<style>
+  :root {
+    --bg:#0a0e1a; --panel:#111827; --panel-2:#1a2234; --border:#2a3650;
+    --text:#e2e8f0; --text-muted:#94a3b8; --muted-deep:#64748b;
+    --cyan:#22d3ee; --green:#6ee7b7; --amber:#fcd34d; --red:#fca5a5;
+    --blue:#60a5fa; --purple:#a78bfa;
+    --font-mono:'Menlo','Consolas','Courier New',monospace;
+  }
+  @media print {
+    :root { --bg:#fff; --panel:#fff; --panel-2:#f5f5f5; --border:#999;
+            --text:#000; --text-muted:#222; --muted-deep:#555;
+            --cyan:#036; --green:#064; --amber:#840; --red:#811;
+            --blue:#14d; --purple:#628; }
+    body { font-size:9pt !important; margin:0 !important; padding:0 !important;
+           max-width:none !important; }
+    @page { size:letter landscape; margin:0.4in; }
+    .card { page-break-inside:avoid; border-width:2px !important; }
+    .noprint { display:none !important; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:24px; max-width:1100px; margin:0 auto;
+         font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg);
+         color:var(--text); line-height:1.5; font-size:13px; }
+  .header { text-align:center; margin-bottom:14px; padding-bottom:10px;
+            border-bottom:2px solid var(--cyan); }
+  .header h1 { font-size:22px; color:var(--cyan); font-family:var(--font-mono);
+               margin:0 0 2px; letter-spacing:-0.02em; }
+  .header .sub { font-size:11px; color:var(--muted-deep); font-family:var(--font-mono);
+                 text-transform:uppercase; letter-spacing:0.1em; }
+  .grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+  .card { background:var(--panel); border:1px solid var(--border); border-radius:5px;
+          padding:12px 14px; }
+  .card.c-cyan { border-left:3px solid var(--cyan); }
+  .card.c-green { border-left:3px solid var(--green); }
+  .card.c-blue { border-left:3px solid var(--blue); }
+  .card.c-amber { border-left:3px solid var(--amber); }
+  .card.c-red { border-left:3px solid var(--red); }
+  .card.c-purple { border-left:3px solid var(--purple); }
+  .card h2 { font-size:10px; color:var(--cyan); font-family:var(--font-mono);
+             text-transform:uppercase; letter-spacing:0.08em; margin:0 0 8px;
+             font-weight:600; padding-bottom:4px; border-bottom:1px solid var(--border); }
+  .card.c-cyan h2 { color:var(--cyan); }
+  .card.c-green h2 { color:var(--green); }
+  .card.c-blue h2 { color:var(--blue); }
+  .card.c-amber h2 { color:var(--amber); }
+  .card.c-red h2 { color:var(--red); }
+  .card.c-purple h2 { color:var(--purple); }
+  .card ul { margin:0 0 0 14px; padding:0; font-size:11.5px; }
+  .card li { margin-bottom:4px; line-height:1.4; }
+  .card li b { color:var(--text); }
+  .card code { background:var(--panel-2); padding:1px 4px; border-radius:2px;
+               font-family:var(--font-mono); font-size:10.5px; color:var(--cyan);
+               border:1px solid var(--border); }
+  .stat { display:flex; align-items:baseline; gap:8px; margin-bottom:4px; }
+  .stat .n { color:var(--cyan); font-family:var(--font-mono); font-size:16px;
+             font-weight:600; min-width:50px; }
+  .stat .l { font-size:11px; color:var(--text-muted); }
+  .tagline { text-align:center; font-style:italic; font-size:11.5px;
+             color:var(--text-muted); margin:14px 0 8px; }
+  .footer { margin-top:14px; padding-top:8px; border-top:1px dashed var(--border);
+            text-align:center; color:var(--muted-deep); font-size:10px;
+            font-family:var(--font-mono); }
+  .ask { background:var(--panel-2); border:2px solid var(--cyan);
+         border-radius:5px; padding:10px 14px; margin:12px 0 6px;
+         text-align:center; font-family:var(--font-mono); }
+  .ask .label { font-size:9.5px; color:var(--cyan); text-transform:uppercase;
+                letter-spacing:0.1em; margin-bottom:4px; font-weight:600; }
+  .ask .val { font-size:13px; color:var(--text); font-weight:600; }
+  @media (max-width:760px) { .grid { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>InsideLLM — Demo Day Cheat Card</h1>
+  <div class="sub">Version 3.1.0 · 2026-05-12 · Opus 4.7 · 12-minute demo</div>
+</div>
+
+<div class="tagline">
+  "We don't compete with the model. We own the governance layer."
+</div>
+
+<div class="grid">
+
+  <div class="card c-cyan">
+    <h2>Numbers that land</h2>
+    <div class="stat"><div class="n">46/46</div><div class="l">OPA tests passing</div></div>
+    <div class="stat"><div class="n">13</div><div class="l">regulations mapped</div></div>
+    <div class="stat"><div class="n">~40</div><div class="l">platform capabilities</div></div>
+    <div class="stat"><div class="n">&lt;20ms</div><div class="l">P99 OPA latency in prod</div></div>
+    <div class="stat"><div class="n">4-layer</div><div class="l">Humility defense in depth</div></div>
+    <div class="stat"><div class="n">1 apply</div><div class="l">deploys the full stack</div></div>
+  </div>
+
+  <div class="card c-green">
+    <h2>5 killer talking points</h2>
+    <ul>
+      <li><b>Integrated platform</b>, not a library. Full stack ships together.</li>
+      <li><b>Policy-as-code.</b> Your GC reads the rego file directly.</li>
+      <li><b>Hash-chained audit.</b> Tamper-evident evidence for CFPB / OCR.</li>
+      <li><b>On-prem data plane.</b> PHI / PII never leaves your network.</li>
+      <li><b>SAIVAS alignment.</b> Published IP — <i>Uniform Gnosis, Vol. I</i>.</li>
+    </ul>
+  </div>
+
+  <div class="card c-blue">
+    <h2>3 competitor counters</h2>
+    <ul>
+      <li><b>ChatGPT Enterprise:</b> no per-tenant guardrail tiers, no policy-as-code, no on-prem.</li>
+      <li><b>Azure / Bedrock:</b> hyperscaler lock-in; our OPA industry bundles aren't in their out-of-box.</li>
+      <li><b>Portkey / Helicone:</b> SaaS gateways; we're on-prem + full stack, not gateway-only.</li>
+    </ul>
+  </div>
+
+  <div class="card c-amber">
+    <h2>Demo flow (minute-by-minute)</h2>
+    <ul>
+      <li><b>1:30</b> Portfolio View — "32 companies, one view"</li>
+      <li><b>2:30</b> Drill into Organization — compliance score</li>
+      <li><b>6:30</b> Dispute Handler — Turn 1 happy, Turn 2 deny, Turn 3 scope escape</li>
+      <li><b>8:00</b> Approval queue — send_letter pending</li>
+      <li><b>9:00</b> Audit trail — curl + jq, point at <code>previous_hash</code></li>
+      <li><b>10:30</b> Policy source — open .rego, "your GC can read this"</li>
+      <li><b>12:00</b> Close + ask</li>
+    </ul>
+  </div>
+
+  <div class="card c-purple">
+    <h2>URLs (pre-loaded tabs)</h2>
+    <ul>
+      <li><code>/governance/portfolio</code></li>
+      <li><code>/</code> (OWUI → Dispute Handler)</li>
+      <li><code>/governance/changes</code></li>
+      <li><code>/governance/policies</code></li>
+      <li>Terminal: <code>curl -sk …/audit | jq '.[-5:]'</code></li>
+    </ul>
+  </div>
+
+  <div class="card c-red">
+    <h2>Concede honestly</h2>
+    <ul>
+      <li><b>SOC 2:</b> not today; Type I Q3, Type II Q1 2027.</li>
+      <li><b>Team size:</b> founder-led; hiring Q3 2026.</li>
+      <li><b>Reference logos:</b> limited; position as design-partner.</li>
+      <li><b>BSL license:</b> OSI-equivalent addendum in Pro+.</li>
+      <li><b>Windows-first:</b> Linux-native on Enterprise via contract.</li>
+    </ul>
+  </div>
+
+</div>
+
+<div class="ask">
+  <div class="label">The Ask</div>
+  <div class="val">Parent Organization as reference. Wave 1 (2–3 tenants) Q3 2026. Full portfolio by Q4.</div>
+</div>
+
+<div class="footer">
+  Uniformedi LLC · Fold this into your pocket · 2026-04-22 · When in doubt, tell the truth
+</div>
+
+</body>
+</html>

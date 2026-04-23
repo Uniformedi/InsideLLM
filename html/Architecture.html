@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>InsideLLM — Architecture Walkthrough</title>
+<style>
+  :root {
+    --bg:#0a0e1a; --panel:#111827; --panel-2:#1a2234; --border:#2a3650;
+    --text:#e2e8f0; --text-muted:#94a3b8; --muted-deep:#64748b;
+    --cyan:#22d3ee; --green:#6ee7b7; --amber:#fcd34d; --red:#fca5a5;
+    --blue:#60a5fa; --purple:#a78bfa;
+    --font-mono:'Menlo','Consolas','Courier New',monospace;
+  }
+  @media print {
+    :root { --bg:#fff; --panel:#fff; --panel-2:#f5f5f5; --border:#888;
+            --text:#111; --text-muted:#555; --muted-deep:#777;
+            --cyan:#0369a1; --green:#065f46; --amber:#92400e; --red:#991b1b;
+            --blue:#1d4ed8; --purple:#6d28d9; }
+    body { font-size:10.5pt !important; max-width:none !important; padding:0 !important; }
+    .arch, .flow, .service-grid { page-break-inside:avoid; }
+    .noprint { display:none !important; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:32px; max-width:1000px; margin:0 auto;
+         font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg);
+         color:var(--text); line-height:1.55; font-size:14px; }
+  h1 { font-size:26px; color:var(--cyan); font-family:var(--font-mono);
+       letter-spacing:-0.01em; margin:0 0 4px; }
+  .lede { color:var(--text-muted); font-size:15px; max-width:760px; margin:0 0 8px; }
+  .meta { font-family:var(--font-mono); font-size:11px; color:var(--muted-deep);
+          text-transform:uppercase; letter-spacing:0.06em; margin-bottom:28px;
+          border-bottom:1px solid var(--border); padding-bottom:16px; }
+  .meta span { display:inline-block; margin-right:18px; }
+  .meta b { color:var(--cyan); }
+  h2 { font-size:19px; color:var(--cyan); font-family:var(--font-mono);
+       margin:36px 0 10px; padding-top:10px; border-top:1px solid var(--border); }
+  h3 { font-size:15px; color:var(--text); margin:22px 0 8px; }
+  p { margin:0 0 12px; }
+  code { background:var(--panel-2); border:1px solid var(--border);
+         padding:1px 6px; border-radius:3px; font-family:var(--font-mono);
+         font-size:0.86em; color:var(--cyan); }
+  ul, ol { margin:0 0 12px 20px; padding:0; }
+  li { margin-bottom:6px; font-size:13px; }
+  table { width:100%; border-collapse:collapse; margin:12px 0;
+          background:var(--panel); border:1px solid var(--border); border-radius:6px; overflow:hidden; }
+  th, td { padding:10px 12px; text-align:left; border-bottom:1px solid var(--border);
+           font-size:13px; vertical-align:top; }
+  th { background:var(--panel-2); color:var(--cyan); font-weight:600;
+       font-size:11px; text-transform:uppercase; letter-spacing:0.05em; }
+  tr:last-child td { border-bottom:none; }
+
+  /* Boundary-layer diagram */
+  .arch { margin:20px 0; }
+  .boundary { border:2px solid var(--cyan); border-radius:8px; padding:20px;
+              background:var(--panel-2); position:relative; }
+  .boundary::before { content:attr(data-label); position:absolute; top:-10px; left:16px;
+                      background:var(--bg); padding:0 10px; font-family:var(--font-mono);
+                      font-size:10px; color:var(--cyan); text-transform:uppercase;
+                      letter-spacing:0.08em; font-weight:600; }
+  .boundary.b-ext { border-color:var(--amber); }
+  .boundary.b-ext::before { color:var(--amber); }
+  .boundary.b-host { border-color:var(--blue); }
+  .boundary.b-host::before { color:var(--blue); }
+  .boundary.b-docker { border-color:var(--purple); }
+  .boundary.b-docker::before { color:var(--purple); }
+  .nested { margin-top:12px; }
+
+  .services-row { display:flex; gap:10px; flex-wrap:wrap; margin:10px 0; }
+  .svc { background:var(--panel); border:1px solid var(--border); border-radius:5px;
+         padding:8px 12px; font-size:12px; font-family:var(--font-mono);
+         min-width:120px; text-align:center; }
+  .svc .n { color:var(--cyan); font-weight:600; display:block; font-size:13px; }
+  .svc .p { color:var(--muted-deep); font-size:10.5px; }
+  .svc.gateway { border-left:3px solid var(--cyan); }
+  .svc.ui { border-left:3px solid var(--green); }
+  .svc.data { border-left:3px solid var(--blue); }
+  .svc.governance { border-left:3px solid var(--purple); }
+  .svc.ops { border-left:3px solid var(--amber); }
+  .svc.optional { border-left:3px solid var(--muted-deep); }
+
+  .flow { background:var(--panel); border:1px solid var(--border); border-radius:6px;
+          padding:16px 20px; margin:14px 0; }
+  .flow .step { display:grid; grid-template-columns:40px 1fr; gap:12px;
+                padding:8px 0; border-bottom:1px dashed var(--border); align-items:start; }
+  .flow .step:last-child { border-bottom:none; }
+  .flow .step .n { font-family:var(--font-mono); font-size:14px; color:var(--cyan);
+                   font-weight:600; }
+  .flow .step .c { font-size:13px; }
+  .flow .step .c b { color:var(--text); }
+  .flow .step .c code { font-size:12px; }
+  .flow .step.check .n { color:var(--green); }
+  .flow .step.route .n { color:var(--blue); }
+  .flow .step.audit .n { color:var(--amber); }
+
+  .layer-stack { display:flex; flex-direction:column; gap:6px; margin:12px 0; }
+  .layer { padding:12px 16px; border-radius:4px; border-left:3px solid var(--border);
+           background:var(--panel); }
+  .layer.L1 { border-left-color:var(--green); }
+  .layer.L2 { border-left-color:var(--blue); }
+  .layer.L3 { border-left-color:var(--amber); }
+  .layer.L4 { border-left-color:var(--purple); }
+  .layer.L5 { border-left-color:var(--red); }
+  .layer h4 { margin:0 0 3px; font-size:13px; color:var(--text); }
+  .layer p { margin:0; font-size:12.5px; color:var(--text-muted); }
+
+  .arrow { text-align:center; color:var(--muted-deep); font-family:var(--font-mono);
+           font-size:16px; margin:4px 0; }
+
+  nav.toc { background:var(--panel-2); border:1px solid var(--border);
+            border-radius:6px; padding:14px 18px; margin-bottom:24px; font-size:13px; }
+  nav.toc h4 { margin:0 0 6px; font-size:11px; color:var(--cyan);
+               text-transform:uppercase; letter-spacing:0.06em; font-family:var(--font-mono); }
+  nav.toc ol { margin:0 0 0 20px; }
+  nav.toc a { text-decoration:none; color:var(--text-muted); }
+  nav.toc a:hover { color:var(--cyan); }
+  .footer { margin-top:48px; padding-top:16px; border-top:1px solid var(--border);
+            color:var(--muted-deep); font-size:11px; font-family:var(--font-mono); }
+</style>
+</head>
+<body>
+
+<h1>InsideLLM — Architecture Walkthrough</h1>
+<p class="lede">How the platform is put together, from the enterprise boundary
+down to the Docker bridge and back up through the request flow. Intended for a
+technical audience in the post-demo deep dive.</p>
+
+<div class="meta">
+  <span>Version <b>3.1.0</b></span>
+  <span>Drafted <b>2026-04-22</b></span>
+  <span>Audience <b>Technical evaluator / architect</b></span>
+</div>
+
+<nav class="toc noprint">
+  <h4>Contents</h4>
+  <ol>
+    <li><a href="#boundary">Enterprise boundary</a></li>
+    <li><a href="#services">Service map</a></li>
+    <li><a href="#flow">Request flow</a></li>
+    <li><a href="#security">Security architecture (layers)</a></li>
+    <li><a href="#data">What exits the boundary vs. what stays</a></li>
+    <li><a href="#deploy">Deployment targets</a></li>
+    <li><a href="#extension">Extension points</a></li>
+  </ol>
+</nav>
+
+<h2 id="boundary">Enterprise boundary</h2>
+
+<p>The platform is designed to collapse the AI <i>consumer-facing surface</i>
+and the AI <i>governance plane</i> into a single deployable boundary. Everything
+that happens between the user and the model traverses the host the customer
+controls.</p>
+
+<div class="arch">
+  <div class="boundary b-ext" data-label="Enterprise network">
+    <p style="margin:0 0 10px; font-size:12.5px; color:var(--text-muted);">
+      Users, external API consumers (Claude Code CLI, custom apps), and inbound
+      automation hit InsideLLM here. Nothing traverses a third-party cloud to
+      reach the platform.
+    </p>
+
+    <div class="boundary b-host nested" data-label="Windows Hyper-V / WSL2 host">
+      <p style="margin:0 0 10px; font-size:12.5px; color:var(--text-muted);">
+        A single VM (or a fleet of them) runs Debian 12 Bookworm with Docker
+        Compose. Hyper-V path is Terraform-provisioned; WSL2 path is
+        PowerShell-scripted. Same image, same services on both.
+      </p>
+
+      <div class="boundary b-docker nested" data-label="Docker bridge — insidellm-internal 172.28.0.0/16">
+        <div class="services-row">
+          <div class="svc gateway"><span class="n">Nginx</span><span class="p">:80 :443</span></div>
+          <div class="svc gateway"><span class="n">LiteLLM</span><span class="p">:4000 gateway</span></div>
+          <div class="svc ui"><span class="n">Open WebUI</span><span class="p">:8080 chat</span></div>
+          <div class="svc governance"><span class="n">Governance Hub</span><span class="p">:8090 FastAPI</span></div>
+          <div class="svc governance"><span class="n">OPA</span><span class="p">:8181 policy</span></div>
+          <div class="svc data"><span class="n">PostgreSQL</span><span class="p">:5432 state</span></div>
+          <div class="svc data"><span class="n">Redis</span><span class="p">:6379 cache</span></div>
+          <div class="svc optional"><span class="n">Ollama</span><span class="p">:11434 local LLM</span></div>
+          <div class="svc ui"><span class="n">DocForge</span><span class="p">:3000 files</span></div>
+          <div class="svc ops"><span class="n">Netdata</span><span class="p">:19999 monitor</span></div>
+          <div class="svc ops"><span class="n">Grafana+Loki</span><span class="p">logs</span></div>
+          <div class="svc optional"><span class="n">Guacamole</span><span class="p">:8080 remote</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p style="font-size:12.5px; color:var(--text-muted); margin-top:10px;">
+<b>Only the host's port 443</b> (and optionally 4000 for direct LiteLLM API
+access) crosses the enterprise network boundary. Everything else — all
+inter-service traffic, database access, policy evaluation — stays on the
+Docker bridge inside the VM.</p>
+
+<h2 id="services">Service map</h2>
+
+<p>Each container has a single job. Service-to-service dependencies are
+explicit; there are no hidden side channels.</p>
+
+<table>
+  <thead>
+    <tr><th>Service</th><th>Role</th><th>Language / Stack</th><th>Depends on</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><b>Nginx</b></td><td>TLS termination, reverse proxy, auth_request delegation, security headers</td><td>C (upstream OSS)</td><td>Open WebUI, LiteLLM, Governance Hub, Admin Portal</td></tr>
+    <tr><td><b>LiteLLM</b></td><td>OpenAI-compatible API gateway. Enforces DLP, authentication, budgets, rate limits. Invokes OPA via callback for guardrail-profile agents.</td><td>Python (BerriAI upstream)</td><td>PostgreSQL, Redis, OPA, Langfuse (callback)</td></tr>
+    <tr><td><b>Open WebUI</b></td><td>Chat UI. Document upload, RAG, custom pipelines (DLP prefilter, OPA enforcement). Model picker shows published agents as Custom Models.</td><td>Python + TypeScript (Open WebUI upstream)</td><td>LiteLLM</td></tr>
+    <tr><td><b>Governance Hub</b></td><td>Admin API, fleet sync, change management, agent CRUD, OPA client, policy compilation. Hash-chained audit is persisted here.</td><td>Python / FastAPI (Uniformedi)</td><td>PostgreSQL / MariaDB / MSSQL, OPA</td></tr>
+    <tr><td><b>OPA</b></td><td>Pure policy engine. Receives input, returns <code>{allow, deny_reasons, obligations}</code>. No network calls, no persistence.</td><td>Go (CNCF)</td><td>(none)</td></tr>
+    <tr><td><b>PostgreSQL</b></td><td>Durable state: users, keys, spend, audit logs, governance tables, full-text keyword analysis.</td><td>C / SQL (upstream)</td><td>(none)</td></tr>
+    <tr><td><b>Redis</b></td><td>Rate-limit counters, budget enforcement, LiteLLM operational state.</td><td>C (upstream)</td><td>(none)</td></tr>
+    <tr><td><b>Ollama</b> (optional)</td><td>Local LLM inference — Qwen 2.5 Coder 14B + Qwen 2.5 14B defaults. GPU-accelerated.</td><td>Go (upstream)</td><td>(none)</td></tr>
+    <tr><td><b>DocForge</b></td><td>Document generation (DOCX / XLSX / PPTX / PDF / CSV / ODF) via LibreOffice headless.</td><td>Node.js / Express + LibreOffice (Uniformedi)</td><td>(none)</td></tr>
+    <tr><td><b>Netdata</b></td><td>Real-time host + container + database monitoring.</td><td>C (upstream)</td><td>(none)</td></tr>
+    <tr><td><b>Grafana + Loki + Promtail</b></td><td>Centralized log aggregation with Slack alerting, dashboards provisioned by script.</td><td>Go (upstream)</td><td>(none)</td></tr>
+    <tr><td><b>Apache Guacamole</b> (optional)</td><td>Browser RDP/VNC/SSH gateway at <code>/remote/</code>.</td><td>Java (upstream)</td><td>PostgreSQL (guacamole schema)</td></tr>
+    <tr><td><b>Uptime Kuma</b></td><td>Service-liveness monitoring (10 monitors configured by provision script).</td><td>Node.js (upstream)</td><td>(none)</td></tr>
+    <tr><td><b>Watchtower</b></td><td>Container image auto-update with Slack notification.</td><td>Go (upstream)</td><td>Docker socket</td></tr>
+    <tr><td><b>Trivy</b></td><td>Continuous container CVE scanning.</td><td>Go (upstream)</td><td>Docker socket</td></tr>
+  </tbody>
+</table>
+
+<h2 id="flow">Request flow</h2>
+
+<p>What happens when a user types a message in Open WebUI and presses Enter:</p>
+
+<div class="flow">
+  <div class="step check">
+    <div class="n">1</div>
+    <div class="c"><b>Browser → Nginx (port 443).</b> TLS 1.2/1.3 termination. HSTS headers. <code>auth_request</code> to Governance Hub for JWT validation (OIDC / LDAP / Open modes).</div>
+  </div>
+  <div class="step route">
+    <div class="n">2</div>
+    <div class="c"><b>Nginx → Open WebUI (:8080).</b> OWUI applies any active pipelines (pre-DLP, OPA enforcement pipeline). Inlines uploaded file contents (PDF / DOCX / XLSX) into the message array so file content is scannable by DLP downstream.</div>
+  </div>
+  <div class="step route">
+    <div class="n">3</div>
+    <div class="c"><b>OWUI → LiteLLM (:4000).</b> OWUI calls LiteLLM's OpenAI-compatible <code>/v1/chat/completions</code>. Authentication uses a user-specific API key; metadata carries the agent identity (<code>agent_id</code>, <code>tenant_id</code>, <code>guardrail_profile</code>, <code>manifest_hash</code>).</div>
+  </div>
+  <div class="step check">
+    <div class="n">4</div>
+    <div class="c"><b>LiteLLM: DLP inlet scan.</b> <code>configs/litellm/callbacks/dlp_guardrail.py</code> scans user messages + inlined file content. SSN, credit card, PHI, credentials, custom regex patterns → block or redact depending on configuration.</div>
+  </div>
+  <div class="step check">
+    <div class="n">5</div>
+    <div class="c"><b>LiteLLM: Humility guardrail (mandatory).</b> <code>humility_guardrail.py</code> builds the OPA input (<code>_build_opa_input</code>) and evaluates. Humility alignment is checked; if OPA is unavailable, core Humility rules evaluate locally in Python (defense-in-depth fallback).</div>
+  </div>
+  <div class="step check">
+    <div class="n">6</div>
+    <div class="c"><b>LiteLLM: industry OPA policy.</b> If the agent's guardrail profile extends a tier (e.g., <code>tier_fdcpa_regulated</code>), the OPA bundle for that tier evaluates. Returns <code>allow</code>, <code>deny_reasons</code>, and <code>obligations</code>.</div>
+  </div>
+  <div class="step check">
+    <div class="n">7</div>
+    <div class="c"><b>LiteLLM: budget + rate limit.</b> PostgreSQL check for remaining daily budget; Redis atomic counter increment for RPM / TPM. Fail closed on exhaustion.</div>
+  </div>
+  <div class="step route">
+    <div class="n">8</div>
+    <div class="c"><b>LiteLLM → Model provider.</b> Request routed per <code>allowed_models</code> in the agent manifest. Cloud: api.anthropic.com / api.openai.com. Local: <code>ollama:11434</code>. BAA-covered routing restriction applies for PHI-tagged agents.</div>
+  </div>
+  <div class="step route">
+    <div class="n">9</div>
+    <div class="c"><b>Model → LiteLLM.</b> Response received (streaming or full).</div>
+  </div>
+  <div class="step check">
+    <div class="n">10</div>
+    <div class="c"><b>LiteLLM: DLP outlet scan.</b> Assistant response scanned before delivery. Any echoed-back PII / credentials / PHI blocked or redacted. Streaming: scan applies per-chunk on chunk boundaries.</div>
+  </div>
+  <div class="step audit">
+    <div class="n">11</div>
+    <div class="c"><b>LiteLLM: execute OPA obligations.</b> <code>audit.log</code>, <code>filter.fields</code>, <code>require.attestation</code>, <code>review.queue</code> obligations fire as post-decision actions. Review-queue items land in Governance Hub's approval queue.</div>
+  </div>
+  <div class="step audit">
+    <div class="n">12</div>
+    <div class="c"><b>Audit record written.</b> Governance Hub appends an entry to the hash-chained audit with <code>sequence</code>, <code>previous_hash</code>, <code>chain_hash</code>. Langfuse callback logs the full prompt / completion / cost / latency.</div>
+  </div>
+  <div class="step route">
+    <div class="n">13</div>
+    <div class="c"><b>LiteLLM → OWUI → browser.</b> Final response (post-DLP, post-obligation) streams back to the user.</div>
+  </div>
+</div>
+
+<h2 id="security">Security architecture (layers)</h2>
+
+<p>Defense in depth. A failure at any single layer does not produce a governance escape.</p>
+
+<div class="layer-stack">
+  <div class="layer L1">
+    <h4>Layer 1 — Prompt injection (soft)</h4>
+    <p><code>configs/litellm/callbacks/humility_prompt.py</code> — subclass of <code>humility.adapters.litellm.HumilityPromptCallback</code>. Injects alignment language into the system prompt. Cannot be disabled.</p>
+  </div>
+  <div class="layer L2">
+    <h4>Layer 2 — Guardrail (hard)</h4>
+    <p><code>configs/litellm/callbacks/humility_guardrail.py</code> — evaluates core Humility rules in Python; delegates to OPA when available. Cannot be disabled.</p>
+  </div>
+  <div class="layer L3">
+    <h4>Layer 3 — OPA policy engine</h4>
+    <p><code>configs/opa/policies/humility/base.rego</code> + industry overlays. Humility is the baseline; industry policies extend. Feature-flag disableable via <code>policy_engine_enable</code> — but Layers 1 + 2 still fire.</p>
+  </div>
+  <div class="layer L4">
+    <h4>Layer 4 — Frontend pipeline</h4>
+    <p><code>configs/open-webui/opa-policy-pipeline.py</code> — additional frontend-side evaluation for OWUI-specific context. Swappable.</p>
+  </div>
+  <div class="layer L5">
+    <h4>Cross-cutting — DLP gateway scanning</h4>
+    <p><code>configs/litellm/callbacks/dlp_guardrail.py</code> — inlet + outlet pattern-based scanning on all traffic, regardless of agent or tier. Independent of the Humility / OPA layers.</p>
+  </div>
+</div>
+
+<h2 id="data">What exits the boundary vs. what stays</h2>
+
+<div class="layer-stack">
+  <div class="layer L1">
+    <h4>Stays inside the customer's network</h4>
+    <p>User data, API keys, spend tracking, team membership, audit logs, RAG-indexed documents, Redis counters, PostgreSQL state, Humility policy sources, industry policy sources, Governance Hub configuration, hash-chained audit chain.</p>
+  </div>
+  <div class="layer L3">
+    <h4>Leaves only if the customer routes to a cloud model</h4>
+    <p>Per-request prompts and completions to api.anthropic.com or api.openai.com, scoped by the model provider's retention and privacy policy. <b>Nothing leaves if</b> the agent's <code>allowed_models</code> lists only Ollama models.</p>
+  </div>
+  <div class="layer L4">
+    <h4>Observability data (customer-controlled)</h4>
+    <p>Langfuse logs by default run on the customer's Langfuse instance (self-hosted). If the customer opts for Langfuse Cloud, logs traverse the boundary to Langfuse-controlled infrastructure. This is a customer configuration choice.</p>
+  </div>
+</div>
+
+<h2 id="deploy">Deployment targets</h2>
+
+<table>
+  <thead>
+    <tr><th>Target</th><th>Provisioning tool</th><th>Image</th><th>GPU</th><th>Use case</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Hyper-V (Windows 11 Pro / Server)</td><td>Terraform + taliesins/hyperv provider</td><td>Debian 12 Bookworm, Gen 2 VM, UEFI + Secure Boot</td><td>DDA or GPU-PV passthrough</td><td>Production on Windows Hyper-V hosts</td></tr>
+    <tr><td>WSL2 (Windows 11 22H2+)</td><td>PowerShell <code>Install-InsideLLM-WSL.ps1</code></td><td>WSL2 Ubuntu distribution</td><td>Native WSL2 GPU</td><td>Development + evaluation</td></tr>
+    <tr><td>Linux native (KVM, libvirt)</td><td>Terraform (Enterprise contract only)</td><td>Debian 12</td><td>Native</td><td>Linux-native enterprises</td></tr>
+    <tr><td>Air-gapped (Enterprise)</td><td>Custom</td><td>Debian 12, offline</td><td>Native</td><td>Regulated environments with no internet egress</td></tr>
+  </tbody>
+</table>
+
+<h2 id="extension">Extension points</h2>
+
+<p>Where customers add functionality without forking:</p>
+
+<ul>
+  <li><b>Custom OPA policies.</b> Drop rego files into <code>configs/opa/policies/tenants/&lt;tenant&gt;/</code>; Governance Hub compiles and hot-reloads.</li>
+  <li><b>Custom DLP patterns.</b> <code>dlp_custom_patterns</code> Terraform variable; regex-based; per-deploy.</li>
+  <li><b>Custom Open WebUI pipelines.</b> Python files in <code>configs/open-webui/pipelines/</code>; registered via OWUI admin UI.</li>
+  <li><b>Custom tools / actions.</b> Upload to <code>/api/v1/actions/upload</code> as YAML; scoped per-tenant in the action catalog.</li>
+  <li><b>Custom agent manifests.</b> Author YAML; POST to <code>/api/v1/agents/</code>; publish via <code>POST /{tenant}/{agent}/publish</code>.</li>
+  <li><b>Custom LiteLLM callbacks.</b> Python files in <code>configs/litellm/callbacks/</code>; registered in the LiteLLM config template.</li>
+  <li><b>External data connectors.</b> PostgreSQL, MySQL, MSSQL, REST APIs configured through Governance Hub admin UI with RBAC, row filtering, field masking.</li>
+  <li><b>Custom DocForge templates.</b> Drop templates into <code>configs/docforge/templates/</code>; referenced by agent actions.</li>
+</ul>
+
+<div class="footer">
+  Uniformedi LLC · Architecture walkthrough · Last updated 2026-04-22 · Pairs with the ASCII diagrams in README.md
+</div>
+
+</body>
+</html>

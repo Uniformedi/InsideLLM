@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>InsideLLM — Demo Day Hub</title>
+<style>
+  :root {
+    --bg:#0a0e1a; --panel:#111827; --panel-2:#1a2234; --border:#2a3650;
+    --text:#e2e8f0; --text-muted:#94a3b8; --muted-deep:#64748b;
+    --cyan:#22d3ee; --green:#6ee7b7; --amber:#fcd34d; --red:#fca5a5;
+    --blue:#60a5fa; --purple:#a78bfa;
+    --font-mono:'Menlo','Consolas','Courier New',monospace;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:32px; max-width:1100px; margin:0 auto;
+         font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg);
+         color:var(--text); line-height:1.55; font-size:14px; }
+  h1 { font-size:30px; color:var(--cyan); font-family:var(--font-mono);
+       letter-spacing:-0.01em; margin:0 0 4px; }
+  .lede { color:var(--text-muted); font-size:16px; max-width:760px; margin:0 0 8px; }
+  .meta { font-family:var(--font-mono); font-size:11px; color:var(--muted-deep);
+          text-transform:uppercase; letter-spacing:0.06em; margin-bottom:36px;
+          border-bottom:1px solid var(--border); padding-bottom:16px; }
+  .meta span { display:inline-block; margin-right:18px; }
+  .meta b { color:var(--cyan); }
+  h2 { font-size:13px; color:var(--text-muted); font-family:var(--font-mono);
+       text-transform:uppercase; letter-spacing:0.1em; margin:32px 0 14px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:14px; }
+  a.card { display:block; background:var(--panel); border:1px solid var(--border);
+           border-radius:6px; padding:18px 20px; text-decoration:none;
+           color:var(--text); transition:border-color 0.15s, transform 0.15s;
+           border-left:3px solid var(--cyan); }
+  a.card:hover { border-color:var(--cyan); transform:translateY(-1px); }
+  a.card .title { font-size:15px; font-weight:600; margin:0 0 4px; color:var(--text);
+                  font-family:var(--font-mono); }
+  a.card .desc { font-size:12.5px; color:var(--text-muted); line-height:1.45; margin:0; }
+  a.card .glyph { font-family:var(--font-mono); color:var(--muted-deep);
+                  font-size:10px; letter-spacing:0.06em; text-transform:uppercase;
+                  margin-bottom:10px; display:block; }
+  a.card.s-green { border-left-color:var(--green); }
+  a.card.s-green:hover { border-color:var(--green); }
+  a.card.s-blue  { border-left-color:var(--blue); }
+  a.card.s-blue:hover  { border-color:var(--blue); }
+  a.card.s-amber { border-left-color:var(--amber); }
+  a.card.s-amber:hover { border-color:var(--amber); }
+  a.card.s-purple { border-left-color:var(--purple); }
+  a.card.s-purple:hover { border-color:var(--purple); }
+  .footer { margin-top:48px; padding-top:16px; border-top:1px solid var(--border);
+            color:var(--muted-deep); font-size:11px; font-family:var(--font-mono); }
+</style>
+</head>
+<body>
+
+<h1>InsideLLM — Demo Day Hub</h1>
+<p class="lede">Every artifact for the 2026-05-12 Parent Organization demo and the
+strategy around it. Start with the Demo-Prep Checklist; leave behind the Executive
+Summary.</p>
+
+<div class="meta">
+  <span>Version <b>3.1.0</b></span>
+  <span>Demo day <b>2026-05-12</b></span>
+  <span>Hub <b>html/index.html</b></span>
+</div>
+
+<h2>Presentation &amp; Demo</h2>
+<div class="grid">
+  <a class="card s-green" href="Executive-Summary.html">
+    <span class="glyph">★ leave-behind</span>
+    <div class="title">Executive Summary</div>
+    <p class="desc">One-page pitch distilling problem, solution, differentiators, compliance coverage, and call to action. Print-first.</p>
+  </a>
+  <a class="card s-green" href="Demo-Runbook.html">
+    <span class="glyph">12-minute script</span>
+    <div class="title">Demo Runbook</div>
+    <p class="desc">Dispute Handler showcase — pre-flight, 6 demo-flow steps with talk tracks, expected behaviors, failure-mode script, seed appendix.</p>
+  </a>
+  <a class="card s-green" href="Demo-Prep-Checklist.html">
+    <span class="glyph">T-24h → T-0</span>
+    <div class="title">Demo-Prep Checklist</div>
+    <p class="desc">Thursday-evening through 15-minute-before checklist. Fresh redeploy of 10.0.0.9 is non-optional.</p>
+  </a>
+  <a class="card s-green" href="FeaturesList.html">
+    <span class="glyph">capability catalog</span>
+    <div class="title">Features List</div>
+    <p class="desc">~40 capabilities across v2.0 / v3.0 / v3.1, grouped by functional area, with demo tags on capabilities shown on stage.</p>
+  </a>
+  <a class="card s-green" href="Pricing.html">
+    <span class="glyph">commercial model</span>
+    <div class="title">Pricing</div>
+    <p class="desc">Community / Professional / Enterprise tiers, add-ons, services, SLAs. Removes buyer-qualification friction.</p>
+  </a>
+  <a class="card s-green" href="Cheat-Card.html">
+    <span class="glyph">★ pocket reference</span>
+    <div class="title">Cheat Card</div>
+    <p class="desc">Single-page foldable reference: key numbers, 5 talking points, 3 competitor counters, demo timing, URLs. Print landscape.</p>
+  </a>
+  <a class="card s-green" href="Discovery-Questions.html">
+    <span class="glyph">pre-demo + in-demo</span>
+    <div class="title">Discovery Questions</div>
+    <p class="desc">Proactive questions to ask before and during the demo to reveal actual priorities, tailor flow, and surface real objections.</p>
+  </a>
+  <a class="card s-green" href="Q-and-A-Anticipation.html">
+    <span class="glyph">40+ questions</span>
+    <div class="title">Q&amp;A Anticipation</div>
+    <p class="desc">Most-likely questions across technical, compliance, commercial, competitive, and roadmap categories — with crisp answers, pushback follow-ups, and honest concessions.</p>
+  </a>
+</div>
+
+<h2>Strategy &amp; Positioning</h2>
+<div class="grid">
+  <a class="card s-blue" href="SWOTanalysis.html">
+    <span class="glyph">internal strategy</span>
+    <div class="title">SWOT Analysis</div>
+    <p class="desc">Strengths / Weaknesses / Opportunities / Threats plus strategic implications and T-20 demo-readiness checkpoint.</p>
+  </a>
+  <a class="card s-blue" href="Competitors.html">
+    <span class="glyph">landscape + matrix</span>
+    <div class="title">Competitive Landscape</div>
+    <p class="desc">5 competitor buckets, differentiator matrix, sales-counter playbook, honest loss list.</p>
+  </a>
+  <a class="card s-blue" href="OpportunitiesList.html">
+    <span class="glyph">growth levers</span>
+    <div class="title">Opportunities List</div>
+    <p class="desc">Portfolio fan-out, industry expansion, regulatory arbitrage, revenue lines, ecosystem plays. Priority matrix.</p>
+  </a>
+  <a class="card s-blue" href="Roadmap.html">
+    <span class="glyph">v3.2 → v4.0</span>
+    <div class="title">Product Roadmap</div>
+    <p class="desc">Quarterly release themes through Q1 2027. SOC 2 ladder, Secular alignment, multi-tenant scale.</p>
+  </a>
+  <a class="card s-blue" href="../docs/PostDemo-Followup.md">
+    <span class="glyph">48-hour playbook</span>
+    <div class="title">Post-Demo Follow-Up</div>
+    <p class="desc">Same-day email template, 24h stakeholder triage, 48h commitment test, 14-day conversion plan, and Plan B if the demo doesn't convert.</p>
+  </a>
+  <a class="card s-blue" href="../docs/Risk-Register.md">
+    <span class="glyph">20 tracked risks</span>
+    <div class="title">Risk Register</div>
+    <p class="desc">Operational risk ledger paired with the SWOT. Severity × likelihood scoring, mitigations, ownership, status. Top 5 eyes-on list.</p>
+  </a>
+</div>
+
+<h2>Engineering &amp; Design</h2>
+<div class="grid">
+  <a class="card s-purple" href="Architecture.html">
+    <span class="glyph">stack walkthrough</span>
+    <div class="title">Architecture</div>
+    <p class="desc">Enterprise boundary, service map, 13-step request flow, 5-layer security, what exits vs. stays, deployment targets, extension points.</p>
+  </a>
+  <a class="card s-purple" href="../docs/Zero-Trust-Design.md">
+    <span class="glyph">NIST SP 800-207</span>
+    <div class="title">Zero Trust Design</div>
+    <p class="desc">~70% NIST-aligned today. v3.3 closes fleet mesh transport via WireGuard + Headscale; v3.4 closes workload identity + SIEM. Customer-facing whitepaper outline included.</p>
+  </a>
+  <a class="card s-purple" href="../docs/Ticketing-Design.md">
+    <span class="glyph">multi-actor real-time</span>
+    <div class="title">Ticketing Design</div>
+    <p class="desc">Ticketing Hub at :8091. Five actor classes, protocol-by-proximity matrix (T0–T5), SSE real-time, OPA-enforced workflow, bidirectional connectors. v3.3–v4 scope.</p>
+  </a>
+</div>
+
+<h2>Reference &amp; Compliance</h2>
+<div class="grid">
+  <a class="card s-amber" href="Compliance-Map.html">
+    <span class="glyph">regulatory map</span>
+    <div class="title">Compliance Map</div>
+    <p class="desc">13 regulations (FDCPA, HIPAA, GLBA, FCRA, ECOA, TCPA, Reg F, FTC §5, SOX, PCI-DSS, FERPA, NIST AI RMF, ISO 42001) with per-card enforcement mechanisms and explicit non-claims.</p>
+  </a>
+  <a class="card s-amber" href="Glossary.html">
+    <span class="glyph">~50 terms</span>
+    <div class="title">Terminology Glossary</div>
+    <p class="desc">Every domain-specific term across platform / governance / AI / policy / deployment / security / regulations — with cross-references. Built for Q&amp;A lookup.</p>
+  </a>
+  <a class="card s-amber" href="Setup.html">
+    <span class="glyph">deployment</span>
+    <div class="title">Setup Wizard</div>
+    <p class="desc">Interactive configuration form generating terraform.tfvars. 9-step restructure shipped in v3.1.</p>
+  </a>
+  <a class="card s-amber" href="DefaultDeployment.html">
+    <span class="glyph">129 defaults</span>
+    <div class="title">Default Deployment</div>
+    <p class="desc">Every Terraform variable with its default value — the out-of-the-box deployment.</p>
+  </a>
+  <a class="card s-amber" href="admin.html">
+    <span class="glyph">admin SPA</span>
+    <div class="title">Admin Portal</div>
+    <p class="desc">Command center UI served at /admin — governance dashboard, change management, fleet overview.</p>
+  </a>
+  <a class="card s-amber" href="sidecar.html">
+    <span class="glyph">deployment mode</span>
+    <div class="title">Sidecar</div>
+    <p class="desc">Browser sidecar deployment for enterprises with existing AI stacks needing a governance layer.</p>
+  </a>
+  <a class="card s-amber" href="../README.html">
+    <span class="glyph">project overview</span>
+    <div class="title">README</div>
+    <p class="desc">Full architecture, solution overview, service map, technology stack. Rendered from README.md.</p>
+  </a>
+</div>
+
+<div class="footer">
+  Uniformedi LLC · Demo Day Hub · Assembled 2026-04-22 · html/index.html · 20 days to demo
+</div>
+
+</body>
+</html>

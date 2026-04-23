@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>InsideLLM — Q&amp;A Anticipation</title>
+<style>
+  :root {
+    --bg:#0a0e1a; --panel:#111827; --panel-2:#1a2234; --border:#2a3650;
+    --text:#e2e8f0; --text-muted:#94a3b8; --muted-deep:#64748b;
+    --cyan:#22d3ee; --green:#6ee7b7; --amber:#fcd34d; --red:#fca5a5;
+    --blue:#60a5fa; --purple:#a78bfa;
+    --font-mono:'Menlo','Consolas','Courier New',monospace;
+  }
+  @media print {
+    :root { --bg:#fff; --panel:#fff; --panel-2:#f5f5f5; --border:#ccc;
+            --text:#111; --text-muted:#555; --muted-deep:#777;
+            --cyan:#0369a1; --green:#065f46; --amber:#92400e; --red:#991b1b;
+            --blue:#1d4ed8; --purple:#6d28d9; }
+    body { font-size:10pt !important; max-width:none !important; padding:0 !important; }
+    .qa { page-break-inside:avoid; }
+    .noprint { display:none !important; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:32px; max-width:960px; margin:0 auto;
+         font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg);
+         color:var(--text); line-height:1.55; font-size:14px; }
+  h1 { font-size:26px; color:var(--cyan); font-family:var(--font-mono);
+       letter-spacing:-0.01em; margin:0 0 4px; }
+  .lede { color:var(--text-muted); font-size:15px; max-width:760px; margin:0 0 8px; }
+  .meta { font-family:var(--font-mono); font-size:11px; color:var(--muted-deep);
+          text-transform:uppercase; letter-spacing:0.06em; margin-bottom:28px;
+          border-bottom:1px solid var(--border); padding-bottom:16px; }
+  .meta span { display:inline-block; margin-right:18px; }
+  .meta b { color:var(--cyan); }
+  h2 { font-size:19px; color:var(--cyan); font-family:var(--font-mono);
+       margin:36px 0 10px; padding-top:10px; border-top:1px solid var(--border); }
+  h3 { font-size:13px; color:var(--text-muted); margin:22px 0 8px;
+       font-family:var(--font-mono); text-transform:uppercase; letter-spacing:0.08em; }
+  p { margin:0 0 12px; }
+  code { background:var(--panel-2); border:1px solid var(--border);
+         padding:1px 6px; border-radius:3px; font-family:var(--font-mono);
+         font-size:0.86em; color:var(--cyan); }
+  .qa { background:var(--panel); border:1px solid var(--border); border-radius:6px;
+        padding:14px 18px; margin-bottom:12px; border-left:3px solid var(--cyan); }
+  .qa.hard { border-left-color:var(--red); }
+  .qa.tricky { border-left-color:var(--amber); }
+  .qa.easy { border-left-color:var(--green); }
+  .qa .q { font-weight:600; color:var(--text); font-size:14px; margin-bottom:6px; }
+  .qa .q::before { content:"Q. "; color:var(--cyan); font-family:var(--font-mono);
+                   font-weight:600; }
+  .qa .a { color:var(--text-muted); font-size:13px; margin:0 0 8px; }
+  .qa .a::before { content:"A. "; color:var(--green); font-family:var(--font-mono);
+                   font-weight:600; }
+  .qa .push { font-size:12.5px; color:var(--text-muted);
+              padding:8px 12px; background:var(--panel-2); border-radius:4px;
+              border-left:2px solid var(--amber); margin-top:8px; font-style:italic; }
+  .qa .push::before { content:"If they push: "; color:var(--amber); font-weight:600;
+                      font-style:normal; font-family:var(--font-mono); font-size:10px;
+                      text-transform:uppercase; letter-spacing:0.06em; display:block;
+                      margin-bottom:2px; }
+  .qa .concede { font-size:12.5px; color:var(--text-muted);
+                 padding:8px 12px; background:#3f1d12; border-radius:4px;
+                 border-left:2px solid var(--red); margin-top:8px; font-style:italic; }
+  .qa .concede::before { content:"When to concede: "; color:var(--red); font-weight:600;
+                         font-style:normal; font-family:var(--font-mono); font-size:10px;
+                         text-transform:uppercase; letter-spacing:0.06em; display:block;
+                         margin-bottom:2px; }
+  nav.toc { background:var(--panel-2); border:1px solid var(--border);
+            border-radius:6px; padding:14px 18px; margin-bottom:24px; font-size:13px; }
+  nav.toc h4 { margin:0 0 6px; font-size:11px; color:var(--cyan);
+               text-transform:uppercase; letter-spacing:0.06em; font-family:var(--font-mono); }
+  nav.toc ol { margin:0 0 0 20px; columns:2; column-gap:24px; }
+  nav.toc a { text-decoration:none; color:var(--text-muted); }
+  nav.toc a:hover { color:var(--cyan); }
+  .footer { margin-top:48px; padding-top:16px; border-top:1px solid var(--border);
+            color:var(--muted-deep); font-size:11px; font-family:var(--font-mono); }
+  .legend { background:var(--panel-2); border:1px solid var(--border); border-radius:6px;
+            padding:12px 16px; margin-bottom:20px; font-size:12.5px; }
+  .legend span { display:inline-block; margin-right:16px; }
+  .dot { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:4px;
+         vertical-align:middle; }
+  .d-easy { background:var(--green); }
+  .d-tricky { background:var(--amber); }
+  .d-hard { background:var(--red); }
+</style>
+</head>
+<body>
+
+<h1>InsideLLM — Q&amp;A Anticipation</h1>
+<p class="lede">The 40+ questions most likely to come up on 2026-05-12. Each with
+a crisp first answer, a follow-up for pushback, and — where applicable — the
+honest concession. Read this Thursday night; it lowers cognitive load on stage.</p>
+
+<div class="meta">
+  <span>Audience <b>Parent Organization portfolio leadership + compliance manager</b></span>
+  <span>Drafted <b>2026-04-22</b></span>
+  <span>Status <b>Internal prep — not for distribution</b></span>
+</div>
+
+<div class="legend">
+  <b>Difficulty:</b>
+  <span><span class="dot d-easy"></span> easy — confident, short answer</span>
+  <span><span class="dot d-tricky"></span> tricky — answer carefully</span>
+  <span><span class="dot d-hard"></span> hard — concede gracefully when needed</span>
+</div>
+
+<nav class="toc noprint">
+  <h4>Categories</h4>
+  <ol>
+    <li><a href="#technical">Technical</a></li>
+    <li><a href="#compliance">Compliance</a></li>
+    <li><a href="#commercial">Commercial</a></li>
+    <li><a href="#competitive">Competitive</a></li>
+    <li><a href="#organizational">Organizational</a></li>
+    <li><a href="#roadmap">Roadmap</a></li>
+    <li><a href="#demo-specific">Demo-specific</a></li>
+  </ol>
+</nav>
+
+<h2 id="technical">Technical</h2>
+
+<div class="qa easy">
+  <div class="q">What AI models does it support?</div>
+  <div class="a">Any OpenAI-compatible model. Claude family (Opus 4.7 today), OpenAI GPT family, and local open-source via Ollama — all interchangeable. The demo runs <code>claude-opus-4-7</code>; HIPAA tenants can restrict to BAA-covered model sets.</div>
+</div>
+
+<div class="qa easy">
+  <div class="q">What's the OPA decision latency at production scale?</div>
+  <div class="a">P99 under 20ms in production. The demo VM is single-core so you'll see slightly higher. OPA runs in-process to the LiteLLM callback, not a network hop.</div>
+</div>
+
+<div class="qa tricky">
+  <div class="q">What happens if the model provider is down?</div>
+  <div class="a">LiteLLM's routing tier supports fallback — you can configure Claude → OpenAI → local Ollama as a fallback chain. If all configured models are down, requests fail with a clear error. Governance policies still fire locally regardless of model availability.</div>
+</div>
+
+<div class="qa tricky">
+  <div class="q">How do you prevent prompt injection from rewriting the agent's manifest or policy?</div>
+  <div class="a">Agent manifests are server-side data, not prompts. OPA policy input is constructed by the LiteLLM callback from request metadata; the model's output never feeds back into policy construction. Even a successful prompt injection can't escape the guardrail — as the Turn 3 demo shows.</div>
+</div>
+
+<div class="qa easy">
+  <div class="q">Does it support function-calling / tools / MCP?</div>
+  <div class="a">Yes. Tools are declared in the tenant action catalog and enforced through OPA at invocation time. MCP wiring is roadmapped for v3.4.</div>
+</div>
+
+<div class="qa easy">
+  <div class="q">Can agents call other agents?</div>
+  <div class="a">Not in the current release. Each agent is scoped to its own manifest. Multi-agent orchestration is an option for v4 if there's demand.</div>
+</div>
+
+<div class="qa easy">
+  <div class="q">Does it support streaming responses?</div>
+  <div class="a">Yes — LiteLLM passes streaming through. DLP outlet scanning happens on chunk boundaries and can redact mid-stream.</div>
+</div>
+
+<div class="qa tricky">
+  <div class="q">How do updates work without downtime?</div>
+  <div class="a">Watchtower handles container patching on individual instances with brief restart. For fleet-wide upgrades, roll instance-by-instance via Governance Hub. True zero-downtime HA (active/active) is on the v4 roadmap.</div>
+</div>
+
+<div class="qa easy">
+  <div class="q">How is data stored on the host?</div>
+  <div class="a">PostgreSQL volume at <code>/opt/InsideLLM/data/postgres</code>, Redis in-memory with AOF persistence, all behind the Docker bridge <code>172.28.0.0/16</code>. Nothing exposed to the host except Nginx 80/443 and LiteLLM 4000 (optionally).</div>
+</div>
+
+<h2 id="compliance">Compliance</h2>
+
+<div class="qa hard">
+  <div class="q">Are you SOC 2 certified?</div>
+  <div class="a">Not today. SOC 2 Type I engagement begins in Q2 2026, Type II targeted for Q1 2027. Our controls map to the Trust Services Criteria; we're happy to share the mapping now and provide audit-readiness artifacts as we progress.</div>
+  <div class="concede">If a buyer absolutely requires SOC 2 Type II today, we can't serve them yet. Offer a design-partner relationship with a SOC 2 Type I commitment on the timeline or walk away gracefully.</div>
+</div>
+
+<div class="qa tricky">
+  <div class="q">Who holds the Anthropic BAA if we use Claude for PHI?</div>
+  <div class="a">The customer holds the BAA directly with Anthropic. InsideLLM enforces the routing — only BAA-approved models are callable for PHI-tagged agents via the <code>baa_models</code> manifest field. We provide the control plane; you hold the vendor agreement.</div>
+</div>
+
+<div class="qa tricky">
+  <div class="q">What about the EU AI Act?</div>
+  <div class="a">High-risk obligations phase in starting August 2026. Our controls align with most Annex III / Article 13-14 requirements. We're drafting a formal Conformity Profile whitepaper for v3.3. For deployments in the EU, customers perform the conformity assessment; we provide the controls and documentation.</div>
+</div>
+
+<div class="qa easy">
+  <div class="q">How do we prove to CFPB that policy X was active on date Y?</div>
+  <div class="a">The hash-chained audit captures every policy version change with a SHA-256 chain. One query returns the active policy at any timestamp, with a verifiable chain back to genesis. No log-forensics required.</div>
+</div>
+
+<div class="qa easy">
+  <div class="q">Can we disable Humility / SAIVAS alignment?</div>
+  <div class="a">No. It's the mandatory baseline — enforced at four layers including the LiteLLM callback that runs regardless of OPA availability. Industry overlays (FDCPA, HIPAA, etc.) are optional and feature-flagged; Humility is not.</div>
+</div>
+
+<div class="qa easy">
+  <div class="q">What data leaves our network?</div>
+  <div class="a">Only what you send to the model provider. If you route to Anthropic or OpenAI, prompts and completions flow to those providers per their privacy terms. If you use Ollama locally, nothing leaves at all. Audit logs, user data, spend tracking — all stay on your PostgreSQL.</div>
+</div>
+
+<div class="qa tricky">
+  <div class="q">What happens if OPA fails?</div>
+  <div class="a">Fails closed. Any OPA error results in request denial. Defense in depth: the LiteLLM Humility guardrail callback also evaluates core rules locally in Python when OPA is unavailable, so policy enforcement continues even during OPA outages for the Humility baseline.</div>
+</div>
+
+<div class="qa tricky">
+  <div class="q">How are policy changes audited?</div>
+  <div class="a">Policy updates go through the Governance Hub change-management workflow with supervisor approval. Every change lands in the hash-chained audit with the approver identity, timestamp, and diff. Tenant-policy changes are tracked separately from platform-policy changes.</div>
+</div>
+
+<h2 id="commercial">Commercial</h2>
+
+<div class="qa easy">
+  <div class="q">How much does it cost?</div>
+  <div class="a">Community tier is $0 — single-instance self-host with everything. Professional starts at $2,500/instance/month for fleets up to 5. Enterprise is custom-priced, typically negotiated per portfolio. Full pricing on <code>Pricing.html</code>.</div>
+</div>
+
+<div class="qa tricky">
+  <div class="q">What's BSL 1.1 and will our procurement accept it?</div>
+  <div class="a">BSL 1.1 is source-available — you can read, modify, and deploy for internal use. The one restriction is offering InsideLLM-as-a-service commercially to third parties. Converts to Apache 2.0 on 2030-04-11. Professional and Enterprise tiers include a licensing addendum that gives OSI-equivalent terms for your contract period.</div>
+  <div class="push">If procurement remains strict after the addendum: happy to have your legal team review the BSL text directly. It's not proprietary — the source is public.</div>
+</div>
+
+<div class="qa easy">
+  <div class="q">Can we self-host free and later upgrade?</div>
+  <div class="a">Yes. Community to Professional is a license change, no data migration. Your configurations, policies, and history all carry forward.</div>
+</div>
+
+<div class="qa hard">
+  <div class="q">What's Uniformedi's financial viability?</div>
+  <div class="a">Uniformedi LLC is founder-owned, profitable on current contracts, and operating without external funding. We're investing internally in SOC 2 Type I for Q2 2026 and v3.2 platform work. Happy to share financial viability documentation under NDA.</div>
+  <div class="concede">If the buyer requires external-investor backing or a certain revenue threshold, that's a real gap. Offer references, escrow of source code, or a partnership with a larger integrator as channel.</div>
+</div>
+
+<div class="qa easy">
+  <div class="q">What's the support SLA on Enterprise?</div>
+  <div class="a">≤4-hour business / ≤24-hour weekend response for Severity-1 (production down or compliance-critical). 24×7 on-call. 8×5 for Sev-2 and below. Full matrix on <code>Pricing.html</code>.</div>
+</div>
+
+<div class="qa hard">
+  <div class="q">Who else is running InsideLLM in production?</div>
+  <div class="a">We have an early reference deployment (the live VMs you saw in the demo). We're positioning Parent Organization as a design-partner for a reference customer story — premium pricing concessions available for that role.</div>
+  <div class="concede">Buyer wants 5 named-logo references today: we don't have them. Pivot to the SAIVAS IP story, the open-source components, and offer reference calls with earlier pilots once those relationships are established.</div>
+</div>
+
+<div class="qa easy">
+  <div class="q">What's the deployment timeline?</div>
+  <div class="a">Community self-host: under an hour. Professional with our implementation services: typically 2 weeks including SSO setup and initial policy config. Enterprise fleet bring-up: 4-6 weeks depending on tenant count.</div>
+</div>
+
+<h2 id="competitive">Competitive</h2>
+
+<div class="qa easy">
+  <div class="q">Why not ChatGPT Enterprise or Copilot for Enterprise?</div>
+  <div class="a">ChatGPT has no per-tenant guardrail tiers, no policy-as-code, no hash-chained audit, no on-prem data plane. We don't compete with the model — we own the governance layer. Copilot is IDE-focused; we govern every AI use.</div>
+</div>
+
+<div class="qa easy">
+  <div class="q">Why not AWS Bedrock or Azure AI Foundry?</div>
+  <div class="a">Both are excellent if you're committed to that hyperscaler. We win when data sovereignty matters (true on-prem), when you want model portability (Claude + OpenAI + Ollama interchangeable), or when your regulatory surface needs industry-specific OPA bundles that the hyperscalers don't provide out-of-box.</div>
+</div>
+
+<div class="qa tricky">
+  <div class="q">Why not Portkey or Helicone?</div>
+  <div class="a">Those are SaaS gateways — your data passes through their cloud. We're on-prem. They also focus on routing + observability; we add DLP + OPA + hash-chained audit + full integrated front-end. Different tool class.</div>
+</div>
+
+<div class="qa tricky">
+  <div class="q">What's unique about Humility / SAIVAS?</div>
+  <div class="a">The SAIVAS framework is published IP from <i>Uniform Gnosis, Vol. I</i> — it's an explicit alignment ethics specification, not a vendor-specific filter. It's enforced at four layers (prompt, guardrail, OPA, pipeline), mandatory, and cannot be disabled. No other AI platform has a published, specification-backed alignment baseline of this kind.</div>
+</div>
+
+<div class="qa tricky">
+  <div class="q">Isn't this just LiteLLM with guardrails bolted on?</div>
+  <div class="a">LiteLLM is the gateway layer — yes, we use it, and it's an excellent piece of software. But the platform is the whole stack: OPA engine, tenant action catalog, Governance Hub, hash-chained audit, SAIVAS alignment, fleet management, industry policy bundles, DLP, approval queues. LiteLLM alone gets you routing and budgets. InsideLLM gets you governance.</div>
+</div>
+
+<div class="qa easy">
+  <div class="q">What about Guardrails AI, NeMo Guardrails?</div>
+  <div class="a">Those are policy libraries — drop-in Python/JS frameworks for developers building their own stack. We ship the whole deployable system. If you're building your own platform and need a policy library, use theirs. If you want a turnkey governed AI platform, use ours.</div>
+</div>
+
+<h2 id="organizational">Organizational</h2>
+
+<div class="qa hard">
+  <div class="q">What's your team size?</div>
+  <div class="a">Uniformedi LLC is founder-led today. The platform has been built by Dan Medina with deep expertise across the stack. We're actively hiring a senior engineer in Q3 2026 — compliance/security background preferred.</div>
+  <div class="concede">Buyer wants a vendor with 50+ engineers: acknowledge the gap, point to the MIT-licensed <code>humility-guardrail</code> component, the open-source ecosystem the platform builds on (LiteLLM, Open WebUI, OPA, each with substantial engineering teams), and the source-available nature of InsideLLM itself as continuity assurance.</div>
+</div>
+
+<div class="qa hard">
+  <div class="q">What's your bus factor?</div>
+  <div class="a">Currently one primary maintainer. That's a real risk we acknowledge openly. Mitigation: the platform is open-source, documented, and built on FOSS components any competent team could maintain. An Enterprise contract can include source-code escrow.</div>
+</div>
+
+<div class="qa tricky">
+  <div class="q">What happens to my deployment if Uniformedi goes away?</div>
+  <div class="a">Your deployment keeps running indefinitely — the BSL license is perpetual for code you've received, and your PostgreSQL and configuration are on your hardware. You'd lose support and managed upgrades. Source-code escrow available on Enterprise contracts for extra assurance.</div>
+</div>
+
+<div class="qa easy">
+  <div class="q">Do you offer professional services?</div>
+  <div class="a">Yes. Deployment implementation, compliance mapping, custom OPA policy authoring, industry-specific workshops. Full menu on <code>Pricing.html</code>.</div>
+</div>
+
+<div class="qa easy">
+  <div class="q">What are your security practices for your own operations?</div>
+  <div class="a">Source code on GitHub private until public release. Secrets never in source — Terraform <code>random_password</code> generates them at deploy time. SCFW wraps our own pip installs. Our SOC 2 Type I engagement starts Q2 2026. Supply-chain posture documented in README.</div>
+</div>
+
+<h2 id="roadmap">Roadmap</h2>
+
+<div class="qa easy">
+  <div class="q">When will you have SOC 2?</div>
+  <div class="a">Type I engagement begins Q2 2026, targeting completion Q3 2026. Type II observation window begins Q4 2026, targeting certification Q1 2027. Happy to share progress artifacts along the way.</div>
+</div>
+
+<div class="qa easy">
+  <div class="q">What's v4 going to add?</div>
+  <div class="a">Q1 2027 target. Headline features: true multi-tenant control plane (beyond fleet-of-singles), cross-tenant policy composition, bias-audit tooling for ECOA / NYC Local Law 144 / state AI laws, HITRUST engagement for healthcare track. Full roadmap on <code>Roadmap.html</code>.</div>
+</div>
+
+<div class="qa tricky">
+  <div class="q">Will this be on AWS / Azure Marketplace?</div>
+  <div class="a">On the roadmap for Q1 2027 after SOC 2 Type II is held. Before that, direct contract is the primary path; happy to accommodate procurement preferences.</div>
+</div>
+
+<div class="qa easy">
+  <div class="q">How do I request a feature?</div>
+  <div class="a">Community tier: GitHub issues. Professional: email support, quarterly review call. Enterprise: priority roadmap input at the annual strategic review. We publicly acknowledge customer feature requests in release notes.</div>
+</div>
+
+<h2 id="demo-specific">Demo-specific</h2>
+
+<div class="qa easy">
+  <div class="q">Why did the OPA deny in Turn 2 take a moment?</div>
+  <div class="a">The demo VM is single-core. In production, P99 OPA decision latency is under 20ms. The deny you saw is the real policy evaluating — that latency is demo artifact, not representative.</div>
+</div>
+
+<div class="qa tricky">
+  <div class="q">Can we see the full audit chain, not just the last 5 entries?</div>
+  <div class="a">Yes — strip the <code>| jq '.[-5:]'</code> and you get the complete chain. I trimmed for screen readability. The verification endpoint walks the whole chain and reports any broken links.</div>
+</div>
+
+<div class="qa easy">
+  <div class="q">How would you handle a dispute in a jurisdiction outside the FDCPA, like a TCPA-only state consent requirement?</div>
+  <div class="a">Apply the corresponding OPA policy overlay — <code>tier_tcpa</code>, or a custom bundle for the state's specific rules. The platform's pattern (base + industry overlay + tenant overlay) means a new jurisdiction adds a rego file, not a platform change.</div>
+</div>
+
+<div class="qa tricky">
+  <div class="q">What if the agent were asked to do something that violates multiple policies?</div>
+  <div class="a">All applicable policies evaluate; the request is denied if any of them denies. The <code>deny_reasons</code> field returns every triggered rule so the reviewer sees the complete picture. This is important for ECOA-style overlapping regulations.</div>
+</div>
+
+<div class="qa hard">
+  <div class="q">Can we run the same demo against our own tenant and our own data?</div>
+  <div class="a">Absolutely — that's a design-partner engagement we'd love to have. Typical timeline: 2-3 weeks to stand up a tenant with your data and run the dispute-handler scenario against real account data. Let's schedule a follow-up call within two weeks of today.</div>
+</div>
+
+<div class="qa tricky">
+  <div class="q">How would this handle 1,000 concurrent agents?</div>
+  <div class="a">Per-instance: tens of concurrent agents are fine. Hundreds-to-thousands needs horizontal scaling — multiple InsideLLM instances in a fleet, Governance Hub central aggregation, and load-balanced LiteLLM. That's the v3.4 / v4 scaling work. For your 32-company portfolio, 32 instances with fleet management is the natural topology.</div>
+</div>
+
+<div class="qa easy">
+  <div class="q">Can we use this for non-collections workflows — HR, legal research, general chat?</div>
+  <div class="a">Yes. Any AI use in your organization can route through the platform. The Dispute Handler is a showcase for regulated-workflow governance; the same platform handles general chat (Tier 3 governance) and internal productivity AI (Tier 2) just as cleanly.</div>
+</div>
+
+<div class="qa tricky">
+  <div class="q">What if we want our General Counsel to write a custom policy?</div>
+  <div class="a">Perfect use case. OPA policies are rego files — human-readable, version-controlled, reviewable in GitHub or the admin UI's policy editor. Our custom-policy-authoring service can partner with your GC team, or Professional-tier customers can author policies directly with our training material.</div>
+</div>
+
+<div class="footer">
+  Uniformedi LLC · Q&amp;A anticipation sheet · Last updated 2026-04-22 · For demo-day reference; not a public artifact
+</div>
+
+</body>
+</html>

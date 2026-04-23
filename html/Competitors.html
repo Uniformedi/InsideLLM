@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>InsideLLM — Competitive Landscape (v3.1.0)</title>
+<style>
+  :root {
+    --bg:#0a0e1a; --panel:#111827; --panel-2:#1a2234; --border:#2a3650;
+    --text:#e2e8f0; --text-muted:#94a3b8; --muted-deep:#64748b;
+    --cyan:#22d3ee; --green:#6ee7b7; --amber:#fcd34d; --red:#fca5a5;
+    --blue:#60a5fa; --purple:#a78bfa;
+    --font-mono:'Menlo','Consolas','Courier New',monospace;
+  }
+  @media print {
+    :root { --bg:#fff; --panel:#fff; --panel-2:#f5f5f5; --border:#ccc;
+            --text:#111; --text-muted:#555; --muted-deep:#777;
+            --cyan:#0369a1; --green:#065f46; --amber:#92400e; --red:#991b1b;
+            --blue:#1d4ed8; --purple:#6d28d9; }
+    body { font-size:10.5pt !important; max-width:none !important; padding:0 !important; }
+    .comp, .counter { page-break-inside:avoid; }
+    .noprint { display:none !important; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:32px; max-width:1100px; margin:0 auto;
+         font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg);
+         color:var(--text); line-height:1.55; font-size:14px; }
+  h1 { font-size:26px; color:var(--cyan); font-family:var(--font-mono);
+       letter-spacing:-0.01em; margin:0 0 4px; }
+  .lede { color:var(--text-muted); font-size:15px; max-width:760px; margin:0 0 8px; }
+  .meta { font-family:var(--font-mono); font-size:11px; color:var(--muted-deep);
+          text-transform:uppercase; letter-spacing:0.06em; margin-bottom:28px;
+          border-bottom:1px solid var(--border); padding-bottom:16px; }
+  .meta span { display:inline-block; margin-right:18px; }
+  .meta b { color:var(--cyan); }
+  h2 { font-size:19px; color:var(--cyan); font-family:var(--font-mono);
+       margin:36px 0 10px; padding-top:10px; border-top:1px solid var(--border); }
+  h3 { font-size:14px; color:var(--text-muted); margin:22px 0 8px;
+       font-family:var(--font-mono); text-transform:uppercase; letter-spacing:0.06em; }
+  p { margin:0 0 12px; }
+  a { color:var(--blue); }
+  code { background:var(--panel-2); border:1px solid var(--border);
+         padding:1px 6px; border-radius:3px; font-family:var(--font-mono);
+         font-size:0.86em; color:var(--cyan); }
+  ul, ol { margin:0 0 14px 20px; padding:0; }
+  li { margin-bottom:6px; font-size:13px; }
+  table { width:100%; border-collapse:collapse; margin:12px 0;
+          background:var(--panel); border:1px solid var(--border); border-radius:6px; overflow:hidden; }
+  th, td { padding:10px 12px; text-align:left; border-bottom:1px solid var(--border);
+           font-size:13px; vertical-align:top; }
+  th { background:var(--panel-2); color:var(--cyan); font-weight:600;
+       font-size:11px; text-transform:uppercase; letter-spacing:0.05em; }
+  tr:last-child td { border-bottom:none; }
+  .summary { background:var(--panel-2); border:1px solid var(--border);
+             border-radius:6px; padding:16px 20px; margin-bottom:20px; }
+  .summary p { margin:0; }
+  .comp { background:var(--panel); border:1px solid var(--border); border-radius:6px;
+          padding:14px 18px; margin-bottom:12px; border-left:3px solid var(--cyan); }
+  .comp h4 { margin:0 0 4px; font-size:15px; color:var(--text); }
+  .comp .what { color:var(--text-muted); font-size:13px; margin-bottom:10px; }
+  .comp .grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:8px; }
+  .comp .cell { background:var(--panel-2); border:1px solid var(--border);
+                border-radius:4px; padding:10px 14px; }
+  .comp .cell.win { border-left:3px solid var(--green); }
+  .comp .cell.lose { border-left:3px solid var(--red); }
+  .comp .cell h5 { margin:0 0 6px; font-size:10px; text-transform:uppercase;
+                   letter-spacing:0.08em; font-family:var(--font-mono); }
+  .comp .cell.win h5 { color:var(--green); }
+  .comp .cell.lose h5 { color:var(--red); }
+  .comp .cell ul { margin:0 0 0 16px; padding:0; }
+  .comp .cell li { font-size:12px; margin-bottom:4px; color:var(--text-muted); }
+  .counter { background:var(--panel); border:1px solid var(--border); border-radius:6px;
+             padding:14px 18px; margin-bottom:10px; border-left:3px solid var(--amber); }
+  .counter h4 { margin:0 0 6px; color:var(--amber); font-size:14px; }
+  .counter p { margin:0; color:var(--text-muted); font-size:13px; }
+  .tag { display:inline-block; padding:2px 8px; border-radius:3px;
+         font-family:var(--font-mono); font-size:10px; text-transform:uppercase;
+         letter-spacing:0.05em; font-weight:600; }
+  .tag-ok { background:#064e3b; color:var(--green); }
+  .tag-warn { background:#78350f; color:var(--amber); }
+  .tag-risk { background:#7f1d1d; color:var(--red); }
+  nav.toc { background:var(--panel-2); border:1px solid var(--border);
+            border-radius:6px; padding:14px 18px; margin-bottom:24px; font-size:13px; }
+  nav.toc h4 { margin:0 0 6px; font-size:11px; color:var(--cyan);
+               text-transform:uppercase; letter-spacing:0.06em; font-family:var(--font-mono); }
+  nav.toc ol { margin:0 0 0 20px; columns:2; column-gap:24px; }
+  nav.toc a { text-decoration:none; color:var(--text-muted); }
+  nav.toc a:hover { color:var(--cyan); }
+  .footer { margin-top:48px; padding-top:16px; border-top:1px solid var(--border);
+            color:var(--muted-deep); font-size:11px; font-family:var(--font-mono); }
+  td.y { color:var(--green); font-family:var(--font-mono); text-align:center; }
+  td.n { color:var(--red); font-family:var(--font-mono); text-align:center; }
+  td.p { color:var(--amber); font-family:var(--font-mono); text-align:center; }
+  @media (max-width:760px) {
+    .comp .grid { grid-template-columns:1fr; }
+  }
+</style>
+</head>
+<body>
+
+<h1>InsideLLM — Competitive Landscape</h1>
+<p class="lede">Where InsideLLM wins, where it doesn't, and how to talk about each
+competitor honestly in a buyer conversation.</p>
+
+<div class="meta">
+  <span>Version <b>3.1.0</b></span>
+  <span>Assessed <b>2026-04-22</b></span>
+  <span>Classification <b>Internal / Uniformedi LLC</b></span>
+</div>
+
+<section class="summary">
+  <p><b>Positioning:</b> InsideLLM is not a general-purpose AI gateway and not a
+  single-layer governance tool. It is an integrated on-prem / private-cloud
+  platform that governs AI use across multiple model providers with machine-readable
+  compliance policy, tamper-evident audit, and a multi-tenant fleet. Competitors
+  win in three specific zones: where data sovereignty is a non-issue (SaaS
+  gateways), where the buyer is already committed to a hyperscaler's ecosystem
+  (Bedrock / Azure AI Foundry / Vertex), and where the buyer needs governance
+  without a gateway (policy-only tools). Outside those zones, InsideLLM's
+  integrated stack + policy-as-code + hash-chained audit are difficult to match.</p>
+</section>
+
+<nav class="toc noprint">
+  <h4>Contents</h4>
+  <ol>
+    <li><a href="#gateways">1. Cloud AI Gateways (SaaS)</a></li>
+    <li><a href="#hyperscalers">2. Hyperscaler AI Platforms</a></li>
+    <li><a href="#vendors">3. Model Vendors Direct</a></li>
+    <li><a href="#governance">4. AI Governance Tools</a></li>
+    <li><a href="#code-tools">5. Enterprise Code / IDE AI</a></li>
+    <li><a href="#matrix">Differentiator matrix</a></li>
+    <li><a href="#counter">How to counter in sales</a></li>
+    <li><a href="#losses">Where InsideLLM genuinely loses</a></li>
+  </ol>
+</nav>
+
+<h2 id="gateways">1. Cloud AI Gateways (SaaS)</h2>
+<h3>LiteLLM-as-a-Service / Portkey / Helicone / Orq.ai</h3>
+
+<div class="comp">
+  <h4>Portkey</h4>
+  <p class="what">SaaS LLM gateway. Unified API across providers, routing,
+  observability, prompt management, basic guardrails.</p>
+  <div class="grid">
+    <div class="cell win">
+      <h5>Where InsideLLM wins</h5>
+      <ul>
+        <li>Full on-prem deployment; no customer data traverses a vendor cloud</li>
+        <li>OPA policy-as-code vs. Portkey's YAML/UI guardrails</li>
+        <li>Hash-chained audit for tamper-evident regulatory response</li>
+        <li>Integrated chat UI (Open WebUI), RAG, DocForge — not gateway-only</li>
+        <li>Per-tenant sovereignty across a fleet; Portkey is multi-tenant SaaS</li>
+      </ul>
+    </div>
+    <div class="cell lose">
+      <h5>Where Portkey wins</h5>
+      <ul>
+        <li>Zero-ops: SaaS installation vs. Terraform + Hyper-V / WSL2</li>
+        <li>Larger dev community, existing integrations</li>
+        <li>Observability UI is more mature (Helicone-like dashboards)</li>
+        <li>Team of engineers vs. solo founder</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="comp">
+  <h4>Helicone</h4>
+  <p class="what">Open-source observability-first LLM gateway with SaaS and
+  self-host options. Strong on analytics and cost tracking.</p>
+  <div class="grid">
+    <div class="cell win">
+      <h5>Where InsideLLM wins</h5>
+      <ul>
+        <li>Governance layer (OPA) Helicone explicitly does not have</li>
+        <li>Industry-specific compliance bundles (FDCPA, HIPAA, GLBA, etc.)</li>
+        <li>Integrated front-end (chat UI, admin portal)</li>
+        <li>DLP at gateway; Helicone is observability-first</li>
+      </ul>
+    </div>
+    <div class="cell lose">
+      <h5>Where Helicone wins</h5>
+      <ul>
+        <li>Best-in-class analytics dashboards</li>
+        <li>Open-source and permissively licensed</li>
+        <li>Simpler install for observability-only use case</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<h2 id="hyperscalers">2. Hyperscaler AI Platforms</h2>
+<h3>AWS Bedrock / Azure AI Foundry + M365 Copilot / Google Vertex AI</h3>
+
+<div class="comp">
+  <h4>Microsoft Azure AI Foundry + M365 Copilot for Enterprise</h4>
+  <p class="what">Integrated AI platform across Azure infrastructure and M365.
+  Deep enterprise relationships, bundling advantage.</p>
+  <div class="grid">
+    <div class="cell win">
+      <h5>Where InsideLLM wins</h5>
+      <ul>
+        <li>True on-prem option (no Azure region required)</li>
+        <li>Model-agnostic — routes to Anthropic, OpenAI, local Ollama equally</li>
+        <li>OPA policy vs. Azure's prompt-filtering guardrails</li>
+        <li>Hash-chained audit (Azure's audit is log-level, not cryptographically chained)</li>
+        <li>Industry-specific regulatory bundles not in Azure's out-of-box story</li>
+      </ul>
+    </div>
+    <div class="cell lose">
+      <h5>Where Microsoft wins</h5>
+      <ul>
+        <li>M365 bundling: Copilot included in E5 SKUs</li>
+        <li>Entra ID integration already in place for Microsoft shops</li>
+        <li>FedRAMP High (Azure Government), SOC 2, HITRUST certifications held</li>
+        <li>Enterprise account teams, partner ecosystem, reseller channel</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="comp">
+  <h4>AWS Bedrock + Guardrails</h4>
+  <p class="what">Hyperscaler AI platform with multi-model access (Anthropic,
+  Meta, Amazon Titan, Cohere) and built-in guardrails feature.</p>
+  <div class="grid">
+    <div class="cell win">
+      <h5>Where InsideLLM wins</h5>
+      <ul>
+        <li>On-prem / no-cloud option (Bedrock is AWS-only)</li>
+        <li>OPA policy-as-code with tenant overlay vs. Bedrock's prompt-filter guardrails</li>
+        <li>Multi-model including local Ollama out-of-box</li>
+        <li>Integrated front-end + admin</li>
+      </ul>
+    </div>
+    <div class="cell lose">
+      <h5>Where Bedrock wins</h5>
+      <ul>
+        <li>Knowledge Bases + Agents features are mature for AWS-native shops</li>
+        <li>Compliance certifications (FedRAMP, SOC 2, HIPAA BAA, PCI)</li>
+        <li>Zero-setup for customers already on AWS</li>
+        <li>AWS account team leverage</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="comp">
+  <h4>Google Vertex AI + Gemini</h4>
+  <p class="what">Google Cloud's managed AI platform with Gemini family access
+  and governance features.</p>
+  <div class="grid">
+    <div class="cell win">
+      <h5>Where InsideLLM wins</h5>
+      <ul>
+        <li>No GCP lock-in; runs fully on-prem</li>
+        <li>Multi-model native; not Gemini-first</li>
+        <li>Purpose-built for regulated US industries (FDCPA, HIPAA bundles)</li>
+      </ul>
+    </div>
+    <div class="cell lose">
+      <h5>Where Vertex wins</h5>
+      <ul>
+        <li>Model Armor + Responsible AI Toolkit comparable to OPA for many use cases</li>
+        <li>Existing GCP relationship for Google-shop buyers</li>
+        <li>Massive MLOps surface (feature store, pipelines, monitoring)</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<h2 id="vendors">3. Model Vendors Direct</h2>
+<h3>Anthropic Claude for Enterprise / OpenAI ChatGPT Enterprise</h3>
+
+<div class="comp">
+  <h4>Anthropic Claude for Enterprise</h4>
+  <p class="what">Anthropic's direct enterprise offering: Claude access, admin
+  controls, SSO, usage dashboards.</p>
+  <div class="grid">
+    <div class="cell win">
+      <h5>Where InsideLLM wins</h5>
+      <ul>
+        <li>Governance layer is the whole story — Anthropic has none comparable</li>
+        <li>Policy-as-code vs. usage-management features</li>
+        <li>Multi-model: adds OpenAI, local LLM, others alongside Claude</li>
+        <li>On-prem data plane; Claude Enterprise is cloud-only</li>
+        <li>Industry regulatory bundles</li>
+      </ul>
+    </div>
+    <div class="cell lose">
+      <h5>Where Anthropic wins</h5>
+      <ul>
+        <li>First-party Claude team support + roadmap alignment</li>
+        <li>Zero-ops</li>
+        <li>Enterprise contract directly with the model vendor (some procurement prefers this)</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="comp">
+  <h4>OpenAI ChatGPT Enterprise</h4>
+  <p class="what">OpenAI's enterprise ChatGPT with admin controls, SSO, data
+  privacy commitments, and GPT-family access.</p>
+  <div class="grid">
+    <div class="cell win">
+      <h5>Where InsideLLM wins</h5>
+      <ul>
+        <li>Policy-as-code governance (ChatGPT Enterprise has no equivalent)</li>
+        <li>Hash-chained audit for regulatory response</li>
+        <li>Multi-model + local LLM</li>
+        <li>On-prem</li>
+      </ul>
+    </div>
+    <div class="cell lose">
+      <h5>Where OpenAI wins</h5>
+      <ul>
+        <li>Brand recognition — "ChatGPT" is the AI vocabulary for most enterprise buyers</li>
+        <li>Zero-ops + OpenAI's compliance posture (SOC 2 Type II)</li>
+        <li>Massive user-education wins on adoption</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<h2 id="governance">4. AI Governance Tools (Policy-Only)</h2>
+<h3>Guardrails AI / NeMo Guardrails / Portkey Guardrails / WhyLabs / Arize</h3>
+
+<div class="comp">
+  <h4>Guardrails AI</h4>
+  <p class="what">Open-source Python library for validating LLM outputs against
+  schema, format, and safety rules.</p>
+  <div class="grid">
+    <div class="cell win">
+      <h5>Where InsideLLM wins</h5>
+      <ul>
+        <li>Full stack — gateway, chat UI, RAG, fleet management, audit</li>
+        <li>OPA policy runs at the gateway layer with industry bundles</li>
+        <li>Hash-chained audit; Guardrails AI does not persist audit state</li>
+        <li>No Python-library integration work required for downstream consumers</li>
+      </ul>
+    </div>
+    <div class="cell lose">
+      <h5>Where Guardrails AI wins</h5>
+      <ul>
+        <li>Drop-in library for developers who already have their own stack</li>
+        <li>Cheaper / simpler for policy-only use cases</li>
+        <li>Active open-source community</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="comp">
+  <h4>NVIDIA NeMo Guardrails</h4>
+  <p class="what">Conversational guardrails framework with Colang DSL. Strong
+  in dialog-safety and topical-rail use cases.</p>
+  <div class="grid">
+    <div class="cell win">
+      <h5>Where InsideLLM wins</h5>
+      <ul>
+        <li>Integrated platform vs. framework-only</li>
+        <li>Rego policy language has regulatory-industry alignment and broad tooling (OPA is used in Kubernetes / Terraform / cloud governance)</li>
+        <li>Admin UX + audit trail + fleet management baked in</li>
+      </ul>
+    </div>
+    <div class="cell lose">
+      <h5>Where NeMo Guardrails wins</h5>
+      <ul>
+        <li>Conversational-rail and dialog-safety features more mature</li>
+        <li>NVIDIA brand + integration with NIM for inference stacks</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<h2 id="code-tools">5. Enterprise Code / IDE AI</h2>
+<h3>GitHub Copilot Enterprise / Cursor for Business / Sourcegraph Cody / JetBrains AI</h3>
+
+<p>These solve a different problem (IDE-based coding assistance) and are
+generally <b>complementary</b>, not competitive — customers adopt both. Where
+sales conversations overlap: when the buyer views "enterprise AI governance"
+as an IDE-scoped problem rather than a platform-scoped one. The counter is
+simple: InsideLLM governs <i>every</i> AI use (chat, RAG, agents, custom apps,
+CLI via Claude Code, document generation), not just IDE autocomplete.</p>
+
+<div class="comp">
+  <h4>GitHub Copilot Enterprise</h4>
+  <p class="what">Microsoft's IDE-first AI coding assistant with enterprise admin
+  controls and usage policies.</p>
+  <div class="grid">
+    <div class="cell win">
+      <h5>Where InsideLLM wins</h5>
+      <ul>
+        <li>Broader scope — governs chat, document generation, agents, any API consumer</li>
+        <li>Policy-as-code for content types Copilot does not address (FDCPA calls, HIPAA PHI handling)</li>
+        <li>Model-agnostic (Copilot is OpenAI / Claude mix, but not configurable beyond that)</li>
+      </ul>
+    </div>
+    <div class="cell lose">
+      <h5>Where Copilot wins</h5>
+      <ul>
+        <li>Best-in-class IDE integration across VS Code, Visual Studio, JetBrains</li>
+        <li>M365 bundling for enterprise procurement</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<h2 id="matrix">Differentiator matrix</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>Capability</th>
+      <th>InsideLLM</th>
+      <th>Portkey</th>
+      <th>Bedrock</th>
+      <th>Azure AI<br>Foundry</th>
+      <th>Claude<br>Enterprise</th>
+      <th>Guardrails<br>AI</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td>True on-prem (no vendor cloud required)</td><td class="y">✓</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="p">lib</td></tr>
+    <tr><td>Multi-model (Claude + GPT + local)</td><td class="y">✓</td><td class="y">✓</td><td class="p">AWS</td><td class="p">MSFT</td><td class="n">—</td><td class="y">✓</td></tr>
+    <tr><td>Local LLM (Ollama, no API cost)</td><td class="y">✓</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="n">—</td></tr>
+    <tr><td>Policy-as-code (OPA / Rego)</td><td class="y">✓</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="p">py</td></tr>
+    <tr><td>Industry regulatory bundles</td><td class="y">✓</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="n">—</td></tr>
+    <tr><td>Hash-chained audit trail</td><td class="y">✓</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="n">—</td></tr>
+    <tr><td>DLP at gateway (inline blocking)</td><td class="y">✓</td><td class="p">partial</td><td class="p">filter</td><td class="p">filter</td><td class="n">—</td><td class="n">—</td></tr>
+    <tr><td>Integrated chat + RAG + doc generation</td><td class="y">✓</td><td class="n">—</td><td class="p">KB</td><td class="y">✓</td><td class="y">✓</td><td class="n">—</td></tr>
+    <tr><td>Multi-tenant fleet + per-tenant sovereignty</td><td class="y">✓</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="n">—</td></tr>
+    <tr><td>FOSS core (inspectable)</td><td class="p">BSL</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="y">Apache</td></tr>
+    <tr><td>SOC 2 Type II</td><td class="n">—</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="n">—</td></tr>
+    <tr><td>FedRAMP High</td><td class="n">—</td><td class="n">—</td><td class="y">GovCloud</td><td class="y">Gov</td><td class="n">—</td><td class="n">—</td></tr>
+    <tr><td>Enterprise account team / partner channel</td><td class="n">—</td><td class="p">small</td><td class="y">AWS</td><td class="y">MSFT</td><td class="y">Anthropic</td><td class="n">—</td></tr>
+  </tbody>
+</table>
+
+<p style="font-size:12px; color:var(--muted-deep);">
+Key: <span class="y">✓</span> = clear capability · <span class="p">partial</span> = partial / with caveats · <span class="n">—</span> = absent
+</p>
+
+<h2 id="counter">How to counter in sales</h2>
+
+<div class="counter">
+  <h4>Data-sovereignty-driven buyer</h4>
+  <p>Lead with on-prem deployment + "no customer data leaves your network"
+  (especially with Ollama). Bedrock / Azure / Vertex collapse here. Portkey and
+  Helicone require SaaS trust. Key phrase: "one <code>terraform apply</code>
+  and the stack runs entirely inside your boundary."</p>
+</div>
+
+<div class="counter">
+  <h4>Regulated-industry buyer (collections, healthcare, finance)</h4>
+  <p>Lead with OPA policy-as-code + industry bundles + hash-chained audit.
+  Key phrase: "your general counsel can read the rego file directly." Bring
+  the Compliance-Map sheet to every pitch.</p>
+</div>
+
+<div class="counter">
+  <h4>Microsoft-shop buyer</h4>
+  <p>Do not fight Copilot. Position as the <b>governance layer</b> that sits
+  alongside Copilot and governs all <i>non-IDE</i> AI use (chat, custom agents,
+  document generation, external APIs). Compatible, not competitive.</p>
+</div>
+
+<div class="counter">
+  <h4>Cost-sensitive buyer</h4>
+  <p>Lead with local-Ollama for bulk inference + per-user budgets + no
+  per-seat license. Azure / Bedrock charge for every token; InsideLLM amortizes
+  across a self-hosted stack.</p>
+</div>
+
+<div class="counter">
+  <h4>Governance-only buyer</h4>
+  <p>Differentiate from Guardrails AI / NeMo with: full stack comes with it
+  (gateway, chat UI, admin, RAG, audit). If buyer specifically wants a policy
+  library only, concede — but price the full platform at a small premium and
+  point out the integration work they would otherwise do themselves.</p>
+</div>
+
+<div class="counter">
+  <h4>"Why not just ChatGPT Enterprise?" (the demo Turn 3 objection)</h4>
+  <p>Direct quote from the demo runbook: "ChatGPT has no per-tenant guardrail
+  tiers, no policy-as-code, no hash-chained audit, no on-prem data plane. We
+  don't compete with the model; we own the governance layer."</p>
+</div>
+
+<h2 id="losses">Where InsideLLM genuinely loses</h2>
+
+<p>Be ready to concede these, because buyers will find them:</p>
+
+<ul>
+  <li><b>Compliance certifications.</b> No SOC 2, HITRUST, ISO 27001, or FedRAMP currently held. Primary disqualifier for public-sector and some financial-services procurement.</li>
+  <li><b>Windows-first deployment.</b> Hyper-V primary; WSL2 alternative. Linux-native enterprises face friction.</li>
+  <li><b>Bus factor.</b> Solo-founder project. Vendor-risk review will flag this first.</li>
+  <li><b>BSL license.</b> OSI-strict shops won't accept source-available. Converts to Apache 2.0 in 2030.</li>
+  <li><b>Brand + channel.</b> No enterprise account team, no partner ecosystem, no analyst coverage.</li>
+  <li><b>Integration breadth.</b> Hyperscalers have deep, pre-built connectors into their own ecosystems (Bedrock ↔ AWS data services, Azure AI ↔ M365). InsideLLM has none of that.</li>
+  <li><b>Roadmap pace.</b> The competitors have engineering teams of dozens to thousands. Features will land slower on InsideLLM relative to hyperscaler platforms.</li>
+</ul>
+
+<p><b>When these disqualify:</b> a buyer requiring a vendor with a SOC 2 Type II
+report today and refusing to budget a 90-day gap cannot buy InsideLLM. Do not
+pretend otherwise — offer a design-partner conversation and a roadmap
+commitment to SOC 2 Type I as the next-quarter milestone.</p>
+
+<div class="footer">
+  Uniformedi LLC · Competitive landscape · Last updated 2026-04-22 · Update before every major prospect pitch — competitor product pages drift
+</div>
+
+</body>
+</html>

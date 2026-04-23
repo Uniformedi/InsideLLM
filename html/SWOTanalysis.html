@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>InsideLLM — SWOT Analysis (v3.1.0)</title>
+<style>
+  :root {
+    --bg:#0a0e1a; --panel:#111827; --panel-2:#1a2234; --border:#2a3650;
+    --text:#e2e8f0; --text-muted:#94a3b8; --muted-deep:#64748b;
+    --cyan:#22d3ee; --green:#6ee7b7; --amber:#fcd34d; --red:#fca5a5;
+    --blue:#60a5fa; --purple:#a78bfa;
+    --font-mono:'Menlo','Consolas','Courier New',monospace;
+  }
+  @media print {
+    :root { --bg:#fff; --panel:#fff; --panel-2:#f5f5f5; --border:#ccc;
+            --text:#111; --text-muted:#555; --muted-deep:#777;
+            --cyan:#0369a1; --green:#065f46; --amber:#92400e; --red:#991b1b;
+            --blue:#1d4ed8; --purple:#6d28d9; }
+    body { font-size:11pt !important; max-width:none !important; padding:0 !important; }
+    .swot-grid { page-break-inside:avoid; }
+    .quadrant { page-break-inside:avoid; }
+    .noprint { display:none !important; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:32px; max-width:1100px; margin:0 auto;
+         font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg);
+         color:var(--text); line-height:1.55; font-size:14px; }
+  h1 { font-size:26px; color:var(--cyan); font-family:var(--font-mono);
+       letter-spacing:-0.01em; margin:0 0 4px; }
+  .lede { color:var(--text-muted); font-size:15px; max-width:760px; margin:0 0 8px; }
+  .meta { font-family:var(--font-mono); font-size:11px; color:var(--muted-deep);
+          text-transform:uppercase; letter-spacing:0.06em; margin-bottom:28px;
+          border-bottom:1px solid var(--border); padding-bottom:16px; }
+  .meta span { display:inline-block; margin-right:18px; }
+  .meta b { color:var(--cyan); }
+  h2 { font-size:20px; color:var(--cyan); font-family:var(--font-mono);
+       margin:36px 0 10px; padding-top:10px; border-top:1px solid var(--border); }
+  h3 { font-size:15px; color:var(--text); margin:18px 0 6px; }
+  p { margin:0 0 12px; }
+  a { color:var(--blue); }
+  code { background:var(--panel-2); border:1px solid var(--border);
+         padding:1px 6px; border-radius:3px; font-family:var(--font-mono);
+         font-size:0.88em; color:var(--cyan); }
+  ul, ol { margin:0 0 14px 22px; padding:0; }
+  li { margin-bottom:8px; }
+  li b { color:var(--text); }
+  table { width:100%; border-collapse:collapse; margin:12px 0;
+          background:var(--panel); border:1px solid var(--border); border-radius:6px; overflow:hidden; }
+  th, td { padding:10px 12px; text-align:left; border-bottom:1px solid var(--border);
+           font-size:13px; vertical-align:top; }
+  th { background:var(--panel-2); color:var(--cyan); font-weight:600;
+       font-size:11px; text-transform:uppercase; letter-spacing:0.05em; }
+  tr:last-child td { border-bottom:none; }
+  .summary { background:var(--panel-2); border:1px solid var(--border);
+             border-radius:6px; padding:16px 20px; margin-bottom:20px; }
+  .summary p { margin:0; color:var(--text); }
+  .swot-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin:14px 0; }
+  .quadrant { background:var(--panel); border:1px solid var(--border);
+              border-radius:6px; padding:16px 18px; border-top-width:3px; }
+  .quadrant h3 { margin:0 0 10px; font-family:var(--font-mono);
+                 font-size:12px; text-transform:uppercase; letter-spacing:0.08em; }
+  .quadrant ul { margin:0 0 0 18px; }
+  .quadrant li { margin-bottom:10px; font-size:13px; line-height:1.5; }
+  .q-s { border-top-color:var(--green); }
+  .q-s h3 { color:var(--green); }
+  .q-w { border-top-color:var(--red); }
+  .q-w h3 { color:var(--red); }
+  .q-o { border-top-color:var(--blue); }
+  .q-o h3 { color:var(--blue); }
+  .q-t { border-top-color:var(--amber); }
+  .q-t h3 { color:var(--amber); }
+  .tag { display:inline-block; padding:2px 8px; border-radius:3px;
+         font-family:var(--font-mono); font-size:10px; text-transform:uppercase;
+         letter-spacing:0.05em; margin-right:4px; }
+  .tag-ok { background:#064e3b; color:var(--green); }
+  .tag-warn { background:#78350f; color:var(--amber); }
+  .tag-info { background:#1e3a8a; color:var(--blue); }
+  .tag-risk { background:#7f1d1d; color:var(--red); }
+  nav.toc { background:var(--panel-2); border:1px solid var(--border);
+            border-radius:6px; padding:14px 18px; margin-bottom:24px;
+            font-size:13px; }
+  nav.toc h4 { margin:0 0 6px; font-size:11px; color:var(--cyan);
+               text-transform:uppercase; letter-spacing:0.06em;
+               font-family:var(--font-mono); }
+  nav.toc ol { margin:0 0 0 20px; columns:2; column-gap:24px; }
+  nav.toc a { text-decoration:none; color:var(--text-muted); }
+  nav.toc a:hover { color:var(--cyan); }
+  .footer { margin-top:48px; padding-top:16px; border-top:1px solid var(--border);
+            color:var(--muted-deep); font-size:11px; font-family:var(--font-mono); }
+  @media (max-width:760px) {
+    .swot-grid { grid-template-columns:1fr; }
+  }
+</style>
+</head>
+<body>
+
+<h1>InsideLLM — SWOT Analysis</h1>
+<p class="lede">Strategic assessment of the platform, positioning, and demo-readiness
+for the Parent Organization engagement on 2026-05-12 (T-20 days).</p>
+
+<div class="meta">
+  <span>Version <b>3.1.0</b></span>
+  <span>Assessed <b>2026-04-22</b></span>
+  <span>Classification <b>Internal / Uniformedi LLC</b></span>
+</div>
+
+<nav class="toc noprint">
+  <h4>Contents</h4>
+  <ol>
+    <li><a href="#summary">Executive Summary</a></li>
+    <li><a href="#swot">SWOT Matrix</a></li>
+    <li><a href="#implications">Strategic Implications</a></li>
+    <li><a href="#demo">Demo-Readiness Checkpoint (T-20)</a></li>
+    <li><a href="#sources">Sources &amp; Methodology</a></li>
+  </ol>
+</nav>
+
+<section id="summary" class="summary">
+  <p><b>Bottom line:</b> InsideLLM v3.1.0 is a fully integrated, self-hosted
+  enterprise AI gateway with a defensible compliance and governance posture
+  and a differentiated IP core (Humility alignment / SAIVAS). Its strongest
+  assets are operational completeness and regulatory alignment; its principal
+  risks are bus factor, BSL-license procurement friction, and unfinished
+  Phase 1 delivery. Strategy: convert the 2026-05-12 demo into a
+  reference-customer relationship while closing the most
+  procurement-blocking gaps (certifications, artifact bundle, published
+  pricing).</p>
+</section>
+
+<h2 id="swot">SWOT Matrix</h2>
+
+<div class="swot-grid">
+
+  <div class="quadrant q-s">
+    <h3>Strengths — what we own</h3>
+    <ul>
+      <li><b>Integrated platform, not a library.</b> One <code>terraform apply</code>
+        (or one PowerShell script) deploys the complete stack — DLP, SSO, budgets,
+        OPA, audit, RAG, fleet. Competitors ship single layers; InsideLLM ships
+        the whole system.</li>
+      <li><b>Proprietary alignment IP.</b> Humility alignment policy implements
+        the SAIVAS framework from <i>Uniform Gnosis, Volume I</i> (Dan Medina).
+        Published provenance, defensible hook no gateway vendor offers.</li>
+      <li><b>Compliance mapped, not hand-waved.</b> Explicit controls for
+        FDCPA, FCRA, ECOA, GLBA, TCPA, CFPB Regulation F, FTC Act §5, with
+        safe-harbor alignment to NIST AI RMF and ISO/IEC 42001:2023.</li>
+      <li><b>Defense-in-depth architecture.</b> DLP at gateway, OPA policy
+        (Humility mandatory + 6 industry overlays), SHA-256 hash-chained audit,
+        four-layer Humility enforcement. Fails closed.</li>
+      <li><b>True data sovereignty.</b> On-prem Hyper-V or WSL2. No cloud
+        dependency required. Works interchangeably with local (Ollama) or
+        cloud (Anthropic, OpenAI via LiteLLM) models.</li>
+      <li><b>Fleet-ready, multi-role.</b> Primary / gateway / workstation /
+        voice / edge roles; Okta / AD / Open auth; Governance Hub central sync;
+        per-VM Claude Code CLI pre-seeded with scoped <code>CLAUDE.md</code>.</li>
+      <li><b>Shipping velocity.</b> v2.0 → v3.0 → v3.1 in rapid succession with
+        substantive feature deltas — not doc-only releases.</li>
+    </ul>
+  </div>
+
+  <div class="quadrant q-w">
+    <h3>Weaknesses — what we carry</h3>
+    <ul>
+      <li><b>Bus factor of 1.</b> Entire stack knowledge lives with the founder.
+        Enterprise vendor-risk review will flag this first.</li>
+      <li><b>BSL 1.1 blocks some procurement.</b> OSI-strict enterprises (public
+        sector, some financial) will not accept source-available. Apache
+        conversion is April 2030 — four years out.</li>
+      <li><b>Polyglot surface.</b> HCL, Python, Rego, Node.js, PowerShell, Bash,
+        YAML. Steep onboarding for contributors or customer IT handoff.</li>
+      <li><b>No third-party audits yet.</b> Compliance <i>alignment</i> is
+        documented; SOC 2, HITRUST, ISO 27001, FedRAMP <i>certifications</i>
+        are not. Material gate for regulated buyers.</li>
+      <li><b>Windows-first.</b> Hyper-V primary; WSL2 fallback. Locks out
+        Linux-native enterprises unless they will run Windows hosts.</li>
+      <li><b>No public pricing.</b> BSL plus mystery. Buyers cannot self-qualify;
+        every sales cycle starts from zero.</li>
+      <li><b>Low public-adoption signals.</b> 1 star, 0 forks, 0 issues on the
+        GitHub repo. Due-diligence teams will see this.</li>
+      <li><b>Phase 1 still incomplete.</b> P1.2 (manifest-to-runtime translation —
+        the IP core) is open. P1.3 – P1.6 pending. 20 days to demo.</li>
+      <li><b>Outward artifacts scattered.</b> FeaturesList, OpportunitiesList,
+        SWOT, Roadmap, Compliance-Map, Competitors, Demo-Runbook — all missing
+        as HTML. Gap in the sales kit.</li>
+    </ul>
+  </div>
+
+  <div class="quadrant q-o">
+    <h3>Opportunities — where to lean</h3>
+    <ul>
+      <li><b>On-prem AI is underserved.</b> Portkey, Helicone, Orq.ai are SaaS.
+        Regulated buyers (collections, healthcare, finance, legal, insurance)
+        who cannot send data to cloud AI have few real options.</li>
+      <li><b>EU AI Act rollout (2026-2027).</b> Phased compliance deadlines drive
+        a European compliance-purchase wave through the year.</li>
+      <li><b>Parent Organization as reference customer.</b> Demo-day close →
+        case study → referral chain → conference talk material.</li>
+      <li><b>Secular as sibling FOSS.</b> AAIF / AGENTS.md standard is four
+        months old. "Governed AI with governed context" is a narrative no
+        competitor owns, and Secular extends InsideLLM's reach into the
+        broader agent ecosystem.</li>
+      <li><b>Sidecar mode.</b> For enterprises with existing AI but no
+        governance, deploy InsideLLM as a policy layer. Different buyer, same
+        product.</li>
+      <li><b>Open-core revenue playbook.</b> HashiCorp, MongoDB, Redis,
+        Supabase have proven the pattern. Enterprise add-ons (multi-tenant,
+        fleet at scale, premium support) on top of BSL core.</li>
+      <li><b>Services revenue.</b> Deployment, industry-specific compliance
+        mapping, custom OPA policy authoring — billable on top of platform
+        license.</li>
+      <li><b>SAIVAS / Humility spin-out.</b> Package as standalone AI
+        alignment policy product; license to other AI platforms.</li>
+      <li><b>Microsoft-shop enterprises.</b> Windows Server + AD + Azure AD
+        environments are disproportionately underserved by Linux-native AI
+        infrastructure. Natural home for InsideLLM.</li>
+    </ul>
+  </div>
+
+  <div class="quadrant q-t">
+    <h3>Threats — what can hurt us</h3>
+    <ul>
+      <li><b>Microsoft Copilot for Enterprise + Azure AI Foundry.</b> Deep
+        enterprise relationships, M365 bundling, "good enough" governance —
+        the primary threat to the Microsoft-shop ICP.</li>
+      <li><b>AWS Bedrock / Google Vertex AI data-residency.</b> Sovereignty
+        features on major clouds narrow the on-prem-only differentiator.</li>
+      <li><b>LiteLLM pivots to enterprise SaaS.</b> If BerriAI commercializes
+        LiteLLM directly, the gateway layer InsideLLM builds on becomes a
+        competitor.</li>
+      <li><b>Anthropic / OpenAI on-prem offerings.</b> Direct enterprise-Claude
+        or enterprise-GPT on-prem products from the model vendors would
+        remove the primary use case.</li>
+      <li><b>Upstream license shifts.</b> Open WebUI, LiteLLM, OPA, Guacamole,
+        Grafana — any one shifting to AGPL or commercial could disrupt
+        distribution.</li>
+      <li><b>Regulatory interpretation drift.</b> CFPB, HHS OCR, and state AGs
+        are issuing AI-specific guidance on a rolling basis. Compliance claims
+        need continuous re-verification.</li>
+      <li><b>Demo risk.</b> 20 days for P1.2 – P1.6 is tight. Demo failure =
+        lost momentum, potentially lost customer.</li>
+      <li><b>Ecosystem convergence on MCP + AGENTS.md.</b> If the standard
+        stack becomes MCP + AGENTS.md, SAIVAS / Humility needs positioning as
+        complementary (policy overlay), not competitive.</li>
+      <li><b>Enterprise sales cycle length.</b> 6-18 months to close. Demo-day
+        wins translate to revenue slowly, during which founder burn continues
+        with no external runway buffer.</li>
+    </ul>
+  </div>
+
+</div>
+
+<h2 id="implications">Strategic Implications</h2>
+
+<ol>
+  <li><b>Finish P1.2 at any cost.</b> Manifest-to-runtime translation is the
+    IP core. Miss it and the demo becomes a tour of v3.1, not the new agent
+    story.
+    <span class="tag tag-risk">Critical path</span></li>
+  <li><b>Ship the artifact bundle before demo day.</b> FeaturesList.html,
+    Demo-Runbook.html, Compliance-Map.html, Competitors.html,
+    pitch-mode SWOT one-pager. ~2 days of focused work.
+    <span class="tag tag-warn">Demo-blocker</span></li>
+  <li><b>Publish a pricing page.</b> Even "Starter / Pro / Enterprise + contact
+    sales" removes buyer friction. Silence loses deals before discovery calls.
+    <span class="tag tag-info">Quick win</span></li>
+  <li><b>Target SOC 2 Type I within the next quarter.</b> Single most
+    important certification for enterprise procurement gates.
+    <span class="tag tag-info">Procurement-unlock</span></li>
+  <li><b>Recruit one trusted operator within 6 months.</b> Reduce bus factor
+    of 1 to 2. Ideally compliance/security background to pair with the
+    platform-engineering surface Dan already owns.
+    <span class="tag tag-warn">Continuity</span></li>
+  <li><b>Sequence Secular post-demo, not before.</b> Apache 2.0 FOSS release,
+    AAIF-aligned, dogfooded against the InsideLLM repo first. Do not let it
+    compete with Phase 1 for attention until after 2026-05-12.
+    <span class="tag tag-ok">Strategic bet</span></li>
+  <li><b>Instrument Humility / SAIVAS with real metrics.</b> "Alignment IP" is
+    a claim until paired with incident-prevented telemetry. Add counters to
+    governance-hub, publish aggregate data in the next release cycle.
+    <span class="tag tag-info">Differentiator proof</span></li>
+  <li><b>Prepare a partnership pitch.</b> One regulated-industry consultancy
+    or MSP as channel beats pure direct sales for the first year while SOC 2
+    is in flight.
+    <span class="tag tag-info">GTM lever</span></li>
+</ol>
+
+<h2 id="demo">Demo-Readiness Checkpoint (T-20)</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th style="width:18%">Status</th>
+      <th style="width:32%">Item</th>
+      <th>Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><span class="tag tag-ok">Done</span></td>
+      <td>P0 Foundations</td>
+      <td>Manifest schema v1.1, OPA input schema extended, guardrail profiles
+        (46/46 tests pass), action catalog schema.</td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-ok">Done</span></td>
+      <td>P1.1 — governance_agents + CRUD</td>
+      <td>Shipped commit <code>83e1cfd</code>. Dispute Handler YAML ingested
+        + published on <code>10.0.0.9</code>.</td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-risk">Critical</span></td>
+      <td>P1.2 — Manifest-to-runtime translator</td>
+      <td>IP core. <code>agent_translator.py</code> skeleton sketched in
+        SESSION-RESUME. LiteLLM virtual-key + OWUI model registration +
+        OPA binding + idempotency + teardown.</td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-warn">Needed</span></td>
+      <td>P1.3 — Tools as catalog actions</td>
+      <td>Wire existing Open WebUI Tools through the action catalog so the
+        demo agent can actually do something.</td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-warn">Needed</span></td>
+      <td>P1.6 — Dispute Handler end-to-end</td>
+      <td>The showcase agent that demonstrates the whole chain (manifest →
+        runtime → guarded execution → audit). This <i>is</i> the demo.</td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-info">Cuttable</span></td>
+      <td>P1.4 — RAG per-agent scope enforcement</td>
+      <td>Can ship post-demo if timeline slips.</td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-info">Cuttable</span></td>
+      <td>P1.5 — Agent builder UI</td>
+      <td>Can demo with YAML + CRUD API if UI slips.</td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-warn">Gap</span></td>
+      <td>Outward-facing HTML artifacts</td>
+      <td>FeaturesList, Compliance-Map, Demo-Runbook, Competitors,
+        OpportunitiesList, Pricing. Batch this week.</td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-risk">Risk</span></td>
+      <td><code>10.0.0.9</code> hot-patched image</td>
+      <td>Schedule fresh redeploy before demo day — not the night of.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="sources">Sources &amp; Methodology</h2>
+
+<p>This assessment is grounded in the following artifacts as of 2026-04-22:</p>
+
+<ul>
+  <li><code>README.md</code> — v3.1.0 and v3.0 feature sets, architecture,
+    compliance positioning.</li>
+  <li><code>CLAUDE.md</code> — stack inventory, OPA policy architecture,
+    Humility enforcement layers, auth modes.</li>
+  <li><code>AI_Governance_Framework.md</code> — compliance mapping,
+    tiered materiality, regulatory surface.</li>
+  <li><code>docs/SESSION-RESUME.md</code> — live infrastructure state,
+    task board, P1.2 sketch, commit history.</li>
+  <li><code>docs/Platform-Ultraplan-v3.md</code>, <code>docs/Agents-Plan.md</code>,
+    <code>docs/PARENT-ORGANIZATION-DEMO-RUNBOOK.md</code> — roadmap and
+    demo scope.</li>
+  <li>Public GitHub repository
+    (<a href="https://github.com/uniformedi/insidellm">github.com/uniformedi/insidellm</a>)
+    for public-facing signals: stars, forks, issues, license, disclosed API
+    surfaces.</li>
+  <li>External market context: AAIF formation (2025-12-09), AGENTS.md
+    adoption (~60k repos), AI AAIF ecosystem growth.</li>
+</ul>
+
+<p>Not sourced: revenue, burn, runway, contract status — unknown to this
+assessment. Strategic implications reflect platform &amp; positioning
+readiness only, not business-finance readiness.</p>
+
+<div class="footer">
+  Uniformedi LLC · Internal strategy document · Last updated 2026-04-22 · T-20 to Parent Organization demo
+</div>
+
+</body>
+</html>
