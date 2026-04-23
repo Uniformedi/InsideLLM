@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>InsideLLM Assist — One-Off Local Install</title>
+<style>
+  :root {
+    --bg:#0a0e1a; --panel:#111827; --panel-2:#1a2234; --border:#2a3650;
+    --text:#e2e8f0; --text-muted:#94a3b8; --muted-deep:#64748b;
+    --cyan:#22d3ee; --green:#6ee7b7; --amber:#fcd34d; --red:#fca5a5;
+    --blue:#60a5fa; --purple:#a78bfa;
+    --font-mono:'Menlo','Consolas','Courier New',monospace;
+  }
+  @media print {
+    :root { --bg:#fff; --panel:#fff; --panel-2:#f5f5f5; --border:#ccc;
+            --text:#111; --text-muted:#555; --muted-deep:#777;
+            --cyan:#0369a1; --green:#065f46; --amber:#92400e; --red:#991b1b;
+            --blue:#1d4ed8; --purple:#6d28d9; }
+    body { font-size:11pt !important; }
+    pre, .matrix, table { page-break-inside:avoid; }
+    .noprint { display:none !important; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:32px; max-width:880px; margin:0 auto;
+         font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg);
+         color:var(--text); line-height:1.55; font-size:14px; }
+  h1 { font-size:26px; color:var(--cyan); font-family:var(--font-mono);
+       letter-spacing:-0.01em; margin:0 0 4px; }
+  .lede { color:var(--text-muted); font-size:15px; max-width:640px; margin:0 0 8px; }
+  .meta { font-family:var(--font-mono); font-size:11px; color:var(--muted-deep);
+          text-transform:uppercase; letter-spacing:0.06em; margin-bottom:28px;
+          border-bottom:1px solid var(--border); padding-bottom:16px; }
+  .meta span { display:inline-block; margin-right:18px; }
+  .meta b { color:var(--cyan); }
+  h2 { font-size:20px; color:var(--cyan); font-family:var(--font-mono);
+       margin:36px 0 10px; padding-top:10px; border-top:1px solid var(--border); }
+  h3 { font-size:15px; color:var(--text); margin:24px 0 6px; }
+  p { margin:0 0 12px; }
+  a { color:var(--blue); }
+  code { background:var(--panel-2); border:1px solid var(--border);
+         padding:1px 6px; border-radius:3px; font-family:var(--font-mono);
+         font-size:0.88em; color:var(--cyan); }
+  pre { background:var(--panel); border:1px solid var(--border);
+        border-radius:6px; padding:14px 16px; overflow:auto;
+        font-family:var(--font-mono); font-size:12px; line-height:1.5;
+        color:var(--text); margin:12px 0; }
+  pre code { background:transparent; border:none; padding:0; color:inherit; font-size:inherit; }
+  table { width:100%; border-collapse:collapse; margin:12px 0;
+          background:var(--panel); border:1px solid var(--border); border-radius:6px; overflow:hidden; }
+  th, td { padding:10px 12px; text-align:left; border-bottom:1px solid var(--border);
+           font-size:13px; vertical-align:top; }
+  th { background:var(--panel-2); color:var(--cyan); font-weight:600;
+       font-size:11px; text-transform:uppercase; letter-spacing:0.05em; }
+  tr:last-child td { border-bottom:none; }
+  ul, ol { margin:0 0 14px 24px; padding:0; }
+  li { margin-bottom:4px; }
+  blockquote { margin:12px 0; padding:10px 16px; background:var(--panel-2);
+               border-left:3px solid var(--cyan); border-radius:4px; color:var(--text-muted); }
+  .tag { display:inline-block; padding:2px 8px; border-radius:3px;
+         font-family:var(--font-mono); font-size:10px; text-transform:uppercase;
+         letter-spacing:0.05em; margin-right:4px; }
+  .tag-ok { background:#064e3b; color:var(--green); }
+  .tag-warn { background:#78350f; color:var(--amber); }
+  .tag-info { background:#1e3a8a; color:var(--blue); }
+  nav.toc { background:var(--panel-2); border:1px solid var(--border);
+            border-radius:6px; padding:14px 18px; margin-bottom:24px;
+            font-size:13px; }
+  nav.toc h4 { margin:0 0 6px; font-size:11px; color:var(--cyan);
+               text-transform:uppercase; letter-spacing:0.06em;
+               font-family:var(--font-mono); }
+  nav.toc ol { margin:0 0 0 20px; columns:2; column-gap:24px; }
+  nav.toc a { text-decoration:none; color:var(--text-muted); }
+  nav.toc a:hover { color:var(--cyan); }
+  .footer { margin-top:48px; padding-top:16px; border-top:1px solid var(--border);
+            color:var(--muted-deep); font-size:11px; font-family:var(--font-mono); }
+  @media (max-width:720px) { nav.toc ol { columns:1; } body { padding:20px; } }
+</style>
+</head>
+<body>
+
+<h1>InsideLLM Assist — One-Off Local Install</h1>
+<p class="lede">
+How to install the <code>page-assist-insidellm</code> extension on a
+single machine for development, demo, or pilot — without the full GPO
+plus self-host update channel.
+</p>
+<div class="meta">
+  <span><b>Codename:</b> page-assist-insidellm</span>
+  <span><b>Audience:</b> developers / pilot testers</span>
+  <span><b>Scope:</b> single workstation</span>
+  <span><b>Status:</b> pre-distribution</span>
+</div>
+
+<nav class="toc noprint">
+  <h4>Contents</h4>
+  <ol>
+    <li><a href="#options">At a glance</a></li>
+    <li><a href="#a">Option A — Load unpacked</a></li>
+    <li><a href="#b">Option B — Pack as .crx</a></li>
+    <li><a href="#c">Option C — Firefox</a></li>
+    <li><a href="#verify">Verifying it works</a></li>
+    <li><a href="#scope">What this is not</a></li>
+  </ol>
+</nav>
+
+<h2 id="options">At a glance</h2>
+<p>Three options, ordered by how close they are to a production install. Pick <b>Option A</b> unless you have a reason not to.</p>
+<table>
+  <thead>
+    <tr><th>Option</th><th>Best for</th><th>Setup cost</th><th>Persists across restart</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><span class="tag tag-ok">A</span> Load unpacked (Chrome)</td>
+      <td>Fastest dev install; demos</td>
+      <td>None beyond the build</td>
+      <td>Yes (with dev-mode banner)</td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-info">B</span> Pack <code>.crx</code> + side-load</td>
+      <td>Testing the actual signed artifact</td>
+      <td>Managed-policy file required</td>
+      <td>Yes</td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-warn">C</span> Firefox temporary</td>
+      <td>No-policy quick trial</td>
+      <td>None</td>
+      <td>No (cleared on restart)</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="a">Option A — Load unpacked (recommended)</h2>
+<p>
+Fastest path. No signing, no <code>.crx</code>, no policy required to
+get it running. Chrome will show a <i>"Disable developer mode
+extensions"</i> banner on every startup — that's expected.
+</p>
+
+<h3>Build</h3>
+<pre><code>git clone https://github.com/Uniformedi/page-assist-insidellm.git
+cd page-assist-insidellm
+./scripts/fork.sh           # Linux/macOS
+# .\scripts\fork.ps1        # Windows PowerShell
+
+cd build/upstream
+bun install
+bun run build               # Chrome MV3 build</code></pre>
+<p>Output: <code>build/upstream/build/chrome-mv3/</code></p>
+
+<h3>Install in Chrome</h3>
+<ol>
+  <li>Open <code>chrome://extensions</code>.</li>
+  <li>Toggle <b>Developer mode</b> (top-right).</li>
+  <li>Click <b>Load unpacked</b>.</li>
+  <li>Select <code>build/upstream/build/chrome-mv3/</code>.</li>
+</ol>
+<p>The extension's ID is shown on the card — <b>copy it</b>, you'll need it for the policy file in the next step.</p>
+
+<h3>(Optional) Seed managed config</h3>
+<p>
+Without a managed-policy file, the extension falls back to its
+in-extension settings UI — fine for a quick demo. For lockdown-mode
+behavior (gateway URL + virtual key pre-seeded, controls hidden), drop
+a Chrome managed-policy file.
+</p>
+
+<p><b>Linux:</b></p>
+<pre><code>sudo mkdir -p /etc/opt/chrome/policies/managed
+sudo tee /etc/opt/chrome/policies/managed/insidellm-assist.json &gt;/dev/null &lt;&lt;'EOF'
+{
+  "3rdparty": {
+    "extensions": {
+      "&lt;EXTENSION_ID_FROM_chrome://extensions&gt;": {
+        "gatewayBaseUrl": "https://insidellm.corp.example.com/v1",
+        "virtualApiKey": "sk-...",
+        "lockdown": true,
+        "pageQaEnabled": true
+      }
+    }
+  }
+}
+EOF</code></pre>
+
+<p>
+<b>macOS:</b> drop the same JSON at
+<code>/Library/Managed Preferences/com.google.Chrome.plist</code>
+(convert to plist) — easier to use <code>defaults write</code> per
+Google's Chrome Enterprise docs.
+</p>
+<p>
+<b>Windows:</b> use <code>regedit</code> under
+<code>HKLM\Software\Policies\Google\Chrome\3rdparty\extensions\&lt;ID&gt;\policy</code>,
+or import the ADMX templates from <code>policy/</code> in the
+extension repo.
+</p>
+<p>
+Restart Chrome and visit <code>chrome://policy</code> to confirm the
+values loaded under <i>Extension policies</i>.
+</p>
+
+<h2 id="b">Option B — Pack into <code>.crx</code> and side-load</h2>
+<p>
+Use this when you want to test the actual <code>.crx</code> artifact
+(signing key, extension ID stability, update flow) — not when you just
+want it running. On a clean Chrome install on Linux/Mac, drag-installing
+a <code>.crx</code> is <b>blocked by default</b>: you must first
+whitelist the extension ID via managed policy. So this is a managed
+test box exercise, not a "no setup" install.
+</p>
+
+<h3>Pack</h3>
+<pre><code># One-time signing key. Keep it safe — it pins the extension ID forever.
+openssl genrsa -out ~/insidellm-assist.pem 2048
+
+google-chrome --pack-extension=build/upstream/build/chrome-mv3 \
+              --pack-extension-key=~/insidellm-assist.pem</code></pre>
+<p>Produces <code>build/upstream/build/chrome-mv3.crx</code>.</p>
+
+<h3>Allow self-install</h3>
+<p>Add to your managed-policy JSON (alongside the per-extension config from Option A):</p>
+<pre><code>{
+  "ExtensionInstallSources": ["file:///*"],
+  "ExtensionInstallAllowlist": ["&lt;EXTENSION_ID&gt;"]
+}</code></pre>
+<p>Restart Chrome, then drag the <code>.crx</code> onto <code>chrome://extensions</code>.</p>
+
+<h2 id="c">Option C — Firefox (no policy dance)</h2>
+<p>
+Fastest if you want to bypass Chrome's policy requirements entirely.
+The install is <b>temporary</b> — cleared on browser restart.
+</p>
+<pre><code>bun run build:firefox</code></pre>
+<p>In Firefox:</p>
+<ol>
+  <li>Open <code>about:debugging</code>.</li>
+  <li>Click <b>This Firefox</b>.</li>
+  <li><b>Load Temporary Add-on…</b></li>
+  <li>Pick the <code>manifest.json</code> inside the firefox build directory.</li>
+</ol>
+
+<h2 id="verify">Verifying it works</h2>
+<p>Regardless of option:</p>
+<ol>
+  <li>Click the extension icon → side panel should open.</li>
+  <li>Right-click any web page → <i>InsideLLM Assist</i> actions in the menu.</li>
+  <li>Trigger a chat → check the InsideLLM gateway logs (LiteLLM proxy) for the inbound request carrying your virtual key.</li>
+</ol>
+<p>If the request never reaches the gateway, the most common causes are:</p>
+<ul>
+  <li>Wrong <code>gatewayBaseUrl</code> (trailing slash, missing <code>/v1</code>).</li>
+  <li>Managed policy not actually loaded — re-check <code>chrome://policy</code>.</li>
+  <li>Virtual key revoked or user budget exhausted (gateway returns 401 / 429).</li>
+</ul>
+
+<h2 id="scope">What this is <i>not</i></h2>
+<p>This document covers a single-machine install. It does <b>not</b> cover:</p>
+<ul>
+  <li>Hosting the <code>.crx</code> + <code>updates.xml</code> self-update channel on the InsideLLM nginx VM.</li>
+  <li>Chrome Enterprise Group Policy rollout to many endpoints (see <code>policy/</code> in <code>page-assist-insidellm</code> for ADMX/ADML templates).</li>
+  <li>Firefox enterprise policy (<code>policies.json</code>) for sustained Firefox installs.</li>
+</ul>
+
+<div class="footer">
+  InsideLLM Assist · one-off local install · companion to sidecar.html
+</div>
+
+</body>
+</html>
