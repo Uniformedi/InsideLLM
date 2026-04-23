@@ -471,6 +471,26 @@ variable "litellm_default_user_tpm" {
   default     = 100000
 }
 
+variable "litellm_cache_enable" {
+  description = <<-EOT
+    Enable LiteLLM's Redis-backed response cache. When true (default),
+    identical prompts return a cached completion without hitting upstream
+    LLM providers — cheap for repeat prompts (demo rehearsal, testing).
+
+    Set to false to force every request to hit the upstream model. Useful
+    for a final demo rehearsal to validate real-path latency and
+    correctness before going live.
+  EOT
+  type        = bool
+  default     = true
+}
+
+variable "litellm_cache_ttl_seconds" {
+  description = "LiteLLM response-cache TTL in seconds when litellm_cache_enable is true."
+  type        = number
+  default     = 600
+}
+
 # =============================================================================
 # LOCAL LLM (OLLAMA)
 # =============================================================================
@@ -1348,4 +1368,53 @@ variable "vapid_subject" {
   description = "VAPID subject (mailto: or https:) — contact point for push-endpoint abuse reports."
   type        = string
   default     = "mailto:ops@insidellm.local"
+}
+
+# =============================================================================
+# DEPLOYMENT PROFILE — bundle of defaults keyed by intent of this deployment
+# =============================================================================
+# When `deployment_profile != ""`, the profile's values for the governed
+# variables win — mirroring the existing `vm_role` precedence pattern in
+# main.tf §Role-aware defaults. To opt out of the profile's effect on a
+# specific variable, leave `deployment_profile = ""` and set each variable
+# explicitly. Empty string (the default) preserves legacy behaviour.
+#
+# Profile-governed variables:
+#   ollama_enable, ops_trivy_enable, ops_watchtower_enable, cockpit_enable,
+#   vm_memory_dynamic, litellm_cache_enable
+#
+# Profile and vm_role govern disjoint variable sets, so they can be combined
+# freely — a `vm_role="edge"` deployment with `deployment_profile="demo"`
+# gets the edge service defaults plus the demo iteration defaults.
+#
+# See docs/DemoPrep-Fast-Iteration.md §3 for the reasoning.
+# =============================================================================
+
+variable "deployment_profile" {
+  description = <<-EOT
+    Bundle of sensible defaults for a class of deployment. Overrides the
+    defaults of a narrow set of variables when set to a non-empty value.
+
+    Supported values:
+      - ""     : no profile — every variable uses its own default
+                 (current behaviour, fully backwards-compatible).
+      - "prod" : production defaults (same as "").
+      - "dev"  : developer-friendly — demo-path services on, background
+                 ops off.
+      - "demo" : demo-prep iteration — minimal boot, services off except
+                 the demo path, LiteLLM cache on. See
+                 docs/DemoPrep-Fast-Iteration.md.
+
+    Precedence: when a profile is set, the profile's values for the
+    governed variables win over the variables' own defaults. This
+    mirrors the existing `vm_role` → `_role_defaults` pattern. To opt
+    out of the profile's effect, leave `deployment_profile = ""` and
+    set each variable explicitly.
+  EOT
+  type        = string
+  default     = ""
+  validation {
+    condition     = contains(["", "prod", "dev", "demo"], var.deployment_profile)
+    error_message = "deployment_profile must be one of: \"\", \"prod\", \"dev\", \"demo\"."
+  }
 }

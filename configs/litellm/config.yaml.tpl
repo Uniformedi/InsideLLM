@@ -111,12 +111,20 @@ litellm_settings:
   # Count total tokens for rate limit enforcement
   token_rate_limit_type: "total"
 
-  # Cache settings (in-memory for speed)
+  # Cache settings (Redis-backed). Controlled by terraform var
+  # `litellm_cache_enable` (default true) so rehearsal runs can force
+  # real-path latency with `cache_enable = false`, and by
+  # `litellm_cache_ttl_seconds` for the TTL of cached completions.
+%{ if cache_enable ~}
   cache: true
   cache_params:
     type: redis
     host: redis
     port: 6379
+    ttl: ${cache_ttl_seconds}
+%{ else ~}
+  cache: false
+%{ endif ~}
 
   # Default budget for new users
   default_internal_user_params:

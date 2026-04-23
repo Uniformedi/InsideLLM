@@ -173,7 +173,7 @@ litellm_default_user_tpm   = ${var.litellm_default_user_tpm}
 postgres_password = "REDACTED"
 
 # Ollama
-ollama_enable = ${var.ollama_enable}
+ollama_enable = ${local.effective_ollama_enable}
 ollama_models = ${jsonencode(var.ollama_models)}
 ollama_gpu    = ${var.ollama_gpu}
 
@@ -203,8 +203,8 @@ ai_ethics_officer_email  = "${var.ai_ethics_officer_email}"
 log_retention_days       = ${var.log_retention_days}
 
 # Operations
-ops_watchtower_enable    = ${var.ops_watchtower_enable}
-ops_trivy_enable         = ${var.ops_trivy_enable}
+ops_watchtower_enable    = ${local.effective_ops_watchtower_enable}
+ops_trivy_enable         = ${local.effective_ops_trivy_enable}
 ops_grafana_enable       = ${local.effective_ops_grafana_enable}
 ops_uptime_kuma_enable   = ${local.effective_ops_uptime_kuma_enable}
 ops_backup_schedule      = "${var.ops_backup_schedule}"
@@ -434,6 +434,50 @@ locals {
   # neither local Loki nor a configured primary, Promtail is skipped entirely.
   effective_promtail_enable = local.effective_ops_grafana_enable || var.fleet_primary_host != ""
   promtail_loki_url         = local.effective_ops_grafana_enable ? "http://loki:3100/loki/api/v1/push" : (var.fleet_primary_host != "" ? "http://${var.fleet_primary_host}:3100/loki/api/v1/push" : "")
+
+  # ---------------------------------------------------------------------------
+  # Profile-aware defaults: bundle iteration-mode toggles behind one flag.
+  # ---------------------------------------------------------------------------
+  # `deployment_profile` does not touch any variable that `_role_defaults`
+  # governs — the two govern disjoint sets. When `deployment_profile != ""`,
+  # the profile's values for its governed variables win (mirroring the
+  # vm_role pattern above).
+  # ---------------------------------------------------------------------------
+  _profile_defaults = {
+    prod = {
+      ollama_enable         = true
+      ops_trivy_enable      = true
+      ops_watchtower_enable = true
+      cockpit_enable        = true
+      vm_memory_dynamic     = false
+      litellm_cache_enable  = true
+    }
+    dev = {
+      ollama_enable         = true
+      ops_trivy_enable      = false
+      ops_watchtower_enable = false
+      cockpit_enable        = true
+      vm_memory_dynamic     = true
+      litellm_cache_enable  = true
+    }
+    demo = {
+      ollama_enable         = false
+      ops_trivy_enable      = false
+      ops_watchtower_enable = false
+      cockpit_enable        = false
+      vm_memory_dynamic     = true
+      litellm_cache_enable  = true
+    }
+  }
+
+  _has_profile = var.deployment_profile != ""
+
+  effective_ollama_enable        = local._has_profile ? local._profile_defaults[var.deployment_profile].ollama_enable : var.ollama_enable
+  effective_ops_trivy_enable     = local._has_profile ? local._profile_defaults[var.deployment_profile].ops_trivy_enable : var.ops_trivy_enable
+  effective_ops_watchtower_enable = local._has_profile ? local._profile_defaults[var.deployment_profile].ops_watchtower_enable : var.ops_watchtower_enable
+  effective_cockpit_enable       = local._has_profile ? local._profile_defaults[var.deployment_profile].cockpit_enable : var.cockpit_enable
+  effective_vm_memory_dynamic    = local._has_profile ? local._profile_defaults[var.deployment_profile].vm_memory_dynamic : var.vm_memory_dynamic
+  effective_litellm_cache_enable = local._has_profile ? local._profile_defaults[var.deployment_profile].litellm_cache_enable : var.litellm_cache_enable
 }
 
 # ---------------------------------------------------------------------------
@@ -493,13 +537,15 @@ locals {
     default_user_rpm          = var.litellm_default_user_rpm
     default_user_tpm          = var.litellm_default_user_tpm
     global_max_budget         = var.litellm_global_max_budget
-    ollama_enable             = var.ollama_enable
+    ollama_enable             = local.effective_ollama_enable
     ollama_models             = var.ollama_models
     ollama_api_base           = var.ollama_separate_vm ? "http://${split("/", var.ollama_vm_static_ip)[0]}:11434" : "http://ollama:11434"
     sso_enabled               = var.sso_provider != "none"
     sso_group_mapping_enabled = var.sso_provider != "none" && length(var.sso_group_mapping) > 0
     sso_group_field           = var.sso_group_field
     governance_hub_enable     = local.effective_governance_hub_enable
+    cache_enable              = local.effective_litellm_cache_enable
+    cache_ttl_seconds         = var.litellm_cache_ttl_seconds
   })
 }
 
@@ -571,13 +617,13 @@ locals {
     hyperv_port                        = var.hyperv_port
     hyperv_https                       = var.hyperv_https
     hyperv_insecure                    = var.hyperv_insecure
-    cockpit_enable                     = var.cockpit_enable
+    cockpit_enable                     = local.effective_cockpit_enable
     oidc_issuer_url                    = var.sso_provider == "azure_ad" ? "https://login.microsoftonline.com/${var.azure_ad_tenant_id}/v2.0" : var.sso_provider == "okta" ? "https://${var.okta_domain}" : ""
-    ollama_enable                      = var.ollama_enable && !var.ollama_separate_vm
+    ollama_enable                      = local.effective_ollama_enable && !var.ollama_separate_vm
     ollama_models                      = var.ollama_models
     ollama_gpu                         = var.ollama_gpu
     docforge_enable                    = local.effective_docforge_enable
-    ops_watchtower_enable              = var.ops_watchtower_enable
+    ops_watchtower_enable              = local.effective_ops_watchtower_enable
     ops_grafana_enable                 = local.effective_ops_grafana_enable
     effective_promtail_enable          = local.effective_promtail_enable
     ops_uptime_kuma_enable             = local.effective_ops_uptime_kuma_enable
@@ -668,7 +714,7 @@ locals {
     admin_auth_mode        = var.sso_provider != "none" ? "oidc" : var.ad_domain_join ? "ldap" : "none"
     chat_enable            = var.chat_enable
     ldap_enable_services   = var.ldap_enable_services
-    cockpit_enable         = var.cockpit_enable
+    cockpit_enable         = local.effective_cockpit_enable
     guacamole_enable       = local.effective_guacamole_enable
     keycloak_enable        = var.keycloak_enable
     n8n_enable             = var.n8n_enable
@@ -716,7 +762,7 @@ locals {
     ops_grafana_enable         = local.effective_ops_grafana_enable
     effective_promtail_enable  = local.effective_promtail_enable
     ops_uptime_kuma_enable     = local.effective_ops_uptime_kuma_enable
-    ops_trivy_enable           = var.ops_trivy_enable
+    ops_trivy_enable           = local.effective_ops_trivy_enable
     ops_backup_schedule        = var.ops_backup_schedule
     guacamole_enable           = local.effective_guacamole_enable
     grafana_datasources_yml    = local.effective_ops_grafana_enable ? templatefile("${path.module}/../configs/grafana/provisioning/datasources/datasources.yml", { postgres_password = local.postgres_password }) : ""
@@ -725,7 +771,7 @@ locals {
     grafana_fleet_json         = local.effective_ops_grafana_enable && local.effective_governance_hub_enable ? file("${path.module}/../configs/grafana/dashboards/fleet.json") : ""
     loki_config                = local.effective_ops_grafana_enable ? file("${path.module}/../configs/loki/loki-config.yml") : ""
     promtail_config            = local.effective_promtail_enable ? templatefile("${path.module}/../configs/promtail/promtail-config.yml.tpl", { loki_url = local.promtail_loki_url }) : ""
-    trivy_scan_sh              = var.ops_trivy_enable ? file("${path.module}/../configs/trivy/scan.sh") : ""
+    trivy_scan_sh              = local.effective_ops_trivy_enable ? file("${path.module}/../configs/trivy/scan.sh") : ""
     governance_tier            = var.governance_tier
     data_classification        = var.data_classification
     ai_ethics_officer          = var.ai_ethics_officer
@@ -743,14 +789,14 @@ locals {
     sessions_bridge_pipeline_py = local.effective_governance_hub_enable ? file("${path.module}/../configs/open-webui/sessions-bridge-pipeline.py") : ""
     session_security_tier      = var.session_security_tier
     session_data_region        = var.session_data_region
-    ollama_enable              = var.ollama_enable && !var.ollama_separate_vm
+    ollama_enable              = local.effective_ollama_enable && !var.ollama_separate_vm
     ad_domain_join             = var.ad_domain_join
     ad_join_user               = var.ad_join_user
     ad_join_password           = var.ad_join_password
     ad_join_ou                 = var.ad_join_ou
     ad_dns_register            = var.ad_dns_register
     vm_domain                  = var.vm_domain
-    cockpit_enable             = var.cockpit_enable
+    cockpit_enable             = local.effective_cockpit_enable
     dc_dns_servers             = var.dc_dns_servers
     ad_domain                  = var.vm_domain
     ad_admin_groups            = var.ad_admin_groups
@@ -786,7 +832,7 @@ locals {
       default_user_budget    = var.litellm_default_user_budget
       vm_fqdn                = local.vm_fqdn
       instance_id            = var.vm_name
-      ollama_enable          = var.ollama_enable && !var.ollama_separate_vm
+      ollama_enable          = local.effective_ollama_enable && !var.ollama_separate_vm
       ollama_models          = var.ollama_models
       docforge_enable        = local.effective_docforge_enable
       sso_group_mapping      = var.sso_group_mapping
@@ -1057,7 +1103,7 @@ resource "hyperv_machine_instance" "insidellm" {
   generation           = 2
   processor_count      = var.vm_processor_count
   memory_startup_bytes = var.vm_memory_startup_bytes
-  static_memory        = !var.vm_memory_dynamic
+  static_memory        = !local.effective_vm_memory_dynamic
   state                = "Running"
 
   # Automatic actions
