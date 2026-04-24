@@ -66,7 +66,7 @@ shared:
   vm_disk_size_bytes:      85899345920       # 80 GB
   vm_path:          "C:\\HyperV\\VMs"
   vm_vhd_path:      "C:\\HyperV\\VHDs"
-  base_vhdx_source: "C:\\HyperV\\Images\\debian-12-genericcloud-amd64.vhdx"
+  base_vhdx_source: "C:\\HyperV\\Images\\debian-13-genericcloud-amd64.vhdx"
 
   # --- VM networking ----------------------------------------------------------
   vm_switch_name:  "InsideLLM"
