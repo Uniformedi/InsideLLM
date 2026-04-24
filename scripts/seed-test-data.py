@@ -5,7 +5,12 @@ from datetime import datetime, timedelta, timezone
 import psycopg2
 from psycopg2.extras import execute_batch
 
-DSN = os.environ.get("DSN", "postgresql://litellm:9m4zBRHnpdc5qHj4Y5VULE8Y@postgres:5432/litellm")
+DSN = os.environ.get("DSN")
+if not DSN:
+    raise SystemExit(
+        "DSN environment variable must be set. "
+        "Example: postgresql://USER:PASS@HOST:PORT/DBNAME"
+    )
 
 TEAMS = {
     "engineering": 14, "sales": 8, "operations": 8,
