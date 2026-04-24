@@ -56,7 +56,7 @@ has_any_attestation(obs) if {
 # -------- Active industries -----------------------------------------------
 
 test_active_industries if {
-    p.active_industries == {"fdcpa", "sox", "pci_dss"}
+    p.active_industries == {"fdcpa", "reg_f", "sox", "pci_dss"}
 }
 
 # -------- Permitted-hours rule (§1692c(a)(1)) -----------------------------

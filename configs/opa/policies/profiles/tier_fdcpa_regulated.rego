@@ -11,7 +11,7 @@ package insidellm.profile.tier_fdcpa_regulated
 
 import rego.v1
 
-active_industries := {"fdcpa", "sox", "pci_dss"}
+active_industries := {"fdcpa", "reg_f", "sox", "pci_dss"}
 
 # -- FDCPA permitted contact hours (§1692c(a)(1)) --------------------------
 # FDCPA permits contact only between 8 AM and 9 PM in the consumer's local

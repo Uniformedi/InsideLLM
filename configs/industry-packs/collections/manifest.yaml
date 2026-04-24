@@ -1,0 +1,81 @@
+apiVersion: insidellm.industry-pack/v1
+kind: IndustryPack
+metadata:
+  id: collections
+  name: Collections
+  version: 0.1.0
+  status: sample              # sample | preview | ga
+  maturity: reference          # the reference implementation other packs pattern after
+  description: >
+    Consumer debt collections operations. Bundles the platform's already-shipped
+    tier_fdcpa_regulated guardrail profile with a curated set of collections-
+    specific agents, DLP patterns, and document templates so an operator can
+    stand up a compliant collections desk without authoring any of it from
+    scratch.
+
+regulatory:
+  primary:
+    - FDCPA            # 15 USC §1692
+    - Regulation_F     # 12 CFR Part 1006 (CFPB, 2021) — call frequency + e-delivery
+    - TCPA             # 47 USC §227 — consent for autodialed/text contact
+  secondary:
+    - SOX              # financial reporting controls on A/R
+    - PCI_DSS          # if card payments are taken
+    - GLBA             # if lender data is handled
+    - State_UDAP       # state unfair/deceptive acts (varies)
+
+guardrail_profile: tier_fdcpa_regulated        # already shipped in 3.1.0
+industry_overlays:                              # already shipped in 3.1.0 (+ reg_f added this cycle)
+  - fdcpa
+  - reg_f                                       # 12 CFR Part 1006 — 7-in-7 call cap + §1006.18(d) mini-Miranda
+  - sox
+  - pci_dss
+
+# What this pack adds ON TOP of what already ships in configs/opa/policies/.
+# Nothing here replaces platform code — these are configs the platform loads
+# when an instance declares industry=collections.
+adds:
+  agents:
+    - agents/dispute-handler.yaml
+    - agents/validation-notice-writer.yaml
+    - agents/skip-tracer.yaml                  # constrained — read-only lookups
+    - agents/compliance-reviewer.yaml
+  dlp_patterns:
+    - dlp/collections-patterns.yaml
+  document_templates:
+    - documents/fdcpa-validation-notice.md.tpl
+    - documents/settlement-offer.md.tpl
+    - documents/cease-and-desist-acknowledgment.md.tpl
+    - documents/dispute-resolution-letter.md.tpl
+  system_prompts:
+    - prompts/collections-humility.md
+  dashboards:
+    - dashboards/collections-ops.json          # Grafana; ships when pack is GA
+  seed_data: []                                  # demo seeding via scripts/seed-dispute-handler.py; setup-wizard SQL seeds land 0.2.0
+
+# Planned enhancements flagged but not loaded until tests land.
+roadmap:
+  - id: tcpa_consent
+    description: >
+      TCPA consent tracker as an obligation type the Dispute Handler agent
+      must satisfy before dispatching SMS. Ships 0.2.0.
+  - id: state_overlays
+    description: >
+      State-specific overlays (NY DFS, CA Rosenthal Act, IL) selectable at
+      setup. Ships 0.3.0.
+
+# What this pack explicitly does NOT do — manage expectations.
+out_of_scope:
+  - Actual collection of debts (no payment rails, no ACH, no card capture)
+  - Credit bureau reporting integrations (FCRA Metro 2)
+  - Legal action filing workflows
+
+# Setup-wizard integration — stored on governance_instances when selected.
+setup_defaults:
+  industry: collections
+  governance_tier: tier_fdcpa_regulated
+  data_classification: restricted
+  default_consumer_timezone: America/New_York  # overridden per-account at runtime
+  operating_hours_local:
+    start: "08:00"
+    end: "21:00"                                # FDCPA §1692c(a)(1)

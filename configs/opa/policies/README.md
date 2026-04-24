@@ -27,8 +27,10 @@ configs/opa/policies/
 │   ├── glba.rego
 │   ├── hipaa.rego
 │   ├── pci_dss.rego
+│   ├── reg_f.rego               — CFPB 12 CFR Part 1006 (7-in-7, §1006.18(d))
 │   └── sox.rego
 └── tests/                       — unit tests (package insidellm.tests.*)
+    ├── reg_f_test.rego
     ├── tier_fdcpa_regulated_test.rego
     ├── tier_financial_regulated_test.rego
     ├── tier_general_business_test.rego

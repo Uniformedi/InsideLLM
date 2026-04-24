@@ -1,0 +1,54 @@
+apiVersion: insidellm.industry-pack/v1
+kind: IndustryPack
+metadata:
+  id: financial-services
+  name: Financial Services
+  version: 0.1.0
+  status: scaffolded
+  maturity: preview
+  description: >
+    Banks, credit unions, brokerages, and lenders. Bundles the
+    tier_financial_regulated guardrail profile with SOX/GLBA/PCI-DSS overlays
+    and financial-services-specific agents, DLP patterns, and document
+    templates. Agents + templates ship in 0.2.0.
+
+regulatory:
+  primary:
+    - SOX              # §404 ITGC
+    - GLBA             # §501(b) safeguards
+    - PCI_DSS          # if card handling
+  secondary:
+    - Reg_E            # electronic fund transfer disclosures
+    - Reg_Z            # truth in lending
+    - Reg_B            # equal credit opportunity
+    - BSA_AML          # bank secrecy / anti-money laundering
+
+guardrail_profile: tier_financial_regulated         # shipped in 3.1.0
+industry_overlays:                                   # shipped in 3.1.0
+  - sox
+  - pci_dss
+  - glba
+
+adds:
+  agents: []                                          # 0.2.0
+  dlp_patterns: []                                    # 0.2.0
+  document_templates: []                              # 0.2.0
+  system_prompts: []                                  # 0.2.0
+
+roadmap:
+  - id: account_servicing_agents
+    description: "Account-servicing, loan-servicing-disclosure-drafter, KYC-lookup agents."
+  - id: reg_e_disclosures
+    description: "Reg E dispute-resolution templates (§1005.11)."
+  - id: bsa_aml_overlay
+    description: "AML alert triage obligation type."
+
+out_of_scope:
+  - Trade execution
+  - Investment advice under Investment Advisers Act of 1940
+  - Credit decisioning (fair-lending exposure)
+
+setup_defaults:
+  industry: financial-services
+  governance_tier: tier_financial_regulated
+  data_classification: restricted

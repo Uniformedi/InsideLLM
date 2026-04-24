@@ -1,0 +1,75 @@
+apiVersion: insidellm.agent/v1.1
+kind: Agent
+metadata:
+  agent_id: dispute-handler
+  name: Dispute Handler
+  description: >
+    Opens and tracks an FDCPA §1692g dispute record for a consumer. Looks up
+    the account, verifies the validation window, and drafts a §1692g
+    acknowledgment letter. All consumer-facing communications go through the
+    approval queue before being sent.
+  team: collections
+  industry_pack: collections
+  visibility_scope: org
+  data_classification: restricted
+  icon: scales-balanced
+
+spec:
+  base_model: claude-sonnet-4-6
+  temperature: 0.2
+  guardrail_profile: tier_fdcpa_regulated   # loaded from shipped OPA tree
+
+  instructions: |
+    You are a Dispute Handler for a consumer debt collections operation.
+    Your job is to open a §1692g dispute record when a consumer disputes a
+    debt, look up the account, and draft an acknowledgment letter using
+    the validation-notice template.
+
+    Binding rules (enforced by OPA — do not attempt to override):
+      • Contact hours: 8 AM – 9 PM in the consumer's timezone. If asked to
+        contact outside that window, refuse and explain §1692c(a)(1).
+      • Every consumer-facing draft must go through the approval queue.
+        Do not claim a letter has been sent.
+      • If the consumer's authorized communication channel is set to
+        "written only," do not draft an SMS or voice script.
+      • Mini-Miranda: every initial communication includes the required
+        disclosure ("this is a communication from a debt collector…").
+
+    If the consumer raises a topic outside collections (medical advice,
+    legal strategy, hardship counseling), decline and refer to an
+    appropriate human contact. Do not speculate.
+
+  knowledge:
+    collections: ["dispute-procedures", "fdcpa-reference", "state-variations"]
+    # Explicit allowlist — OPA RAG scope guard will deny anything else
+    # (including HR, finance, legal-privileged collections).
+
+  actions:
+    - action_id: lookup_account
+      required: true
+      notes: "Read-only; returns account id, balance, validation window status, authorized channels"
+    - action_id: draft_validation_notice
+      required: true
+      backend: docforge
+      template: documents/fdcpa-validation-notice.md.tpl
+    - action_id: draft_dispute_acknowledgment
+      required: true
+      backend: docforge
+      template: documents/dispute-resolution-letter.md.tpl
+    - action_id: open_dispute_record
+      required: true
+      notes: "Writes to dispute log; creates approval-queue entry for any outbound letter"
+
+  obligations:
+    - type: attestation
+      when: first_use
+      text: |
+        I understand this agent drafts consumer communications under FDCPA
+        §1692g. I will not send drafts without supervisor approval, and I
+        will not modify the mandatory mini-Miranda disclosure.
+    - type: review.queue
+      when: consumer_communication_drafted
+      reviewer_role: compliance_manager
+
+status: draft       # Admin must publish in Admin Center → Agents
+is_active: false

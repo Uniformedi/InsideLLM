@@ -1,0 +1,50 @@
+apiVersion: insidellm.industry-pack/v1
+kind: IndustryPack
+metadata:
+  id: healthcare
+  name: Healthcare
+  version: 0.1.0
+  status: scaffolded
+  maturity: preview
+  description: >
+    Providers and payers handling protected health information. Bundles the
+    platform's tier_hipaa_regulated guardrail profile with healthcare-specific
+    agents, DLP patterns, and document templates. Agents + templates ship in
+    0.2.0.
+
+regulatory:
+  primary:
+    - HIPAA            # 45 CFR §160, §164
+    - HITECH           # breach notification
+    - 42_CFR_Part_2    # substance-use disorder records
+  secondary:
+    - State_privacy    # CMIA (CA), PHIPA analogues
+    - GLBA             # if financial services (billing) are in-scope
+    - FTC_Act          # §5 deceptive practices in health marketing
+
+guardrail_profile: tier_hipaa_regulated            # shipped in 3.1.0
+industry_overlays:                                  # shipped in 3.1.0
+  - hipaa
+
+adds:
+  agents: []                                         # 0.2.0
+  dlp_patterns: []                                   # 0.2.0
+  document_templates: []                             # 0.2.0
+  system_prompts: []                                 # 0.2.0
+
+roadmap:
+  - id: phi_agents
+    description: "Care-coordinator, clinical-summary-drafter, BAA-scoped data-query agents."
+  - id: substance_use_overlay
+    description: "42 CFR Part 2 overlay with stricter consent rules."
+  - id: minimum_necessary_obligation
+    description: "Obligation type enforcing §164.502(b) minimum-necessary on every PHI query."
+
+out_of_scope:
+  - Clinical diagnosis or treatment recommendation
+  - Prescribing or medication management
+
+setup_defaults:
+  industry: healthcare
+  governance_tier: tier_hipaa_regulated
+  data_classification: restricted
