@@ -27,7 +27,7 @@ actions:
       account_numbers:
         type: array
         required: true
-        description: "List of Organization account ids to merge."
+        description: "List of example-tenant account ids to merge."
       letter_template_id:
         type: string
         required: true

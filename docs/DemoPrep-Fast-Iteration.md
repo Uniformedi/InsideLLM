@@ -105,8 +105,8 @@ ops_grafana_enable             = true            # operator observability during
 # --- Local package cache — point at primary ---------------------------------
 # Single biggest speedup for 2nd+ VM (~20 min/deploy saved). See
 # docs/LocalPackageCache.md for the full story.
-apt_mirror_host                = "10.0.0.9"      # or your primary IP
-docker_mirror_host             = "10.0.0.9"
+apt_mirror_host                = "192.168.100.10"      # or your primary IP
+docker_mirror_host             = "192.168.100.10"
 
 # --- Industry + defaults for Collections demo ------------------------------
 industry                       = "collections"
@@ -244,7 +244,7 @@ For the Friday demo, 8 things matter. Everything else can be broken
 with impunity during iteration.
 
 **Must work (demo path):**
-1. Demo VM boots, Admin Center loads at `https://10.0.0.9/`
+1. Demo VM boots, Admin Center loads at `https://192.168.100.10/`
 2. Portfolio dashboard renders seeded data
 3. Open WebUI chat works, Dispute Handler appears in model picker
 4. `lookup_account` action returns canned response
@@ -332,15 +332,15 @@ docker logs -f --tail 100 insidellm-governance-hub
 docker compose restart governance-hub && \
   sleep 3 && \
   curl -sk -u insidellm-admin:$KEY \
-    https://10.0.0.9/governance/api/v1/agents/organization-collections/dispute-handler/sync
+    https://192.168.100.10/governance/api/v1/agents/example-tenant/dispute-handler/sync
 
 # Verify the audit chain — core demo moment
 curl -sk -u insidellm-admin:$KEY \
-  https://10.0.0.9/governance/api/v1/audit/chain/stats | jq
+  https://192.168.100.10/governance/api/v1/audit/chain/stats | jq
 
 # Force a governance-hub sync (default is every 6 h; force during prep)
 curl -sk -u insidellm-admin:$KEY -X POST \
-  https://10.0.0.9/governance/api/v1/sync/run
+  https://192.168.100.10/governance/api/v1/sync/run
 
 # OPA tests — inner loop. Run anywhere with OPA installed, no VM needed.
 opa test configs/opa/policies/ -v

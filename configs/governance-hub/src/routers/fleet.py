@@ -94,7 +94,7 @@ async def fleet_topology():
 
     Response shape:
         {
-          "primary_id": "insidellm-mgmt" | null,
+          "primary_id": "insidellm-primary" | null,
           "instances": [
             {
               "instance_id": "...",
@@ -375,7 +375,7 @@ def _require_master_key(request: Request) -> None:
 
 
 class FleetAdJoinRequest(BaseModel):
-    target_url: str = Field(..., description="Target instance gateway URL (e.g. https://10.0.0.11)")
+    target_url: str = Field(..., description="Target instance gateway URL (e.g. https://192.168.100.11)")
     target_key: str = Field(..., min_length=1, description="Target instance LITELLM_MASTER_KEY")
     user: str = Field(..., min_length=1, description="AD admin sAMAccountName")
     password: str = Field(..., min_length=1, description="AD admin password")

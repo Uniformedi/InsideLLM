@@ -46,9 +46,9 @@ def pipeline(pipeline_module):
 
 def test_parse_agent_id_from_translator_owned_model(pipeline):
     t, a = pipeline._parse_agent_id_from_model(
-        "insidellm-agent-organization-collections--dispute-handler"
+        "insidellm-agent-example-tenant--dispute-handler"
     )
-    assert t == "organization-collections"
+    assert t == "example-tenant"
     assert a == "dispute-handler"
 
 
@@ -176,7 +176,7 @@ def test_build_input_carries_rag_fields_for_agent_model(pipeline_module):
     fake_response.raise_for_status = lambda: None
 
     body = {
-        "model": "insidellm-agent-organization-collections--dispute-handler",
+        "model": "insidellm-agent-example-tenant--dispute-handler",
         "messages": [{"role": "user", "content": "look up account"}],
         "collection_ids": ["organization-fdcpa-letters"],
     }
@@ -187,7 +187,7 @@ def test_build_input_carries_rag_fields_for_agent_model(pipeline_module):
         opa_in = p._build_input(body, user)
 
     assert opa_in["agent_id"] == "dispute-handler"
-    assert opa_in["tenant_id"] == "organization-collections"
+    assert opa_in["tenant_id"] == "example-tenant"
     assert opa_in["agent_knowledge_collections"] == ["organization-fdcpa-letters", "organization-account-policies"]
     assert opa_in["knowledge_scope"] == "strict"
     assert opa_in["requested_collections"] == ["organization-fdcpa-letters"]

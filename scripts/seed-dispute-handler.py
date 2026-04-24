@@ -15,7 +15,7 @@ Env:
     DSN   — PostgreSQL DSN. Defaults match the compose-stack credentials.
     PACK  — path to the Collections pack root
             (default: /opt/InsideLLM/configs/industry-packs/collections)
-    TENANT_ID — default "organization-collections"
+    TENANT_ID — default "example-tenant"
 """
 
 from __future__ import annotations
@@ -48,7 +48,7 @@ DSN = os.environ.get(
     "postgresql://litellm:9m4zBRHnpdc5qHj4Y5VULE8Y@postgres:5432/litellm",
 )
 PACK_ROOT = Path(os.environ.get("PACK", "/opt/InsideLLM/configs/industry-packs/collections"))
-TENANT_ID = os.environ.get("TENANT_ID", "organization-collections")
+TENANT_ID = os.environ.get("TENANT_ID", "example-tenant")
 
 
 def manifest_hash(manifest: dict) -> str:

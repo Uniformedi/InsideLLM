@@ -1,9 +1,9 @@
 """InsideLLM demo workers — stub backends for declarative-agent actions.
 
 Runs as the `insidellm-workers` docker service. Hosts the four endpoints
-the Parent Organization Dispute Handler agent calls:
+the example-tenant Dispute Handler agent calls:
 
-  POST /actions/lookup_account       — canned Organization account row
+  POST /actions/lookup_account       — canned example-tenant account row
   POST /actions/draft_fdcpa_letter   — §1692g(b) letter template
   POST /actions/send_letter          — approval-queue stub (never mails)
   POST /actions/schedule_callback    — callback-record stub
@@ -147,7 +147,7 @@ class DraftLetterResponse(BaseModel):
 
 
 _LETTER_TEMPLATE = """\
-**Organization, LLC**
+**Example Co., LLC**
 *FDCPA Dispute Acknowledgment — §1692g(b)*
 
 Date: {date}
@@ -173,7 +173,7 @@ this period.
 
 Sincerely,
 Compliance Operations
-Organization, LLC
+Example Co., LLC
 """
 
 
@@ -215,7 +215,7 @@ class SendLetterResponse(BaseModel):
 @app.post("/actions/send_letter", response_model=SendLetterResponse)
 async def send_letter(req: SendLetterRequest) -> SendLetterResponse:
     _validate_account(req.account_number)
-    ticket = f"Organization-APPROVAL-{uuid.uuid4().hex[:12].upper()}"
+    ticket = f"EXAMPLE-APPROVAL-{uuid.uuid4().hex[:12].upper()}"
     logger.info(
         f"send_letter QUEUED: account={req.account_number} letter_id={req.letter_id} "
         f"ticket={ticket} attestation_len={len(req.attestation)}"

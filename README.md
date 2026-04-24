@@ -1333,7 +1333,7 @@ instances:
   - vm_name: insidellm-tech
     vm_static_ip: "10.0.0.120/24"
     anthropic_api_key: "sk-ant-api03-..."
-  - vm_name: insidellm-mgmt
+  - vm_name: insidellm-primary
     vm_static_ip: "10.0.0.122/24"
     anthropic_api_key: "sk-ant-api03-..."
 ```
@@ -1380,23 +1380,23 @@ edge:
   vms:
     - 10.0.0.100                       # primary edge VM (MASTER)
     # - 10.0.0.101                     # optional secondary for keepalived HA
-  vip: 10.0.0.99                       # virtual IP owned by keepalived
+  vip: 192.168.100.109                       # virtual IP owned by keepalived
   domain: insidellm.corp.example.com
   tls_source: self-signed              # self-signed | letsencrypt | custom
 
 departments:
   engineering:
-    backend: insidellm-eng
+    backend: insidellm-gateway
     fallback: insidellm-gen            # if eng is down, route to general pool
   legal:
     backend: insidellm-legal           # no fallback - legal enforces its own DLP
   exec:
-    backend: insidellm-mgmt
+    backend: insidellm-primary
 
 instances:
   - vm_name: insidellm-gen             # auto vm_role = "primary"
-    vm_static_ip: "10.0.0.110/24"
-  - vm_name: insidellm-eng             # auto vm_role = "gateway", department = "engineering"
+    vm_static_ip: "192.168.100.110/24"
+  - vm_name: insidellm-gateway             # auto vm_role = "gateway", department = "engineering"
     vm_static_ip: "10.0.0.120/24"
   - vm_name: insidellm-edge            # auto vm_role = "edge" (IP matches edge.vms[0])
     vm_static_ip: "10.0.0.100/24"
@@ -1444,16 +1444,16 @@ curl -k -X POST https://insidellm-gen/governance/api/v1/fleet/registration-token
 
 # 2. On the new VM (or the operator workstation):
 pwsh ./scripts/Join-Fleet.ps1 `
-    -Leader 10.0.0.110 `
+    -Leader 192.168.100.110 `
     -Token reg-xxxxxxxxxxxxxxxx `
     -Role gateway `
     -Department engineering `
-    -VmName insidellm-eng2 `
+    -VmName insidellm-gateway2 `
     -StaticIp 10.0.0.127/24 `
     -Insecure
 
 # 3. Apply the generated tfvars
-cd ./fleet-out/insidellm-eng2
+cd ./fleet-out/insidellm-gateway2
 terraform -chdir=../../terraform apply -var-file=./terraform.tfvars -state=./terraform.tfstate
 ```
 

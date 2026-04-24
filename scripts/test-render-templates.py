@@ -347,7 +347,7 @@ DUMMY_CTX = {
     "edge_tls_source": "self-signed",
     "edge_domain": "",
     "fallback_department": "",
-    "fleet_virtual_ip": "10.0.0.99",
+    "fleet_virtual_ip": "192.168.100.109",
     "keepalived_password": "pw",
     "fleet_edge_secret": "secret",
     "oauth2_cookie_secret": "cookie",

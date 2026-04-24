@@ -1,7 +1,7 @@
 # =============================================================================
 # terraform.tfvars for the InsideLLM edge VM (P1.C)
 #
-# Target: 10.0.0.98/24  (VIP 10.0.0.99 owned by keepalived)
+# Target: 192.168.100.108/24  (VIP 192.168.100.109 owned by keepalived)
 # Role:   edge — front-door router; terminates TLS, validates OIDC, forwards
 #                to per-department backends based on OIDC group claim
 #
@@ -34,17 +34,17 @@ base_vhdx_source    = "C:\\HyperV\\Images\\debian-12-genericcloud-amd64.vhdx"
 vm_switch_name      = "InsideLLM"
 vm_switch_type      = "External"
 vm_switch_adapter   = "Ethernet"                          # adjust to your host NIC
-vm_static_ip        = "10.0.0.98/24"
+vm_static_ip        = "192.168.100.108/24"
 vm_gateway          = "10.0.0.1"
-vm_dns_servers      = ["10.0.0.9", "8.8.8.8"]             # primary VM's DNS first
+vm_dns_servers      = ["192.168.100.10", "8.8.8.8"]             # primary VM's DNS first
 
 # ---- SSH ---------------------------------------------------------------------
 ssh_admin_user      = "insidellm"
 ssh_public_key_path = "~/.ssh/id_rsa.pub"
 
 # ---- Fleet wiring (REQUIRED for edge) ---------------------------------------
-fleet_primary_host  = "10.0.0.9"                          # points at the primary gov-hub
-fleet_virtual_ip    = "10.0.0.99"                         # keepalived VIP on the active edge
+fleet_primary_host  = "192.168.100.10"                          # points at the primary gov-hub
+fleet_virtual_ip    = "192.168.100.109"                         # keepalived VIP on the active edge
 edge_domain         = "insidellm.corp.example.com"        # FQDN for TLS CN + OIDC redirect
 edge_tls_source     = "self-signed"                       # self-signed | letsencrypt | custom
 
@@ -60,8 +60,8 @@ anthropic_api_key   = ""
 
 # ---- Optional — mirror package pulls through the primary VM -----------------
 # Speeds up 2nd+ VM deploys by ~8 min each. Primary runs apt-cacher-ng + registry.
-apt_mirror_host     = "10.0.0.9"
-docker_mirror_host  = "10.0.0.9"
+apt_mirror_host     = "192.168.100.10"
+docker_mirror_host  = "192.168.100.10"
 
 # ---- Do NOT enable on the edge VM --------------------------------------------
 # The edge is intentionally thin. These modules would consume resources the

@@ -1132,7 +1132,7 @@ variable "keycloak_enable" {
 # Demo workers — stub FastAPI backing for showcase declarative agents (P1.6)
 # -----------------------------------------------------------------------------
 # Production tenants replace this per-tenant; leave false unless running the
-# Parent Organization Dispute Handler showcase or another demo agent that references
+# Parent Portfolio Dispute Handler showcase or another demo agent that references
 # http://insidellm-workers:8000 in its action catalog entries.
 variable "workers_enable" {
   description = "Deploy the insidellm-workers stub FastAPI service. Default false."

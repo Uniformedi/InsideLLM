@@ -43,15 +43,15 @@ set `pkg_mirror_enable = true` explicitly.
 After deploy, the primary's READY banner shows:
 ```
 Local package mirrors (point future VMs here to skip upstream traffic):
-  apt proxy:        http://10.0.0.9:3142
-  Docker registry:  http://10.0.0.9:5000
+  apt proxy:        http://192.168.100.10:3142
+  Docker registry:  http://192.168.100.10:5000
 ```
 
 ### Every other VM
 ```hcl
 # terraform.tfvars (gateway / workstation / edge / voice)
-apt_mirror_host    = "10.0.0.9"
-docker_mirror_host = "10.0.0.9"
+apt_mirror_host    = "192.168.100.10"
+docker_mirror_host = "192.168.100.10"
 ```
 
 `fleet.yaml` can set these in the `shared:` block once so every peer VM

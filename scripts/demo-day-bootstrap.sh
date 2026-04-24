@@ -13,7 +13,7 @@
 # to return to this state between rehearsals.
 #
 # Env:
-#   HOST          — demo VM host (default 10.0.0.9)
+#   HOST          — demo VM host (default 192.168.100.10)
 #   VM_NAME       — Hyper-V VM name (default InsideLLM)
 #   HYPERV_HOST   — Hyper-V host to SSH for snapshot (default skip snapshot)
 #   HYPERV_USER   — Hyper-V host user (default Administrator)
@@ -26,7 +26,7 @@
 # ============================================================================
 
 set -eu
-HOST="${HOST:-10.0.0.9}"
+HOST="${HOST:-192.168.100.10}"
 VM_NAME="${VM_NAME:-InsideLLM}"
 SNAPSHOT_NAME="${SNAPSHOT_NAME:-seeded-clean-$(date +%s)}"
 

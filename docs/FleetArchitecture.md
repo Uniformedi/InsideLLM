@@ -158,10 +158,10 @@ reaper.
 
 ```json
 {
-  "primary_id": "insidellm-mgmt",
+  "primary_id": "insidellm-primary",
   "instances": [
     {
-      "instance_id": "insidellm-mgmt",
+      "instance_id": "insidellm-primary",
       "role": "primary",
       "capabilities": [
         {"name": "governance-hub", "endpoint": "...", "status": "live",
@@ -172,8 +172,8 @@ reaper.
     }
   ],
   "capabilities_index": {
-    "governance-hub": ["insidellm-mgmt"],
-    "litellm":        ["insidellm-mgmt", "insidellm-eng"]
+    "governance-hub": ["insidellm-primary"],
+    "litellm":        ["insidellm-primary", "insidellm-gateway"]
   }
 }
 ```

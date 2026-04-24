@@ -33,7 +33,7 @@ policies for this request.
 ## Portfolio policy inheritance (Ultraplan v3 §5.3)
 
 ```
-Parent Organization portfolio baseline
+Parent Portfolio portfolio baseline
   └── Company override (company-specific additions)
        └── Agent manifest profile (per-agent constraints)
             └── Session context (runtime evaluation)

@@ -10,12 +10,12 @@
 # Each check prints "OK" or "FAIL: <reason>" on its own line.
 #
 # Env:
-#   HOST  — VM host (default 10.0.0.9)
+#   HOST  — VM host (default 192.168.100.10)
 #   KEY   — LiteLLM master key; auto-read from /opt/InsideLLM/.env if unset
 # ============================================================================
 
 set -u
-HOST="${HOST:-10.0.0.9}"
+HOST="${HOST:-192.168.100.10}"
 ENV_FILE="${ENV_FILE:-/opt/InsideLLM/.env}"
 
 if [[ -z "${KEY:-}" ]]; then
@@ -93,7 +93,7 @@ check_portfolio() {
 # -- Collections: Dispute Handler present, status=published ------------------
 check_dispute_handler() {
     local status
-    status="$($CURL "https://$HOST/governance/api/v1/agents/organization-collections/dispute-handler" | \
+    status="$($CURL "https://$HOST/governance/api/v1/agents/example-tenant/dispute-handler" | \
         python3 -c 'import sys,json; j=json.load(sys.stdin); print(j.get("status","?"))' 2>&1)"
     if [[ "$status" == "published" ]]; then
         echo "published"

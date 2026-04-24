@@ -1,6 +1,6 @@
 """Portfolio observability REST endpoints + HTML dashboard (P4.1).
 
-The Parent Organization-facing cross-tenant view:
+The Parent Portfolio-facing cross-tenant view:
 
   * GET /governance/portfolio                          HTML dashboard
   * GET /api/v1/portfolio/overview                     headline aggregates

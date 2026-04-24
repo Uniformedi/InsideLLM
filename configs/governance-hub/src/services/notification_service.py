@@ -182,7 +182,7 @@ async def _send_slack(channel: str, subject: str, body: str, severity: str) -> t
 
 async def _send_email(channel: str, subject: str, body: str, severity: str) -> tuple[int, str]:
     """SMTP send — bootstrap reads SMTP_HOST/PORT/USER/PASS env vars.
-    For the Parent Organization-demo window we stub this out to log-only; wiring
+    For the Parent Portfolio-demo window we stub this out to log-only; wiring
     aiosmtplib lands in a follow-up when a real relay is configured."""
     host = os.environ.get("SMTP_HOST", "")
     if not host:

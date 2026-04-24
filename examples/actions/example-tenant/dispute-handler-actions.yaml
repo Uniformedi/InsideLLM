@@ -1,18 +1,18 @@
-# Organization Collections tenant actions — Dispute Handler agent backing (P1.6)
+# Example tenant actions — Dispute Handler agent backing (P1.6)
 #
-# Seeded into the governance_actions table with tenant_id=organization-collections,
+# Seeded into the governance_actions table with tenant_id=example-tenant,
 # so they override the core catalog entries (none exist for these) and are
-# only visible to the Organization tenant. Each entry points at the insidellm-workers
+# only visible to the example tenant. Each entry points at the insidellm-workers
 # FastAPI service which hosts the stub implementations used during the
-# Parent Organization demo.
+# portfolio showcase demo.
 
 schema_version: "1.0"
 actions:
   - schema_version: "1.0"
     action_id: lookup_account
-    tenant_id: organization-collections
+    tenant_id: example-tenant
     display_name: "Look Up Consumer Account"
-    description: "Retrieve account summary, balance, §1692g validation-notice date, and payment history for an Organization account number."
+    description: "Retrieve account summary, balance, §1692g validation-notice date, and payment history for an example-tenant account number."
     category: lookup
     backend:
       type: fastapi_http
@@ -24,7 +24,7 @@ actions:
         type: string
         required: true
         pattern: "^[A-Z0-9]{6,20}$"
-        description: "Organization internal account identifier."
+        description: "Example-tenant internal account identifier."
     outputs:
       account_summary:
         type: object
@@ -47,7 +47,7 @@ actions:
 
   - schema_version: "1.0"
     action_id: draft_fdcpa_letter
-    tenant_id: organization-collections
+    tenant_id: example-tenant
     display_name: "Draft FDCPA Dispute Letter"
     description: "Produce a §1692g(b)-compliant dispute acknowledgment letter from the supplied account + consumer context. Returns markdown; mailing requires send_letter approval."
     category: draft
@@ -93,7 +93,7 @@ actions:
 
   - schema_version: "1.0"
     action_id: send_letter
-    tenant_id: organization-collections
+    tenant_id: example-tenant
     display_name: "Send Letter (requires approval)"
     description: "Mail a previously drafted letter to the consumer. Routes to the compliance_manager approval queue before the mailroom handoff — NEVER auto-executed."
     category: send
@@ -135,7 +135,7 @@ actions:
 
   - schema_version: "1.0"
     action_id: schedule_callback
-    tenant_id: organization-collections
+    tenant_id: example-tenant
     display_name: "Schedule Consumer Callback"
     description: "Record a callback request against the account. Honors FDCPA §1692c(a)(1) permitted-hours at the OPA layer — callbacks outside 8am–9pm consumer-local are denied before reaching this action."
     category: schedule

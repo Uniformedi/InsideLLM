@@ -170,10 +170,10 @@
 
 <header>
   <h1>InsideLLM — Test Plan V1</h1>
-  <div class="sub">Apply + smoke-test the 16 platform commits against 10.0.0.9 before the Parent Organization demo.</div>
+  <div class="sub">Apply + smoke-test the 16 platform commits against 192.168.100.10 before the Parent Portfolio demo.</div>
   <div class="meta">
     <span><strong>Scope:</strong> P0 → P4.1 + drift guard</span>
-    <span><strong>Target:</strong> insidellm-mgmt (10.0.0.9)</span>
+    <span><strong>Target:</strong> insidellm-primary (192.168.100.10)</span>
     <span><strong>Time:</strong> ~20 min green / ~45 min w/ triage</span>
     <span><strong>Head:</strong> fc0be1d (P3.2)</span>
   </div>
@@ -194,8 +194,8 @@ git log --oneline -5    # verify fc0be1d (P3.2) is tip
 git push                # if the remote is behind</code></pre>
 
 <!-- ============================================================ -->
-<h2>1. Land code on 10.0.0.9</h2>
-<pre><code>ssh insidellm-mgmt
+<h2>1. Land code on 192.168.100.10</h2>
+<pre><code>ssh insidellm-primary
 cd /opt/InsideLLM       # (OR wherever the repo lives on the VM)
 
 # Safety: back up .env before anything touches Terraform
@@ -255,7 +255,7 @@ terraform plan -var-file="../terraform.tfvars" -out tfplan 2>&amp;1 | tee /tmp/p
 <div class="step">
   <h3>4b. Gov-Hub alive + new tables created</h3>
 <pre><code>KEY=$(grep -E '^LITELLM_MASTER_KEY=' /opt/InsideLLM/.env | cut -d= -f2-)
-curl -sk https://10.0.0.9/governance/health | jq
+curl -sk https://192.168.100.10/governance/health | jq
 docker exec insidellm-postgres psql -U litellm -d litellm \
   -c "\dt governance_*" | grep -E "agents|actions|identity"
 # Expect: governance_agents, governance_actions, governance_identity_*</code></pre>
@@ -264,20 +264,20 @@ docker exec insidellm-postgres psql -U litellm -d litellm \
 <div class="step">
   <h3>4c. Core catalog auto-seeded <em>(P1.3 + P3.1 + P3.2 + P3.3)</em></h3>
 <pre><code>curl -sk -u insidellm-admin:$KEY \
-  https://10.0.0.9/governance/api/v1/actions/?tenant_id=core | jq '.total'
+  https://192.168.100.10/governance/api/v1/actions/?tenant_id=core | jq '.total'
 # Expect ≥20 actions across the 7 wrapper files</code></pre>
 </div>
 
 <div class="step">
   <h3>4d. Portfolio dashboard <em>(P4.1)</em></h3>
-  <p>Open <a href="https://10.0.0.9/governance/portfolio">https://10.0.0.9/governance/portfolio</a> in a browser — or curl the JSON:</p>
+  <p>Open <a href="https://192.168.100.10/governance/portfolio">https://192.168.100.10/governance/portfolio</a> in a browser — or curl the JSON:</p>
 <pre><code>curl -sk -u insidellm-admin:$KEY \
-  https://10.0.0.9/governance/api/v1/portfolio/overview | jq</code></pre>
+  https://192.168.100.10/governance/api/v1/portfolio/overview | jq</code></pre>
 </div>
 
 <div class="step">
   <h3>4e. Agent Builder UI <em>(P1.5)</em></h3>
-  <p>Open <a href="https://10.0.0.9/governance/agents">https://10.0.0.9/governance/agents</a>.</p>
+  <p>Open <a href="https://192.168.100.10/governance/agents">https://192.168.100.10/governance/agents</a>.</p>
   <ul>
     <li>Sign in.</li>
     <li>Click <strong>+ new agent</strong>, fill the form.</li>
@@ -293,21 +293,21 @@ bash /opt/InsideLLM/scripts/seed-dispute-handler.sh
 
 # Verify
 curl -sk -u insidellm-admin:$KEY \
-  https://10.0.0.9/governance/api/v1/agents/organization-collections/dispute-handler | \
+  https://192.168.100.10/governance/api/v1/agents/example-tenant/dispute-handler | \
   jq '.status, .runtime_sync_state'
 # Expect: "published", "provisioned"</code></pre>
-  <p>Then: open <a href="https://10.0.0.9/">https://10.0.0.9/</a> (Open WebUI), model picker → <strong>Dispute Handler</strong>. Run one turn against <code>HH000001</code> and confirm the agent calls <code>lookup_account</code>.</p>
+  <p>Then: open <a href="https://192.168.100.10/">https://192.168.100.10/</a> (Open WebUI), model picker → <strong>Dispute Handler</strong>. Run one turn against <code>HH000001</code> and confirm the agent calls <code>lookup_account</code>.</p>
 </div>
 
 <div class="step">
   <h3>4g. Keycloak <em>(P1.B)</em></h3>
-  <p><a href="https://10.0.0.9/keycloak/">https://10.0.0.9/keycloak/</a> — login: <code>insidellm-admin</code> / <code>&lt;LITELLM_MASTER_KEY&gt;</code>. Switch to the <code>insidellm</code> realm and confirm the three groups (<code>InsideLLM-View</code>, <code>InsideLLM-Admin</code>, <code>InsideLLM-Approve</code>).</p>
+  <p><a href="https://192.168.100.10/keycloak/">https://192.168.100.10/keycloak/</a> — login: <code>insidellm-admin</code> / <code>&lt;LITELLM_MASTER_KEY&gt;</code>. Switch to the <code>insidellm</code> realm and confirm the three groups (<code>InsideLLM-View</code>, <code>InsideLLM-Admin</code>, <code>InsideLLM-Approve</code>).</p>
 <pre><code>curl -sk -u insidellm-admin:$KEY \
-  https://10.0.0.9/governance/api/v1/identity/whoami | jq
+  https://192.168.100.10/governance/api/v1/identity/whoami | jq
 # Expect: {"ok": true, "realm": "insidellm", ...}
 
 curl -sk -u insidellm-admin:$KEY \
-  https://10.0.0.9/governance/api/v1/identity/sync/status | jq '.runs[0]'
+  https://192.168.100.10/governance/api/v1/identity/sync/status | jq '.runs[0]'
 # Expect: most recent run with status=success</code></pre>
 </div>
 
@@ -315,7 +315,7 @@ curl -sk -u insidellm-admin:$KEY \
   <h3>4h. DLP sidecar + notifications <em>(P2.1)</em></h3>
 <pre><code># Dry-run scan (no webhook needed)
 curl -sk -u insidellm-admin:$KEY -X POST \
-  https://10.0.0.9/governance/api/v1/notifications/scan \
+  https://192.168.100.10/governance/api/v1/notifications/scan \
   -H 'Content-Type: application/json' \
   -d '{"text":"Customer SSN 123-45-6789 disputed account 12345678"}' | jq
 # Expect: hit_count &gt;= 2, has_critical=true,
@@ -352,7 +352,7 @@ curl -sk -u insidellm-admin:$KEY -X POST \
     <tr>
       <td>OWUI shows no Dispute Handler</td>
       <td>Translator partial-provisioned</td>
-      <td><code>POST .../agents/organization-collections/dispute-handler/sync</code> (idempotent retry)</td>
+      <td><code>POST .../agents/example-tenant/dispute-handler/sync</code> (idempotent retry)</td>
     </tr>
     <tr>
       <td>Anything else</td>
@@ -385,7 +385,7 @@ terraform apply -var-file="../terraform.tfvars"
   <li><strong>4g.</strong> Keycloak whoami + sync green</li>
   <li><strong>4h.</strong> DLP scan returns redacted fingerprints (no raw match)</li>
 </ul>
-<p>When all eight rows are checked, the stack is <strong class="tag-ok">Parent Organization-demo-ready</strong>.</p>
+<p>When all eight rows are checked, the stack is <strong class="tag-ok">Parent Portfolio-demo-ready</strong>.</p>
 
 <footer>
   InsideLLM · Test Plan V1 · Source: <code>docs/TestPlan_V1.md</code>

@@ -170,10 +170,10 @@
 
 <header>
   <h1>InsideLLM — Edge VM Deployment (P1.C)</h1>
-  <div class="sub">Stand up the front-door router at 10.0.0.98/24 with keepalived VIP 10.0.0.99. Terminates TLS, validates OIDC, forwards to per-department backends.</div>
+  <div class="sub">Stand up the front-door router at 192.168.100.108/24 with keepalived VIP 192.168.100.109. Terminates TLS, validates OIDC, forwards to per-department backends.</div>
   <div class="meta">
-    <span><strong>VM IP:</strong> 10.0.0.98/24</span>
-    <span><strong>VIP:</strong> 10.0.0.99</span>
+    <span><strong>VM IP:</strong> 192.168.100.108/24</span>
+    <span><strong>VIP:</strong> 192.168.100.109</span>
     <span><strong>Role:</strong> edge</span>
     <span><strong>Stack:</strong> oauth2-proxy + openresty + keepalived</span>
     <span><strong>Time:</strong> ~20 min w/ smoke</span>
@@ -188,7 +188,7 @@
 </p>
 
 <div class="callout">
-  <strong>Prereqs:</strong> Primary VM (10.0.0.9) already green
+  <strong>Prereqs:</strong> Primary VM (192.168.100.10) already green
   (<a href="TestPlan_V1.html" style="color:#22d3ee">TestPlan_V1</a>);
   Debian 12 (Bookworm) cloud image staged on the Hyper-V host; OIDC provider
   (Azure AD or Okta) with a tenant + app registration.
@@ -217,8 +217,8 @@ notepad ..\terraform.tfvars</code></pre>
     <tr><td><code>vm_switch_adapter</code></td><td><code>"Ethernet"</code></td><td>Must match your physical NIC</td></tr>
     <tr><td><code>edge_domain</code></td><td><code>"insidellm.corp.acme.com"</code></td><td>TLS CN + OIDC redirect_uri</td></tr>
     <tr><td><code>sso_provider</code> + creds</td><td><code>"azure_ad"</code> + client id/secret/tenant</td><td>OIDC validation</td></tr>
-    <tr><td><code>fleet_primary_host</code></td><td><code>"10.0.0.9"</code></td><td>Where gov-hub lives</td></tr>
-    <tr><td><code>fleet_virtual_ip</code></td><td><code>"10.0.0.99"</code></td><td>keepalived VIP — <strong>never 10.0.0.98</strong> (that's the edge's own NIC)</td></tr>
+    <tr><td><code>fleet_primary_host</code></td><td><code>"192.168.100.10"</code></td><td>Where gov-hub lives</td></tr>
+    <tr><td><code>fleet_virtual_ip</code></td><td><code>"192.168.100.109"</code></td><td>keepalived VIP — <strong>never 192.168.100.108</strong> (that's the edge's own NIC)</td></tr>
   </tbody>
 </table>
 
@@ -230,7 +230,7 @@ terraform plan  -var-file="..\terraform.tfvars" -out edge.tfplan
 # docker-compose (oauth2-proxy + openresty + keepalived, nothing else).
 terraform apply edge.tfplan</code></pre>
 <p>Post-deploy runs ~4–5 minutes. Tail it:</p>
-<pre><code>ssh -i $env:USERPROFILE\.ssh\id_rsa insidellm@10.0.0.98
+<pre><code>ssh -i $env:USERPROFILE\.ssh\id_rsa insidellm@192.168.100.108
 sudo tail -f /var/log/InsideLLM-deploy.log
 # Wait for: "Inside LLM — READY"</code></pre>
 
@@ -249,39 +249,39 @@ sudo tail -f /var/log/InsideLLM-deploy.log
 
 <div class="step">
   <h3>3b. keepalived owns the VIP</h3>
-<pre><code>ip addr show | grep -A1 '10.0.0.99'
-# Expect: inet 10.0.0.99/32 scope global on eth0
+<pre><code>ip addr show | grep -A1 '192.168.100.109'
+# Expect: inet 192.168.100.109/32 scope global on eth0
 
 # From the primary or workstation:
-ping -c 3 10.0.0.99
+ping -c 3 192.168.100.109
 # Should respond from the edge's MAC address.</code></pre>
 </div>
 
 <div class="step">
   <h3>3c. TLS terminates on the VIP</h3>
-<pre><code>curl -vk https://10.0.0.99/ 2>&amp;1 | grep -E "subject|CN=|issuer"
+<pre><code>curl -vk https://192.168.100.109/ 2>&amp;1 | grep -E "subject|CN=|issuer"
 # Expect: CN matches edge_domain (or the self-signed default)
 
 # With DNS:
 dig +short insidellm.corp.example.com
-# Should return 10.0.0.99</code></pre>
+# Should return 192.168.100.109</code></pre>
 </div>
 
 <div class="step">
   <h3>3d. OIDC redirect handshake</h3>
-  <p>In a browser, open <code>https://insidellm.corp.example.com/</code> (or <code>https://10.0.0.99/</code> if DNS isn't wired yet). Expected flow:</p>
+  <p>In a browser, open <code>https://insidellm.corp.example.com/</code> (or <code>https://192.168.100.109/</code> if DNS isn't wired yet). Expected flow:</p>
   <ol>
     <li>302 → your IdP login page</li>
     <li>Sign in with an account that has a department claim matching a key under <code>departments:</code> in <code>fleet.yaml</code> (e.g. <code>engineering</code>)</li>
     <li>IdP bounces back to <code>https://&lt;edge_domain&gt;/oauth2/callback</code></li>
     <li>oauth2-proxy sets its session cookie</li>
-    <li>You land on the routed backend's Open WebUI page (e.g. <code>10.0.0.11</code> for <code>engineering</code>)</li>
+    <li>You land on the routed backend's Open WebUI page (e.g. <code>192.168.100.11</code> for <code>engineering</code>)</li>
   </ol>
 </div>
 
 <div class="step">
   <h3>3e. Header forwarding (edge → backend trust)</h3>
-<pre><code># On the backend VM (e.g. 10.0.0.11):
+<pre><code># On the backend VM (e.g. 192.168.100.11):
 docker logs insidellm-nginx --tail 50 | grep "X-User-Email"
 # Expect: the most recent request carries
 #   X-User-Email: &lt;your email from the IdP&gt;
@@ -294,8 +294,8 @@ docker logs insidellm-nginx --tail 50 | grep "X-User-Email"
 <pre><code># From the primary VM:
 KEY=$(grep -E '^LITELLM_MASTER_KEY=' /opt/InsideLLM/.env | cut -d= -f2-)
 curl -sk -u insidellm-admin:$KEY \
-  https://10.0.0.9/governance/api/v1/fleet/topology | jq '.edges'
-# Expect: insidellm-edge (10.0.0.98) listed with capabilities
+  https://192.168.100.10/governance/api/v1/fleet/topology | jq '.edges'
+# Expect: insidellm-edge (192.168.100.108) listed with capabilities
 # oauth2_proxy, keepalived, openresty.
 # If missing, wait ~60s for heartbeat; if still missing, see Triage #5.</code></pre>
 </div>
@@ -318,7 +318,7 @@ curl -sk -u insidellm-admin:$KEY \
       <td><code>sudo systemctl status cloud-final.service</code> — if active (running), wait</td>
     </tr>
     <tr>
-      <td><code>10.0.0.99</code> unreachable</td>
+      <td><code>192.168.100.109</code> unreachable</td>
       <td>keepalived not started</td>
       <td><code>sudo docker logs insidellm-keepalived</code> — often a VRRP authentication mismatch if two edges share a broadcast domain</td>
     </tr>
@@ -351,19 +351,19 @@ curl -sk -u insidellm-admin:$KEY \
 <pre><code>vm_name       = "insidellm-edge-2"
 vm_hostname   = "insidellm-edge-2"
 vm_static_ip  = "10.0.0.101/24"
-# fleet_virtual_ip stays 10.0.0.99 — both edges share it</code></pre>
+# fleet_virtual_ip stays 192.168.100.109 — both edges share it</code></pre>
 <p>keepalived runs VRRP on the <code>insidellm-internal</code> broadcast domain and negotiates master automatically.</p>
-<pre><code># On 10.0.0.98
+<pre><code># On 192.168.100.108
 sudo docker logs insidellm-keepalived --tail 30 | grep -i master
 # On 10.0.0.101
 sudo docker logs insidellm-keepalived --tail 30 | grep -i master
 # Exactly one should log "Entering MASTER state"</code></pre>
 
 <h3>Failover test</h3>
-<pre><code># Stop master (say, 10.0.0.98)
+<pre><code># Stop master (say, 192.168.100.108)
 sudo docker stop insidellm-keepalived
 # Within 3s, 10.0.0.101 should take over
-# From workstation: ping 10.0.0.99 should stay responsive</code></pre>
+# From workstation: ping 192.168.100.109 should stay responsive</code></pre>
 
 <!-- ============================================================ -->
 <h2>6. Rollback</h2>
@@ -379,8 +379,8 @@ terraform destroy -var-file="..\terraform.tfvars"
 <p>Mark each row ✅ before calling the edge deployment complete:</p>
 <ul class="check-list">
   <li><strong>3a.</strong> Only 3 containers on the edge (no gov-hub / LiteLLM / OWUI)</li>
-  <li><strong>3b.</strong> keepalived owns <code>10.0.0.99</code> and it pings</li>
-  <li><strong>3c.</strong> TLS cert presented on <code>https://10.0.0.99/</code></li>
+  <li><strong>3b.</strong> keepalived owns <code>192.168.100.109</code> and it pings</li>
+  <li><strong>3c.</strong> TLS cert presented on <code>https://192.168.100.109/</code></li>
   <li><strong>3d.</strong> OIDC login → backend redirect works end-to-end</li>
   <li><strong>3e.</strong> Backend logs show <code>X-User-Email</code> + valid <code>X-Edge-Secret</code></li>
   <li><strong>3f.</strong> Edge listed under <code>/governance/api/v1/fleet/topology</code></li>

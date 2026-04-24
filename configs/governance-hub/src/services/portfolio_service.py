@@ -1,7 +1,7 @@
 """Portfolio observability — cross-tenant aggregate queries (P4.1).
 
 Reads from the central governance DB to produce the fleet-wide view
-a portfolio operator (e.g. Parent Organization) sees on the /governance/portfolio
+a portfolio operator (e.g. Parent Portfolio) sees on the /governance/portfolio
 page. Every metric pivots on the *latest* telemetry row per instance
 so a reporting lag doesn't distort the headline numbers.
 """

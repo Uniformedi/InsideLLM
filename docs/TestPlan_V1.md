@@ -1,8 +1,8 @@
 # InsideLLM — Test Plan V1
 
 **Scope:** apply the 16 new platform commits (P0 through P4.1 + drift guard) to
-the running primary VM at `10.0.0.9` and validate every module end-to-end
-before the Parent Organization demo.
+the running primary VM at `192.168.100.10` and validate every module end-to-end
+before the Parent Portfolio demo.
 
 **Audience:** Dan + anyone pairing on the smoke run.
 
@@ -24,10 +24,10 @@ git push                # if the remote is behind
 
 ---
 
-## 1. Land code on 10.0.0.9
+## 1. Land code on 192.168.100.10
 
 ```bash
-ssh insidellm-mgmt
+ssh insidellm-primary
 cd /opt/InsideLLM       # (OR wherever the repo lives on the VM)
 
 # Safety: back up .env before anything touches Terraform
@@ -114,7 +114,7 @@ docker ps --format '{{.Names}}\t{{.Status}}' | grep -v healthy
 
 ```bash
 KEY=$(grep -E '^LITELLM_MASTER_KEY=' /opt/InsideLLM/.env | cut -d= -f2-)
-curl -sk https://10.0.0.9/governance/health | jq
+curl -sk https://192.168.100.10/governance/health | jq
 docker exec insidellm-postgres psql -U litellm -d litellm \
   -c "\dt governance_*" | grep -E "agents|actions|identity"
 # Expect: governance_agents, governance_actions, governance_identity_*
@@ -124,24 +124,24 @@ docker exec insidellm-postgres psql -U litellm -d litellm \
 
 ```bash
 curl -sk -u insidellm-admin:$KEY \
-  https://10.0.0.9/governance/api/v1/actions/?tenant_id=core | jq '.total'
+  https://192.168.100.10/governance/api/v1/actions/?tenant_id=core | jq '.total'
 # Expect ≥20 actions across the 7 wrapper files
 ```
 
 ### 4d. Portfolio dashboard (P4.1)
 
-Open in a browser: **https://10.0.0.9/governance/portfolio**
+Open in a browser: **https://192.168.100.10/governance/portfolio**
 
 Or curl the JSON:
 
 ```bash
 curl -sk -u insidellm-admin:$KEY \
-  https://10.0.0.9/governance/api/v1/portfolio/overview | jq
+  https://192.168.100.10/governance/api/v1/portfolio/overview | jq
 ```
 
 ### 4e. Agent Builder UI (P1.5)
 
-Open **https://10.0.0.9/governance/agents**.
+Open **https://192.168.100.10/governance/agents**.
 
 - Sign in.
 - Click **+ new agent**, fill the form.
@@ -156,28 +156,28 @@ bash /opt/InsideLLM/scripts/seed-dispute-handler.sh
 
 # Verify
 curl -sk -u insidellm-admin:$KEY \
-  https://10.0.0.9/governance/api/v1/agents/organization-collections/dispute-handler | \
+  https://192.168.100.10/governance/api/v1/agents/example-tenant/dispute-handler | \
   jq '.status, .runtime_sync_state'
 # Expect: "published", "provisioned"
 ```
 
-Then: open **https://10.0.0.9/** (Open WebUI), model picker → **Dispute
+Then: open **https://192.168.100.10/** (Open WebUI), model picker → **Dispute
 Handler**. Run one turn against `HH000001` and confirm the agent calls
 `lookup_account`.
 
 ### 4g. Keycloak (P1.B)
 
-**https://10.0.0.9/keycloak/** — login: `insidellm-admin` / `<LITELLM_MASTER_KEY>`.
+**https://192.168.100.10/keycloak/** — login: `insidellm-admin` / `<LITELLM_MASTER_KEY>`.
 Switch to the `insidellm` realm and confirm the three groups
 (`InsideLLM-View`, `InsideLLM-Admin`, `InsideLLM-Approve`).
 
 ```bash
 curl -sk -u insidellm-admin:$KEY \
-  https://10.0.0.9/governance/api/v1/identity/whoami | jq
+  https://192.168.100.10/governance/api/v1/identity/whoami | jq
 # Expect: {"ok": true, "realm": "insidellm", ...}
 
 curl -sk -u insidellm-admin:$KEY \
-  https://10.0.0.9/governance/api/v1/identity/sync/status | jq '.runs[0]'
+  https://192.168.100.10/governance/api/v1/identity/sync/status | jq '.runs[0]'
 # Expect: most recent run with status=success
 ```
 
@@ -186,7 +186,7 @@ curl -sk -u insidellm-admin:$KEY \
 ```bash
 # Dry-run scan (no webhook needed)
 curl -sk -u insidellm-admin:$KEY -X POST \
-  https://10.0.0.9/governance/api/v1/notifications/scan \
+  https://192.168.100.10/governance/api/v1/notifications/scan \
   -H 'Content-Type: application/json' \
   -d '{"text":"Customer SSN 123-45-6789 disputed account 12345678"}' | jq
 # Expect: hit_count >= 2, has_critical=true,
@@ -202,8 +202,8 @@ curl -sk -u insidellm-admin:$KEY -X POST \
 | `governance-hub` unhealthy | PyYAML or Celery missing | `docker logs insidellm-governance-hub --tail 50` — look for `ModuleNotFoundError` |
 | Agent publish fails with `0 columns` error | Column migration didn't run | `docker exec insidellm-postgres psql -U litellm -d litellm -c "\d governance_agents"` — check for `runtime_sync_state` column |
 | Keycloak won't start | Postgres race | `docker logs insidellm-keycloak --tail 100`; usually resolves on retry |
-| `/governance/portfolio` empty | Central DB empty | Expected on a fresh deploy — populate with `curl -sk -u insidellm-admin:$KEY -X POST https://10.0.0.9/governance/api/v1/sync/run` |
-| OWUI shows no Dispute Handler | Translator partial-provisioned | `curl -sk -u insidellm-admin:$KEY -X POST .../agents/organization-collections/dispute-handler/sync` (idempotent retry) |
+| `/governance/portfolio` empty | Central DB empty | Expected on a fresh deploy — populate with `curl -sk -u insidellm-admin:$KEY -X POST https://192.168.100.10/governance/api/v1/sync/run` |
+| OWUI shows no Dispute Handler | Translator partial-provisioned | `curl -sk -u insidellm-admin:$KEY -X POST .../agents/example-tenant/dispute-handler/sync` (idempotent retry) |
 | Anything else | Check `/var/log/InsideLLM-deploy.log` + `docker logs insidellm-<service> --tail 100` |
 
 ---
@@ -236,4 +236,4 @@ Mark each row ✅ before calling the validation complete:
 - [ ] **4g.** Keycloak whoami + sync green
 - [ ] **4h.** DLP scan returns redacted fingerprints (no raw match)
 
-When all eight rows are checked, the stack is Parent Organization-demo-ready.
+When all eight rows are checked, the stack is Parent Portfolio-demo-ready.

@@ -4,7 +4,7 @@
 
 schema_version: "1.0"
 action_id: lookup_account
-tenant_id: organization-collections
+tenant_id: example-tenant
 
 display_name: "Look Up Consumer Account"
 description: "Retrieves account summary, balance, validation-notice date, and payment history for a given account number."
@@ -21,7 +21,7 @@ inputs:
     type: string
     required: true
     pattern: "^[A-Z0-9]{6,20}$"
-    description: "Organization internal account identifier."
+    description: "Example-tenant internal account identifier."
 
 outputs:
   account_summary:

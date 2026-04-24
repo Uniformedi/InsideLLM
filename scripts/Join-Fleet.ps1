@@ -57,11 +57,11 @@
 
 .EXAMPLE
     pwsh ./scripts/Join-Fleet.ps1 `
-        -Leader 10.0.0.110 `
+        -Leader 192.168.100.110 `
         -Token reg-xxxxxxxxxxxxxxxx `
         -Role gateway `
         -Department engineering `
-        -VmName insidellm-eng2 `
+        -VmName insidellm-gateway2 `
         -StaticIp 10.0.0.127/24 `
         -Insecure
 #>

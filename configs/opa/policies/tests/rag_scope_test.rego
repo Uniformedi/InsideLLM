@@ -12,7 +12,7 @@ import data.insidellm.policy
 base_input := {
     "guardrail_profile": "tier_general_business",
     "agent_id": "dispute-handler",
-    "tenant_id": "organization-collections",
+    "tenant_id": "example-tenant",
     "messages": [{"role": "user", "content": "look up account"}],
     "requested_collections": [],
     "agent_knowledge_collections": ["organization-fdcpa-letters", "organization-account-policies"],

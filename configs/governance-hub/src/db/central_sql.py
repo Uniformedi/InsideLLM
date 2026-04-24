@@ -341,7 +341,7 @@ class _PostgreSQL:
     """
 
     # --- Portfolio observability (P4.1) -------------------------------------
-    # Aggregates across the fleet for the Parent Organization-style cross-tenant view.
+    # Aggregates across the fleet for the Parent Portfolio-style cross-tenant view.
     # All metrics pivot on the *latest* telemetry row per instance so a
     # reporting lag doesn't distort the headline numbers.
 

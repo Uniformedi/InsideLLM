@@ -27,7 +27,7 @@
     "tenant_id": {
       "type": "string",
       "pattern": "^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$",
-      "description": "Which tenant / company this agent belongs to (e.g. 'organization-collections', 'parent-organization-acme')."
+      "description": "Which tenant / company this agent belongs to (e.g. 'example-tenant', 'parent-organization-acme')."
     },
     "created_by": {
       "type": "string",
@@ -226,7 +226,7 @@
           "type": "string",
           "enum": ["private", "team", "org", "fleet"],
           "default": "private",
-          "description": "private = author only. team = members of `team` above. org = all users in tenant. fleet = all users across all tenants (Parent Organization portfolio-wide). scope=org requires tier-2+ approval via governance_changes. scope=fleet requires tier-3 approval."
+          "description": "private = author only. team = members of `team` above. org = all users in tenant. fleet = all users across all tenants (Parent Portfolio portfolio-wide). scope=org requires tier-2+ approval via governance_changes. scope=fleet requires tier-3 approval."
         },
         "available_to": {
           "type": "array",

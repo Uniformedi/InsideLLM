@@ -161,7 +161,7 @@ edge:
   vms:
     - 10.0.0.100                             # primary edge VM IP (MASTER)
     # - 10.0.0.101                           # optional secondary for keepalived HA
-  vip: 10.0.0.99                             # virtual IP owned by keepalived on the active edge
+  vip: 192.168.100.109                             # virtual IP owned by keepalived on the active edge
   domain: insidellm.corp.example.com         # FQDN served by the edge (TLS CN, OIDC redirect_uri)
   tls_source: self-signed                    # self-signed | letsencrypt | custom
   # tls_cert_path: /etc/ssl/corp.crt         # only when tls_source = custom
@@ -179,7 +179,7 @@ edge:
 
 departments:
   engineering:
-    backend: insidellm-eng                   # eng users -> insidellm-eng
+    backend: insidellm-gateway                   # eng users -> insidellm-gateway
     fallback: insidellm-gen                  # if eng is down, route to general pool
 
   legal:
@@ -191,7 +191,7 @@ departments:
     fallback: insidellm-gen
 
   exec:
-    backend: insidellm-mgmt
+    backend: insidellm-primary
 
 # ============================================================================
 # Instances — one entry per VM to deploy.
@@ -216,7 +216,7 @@ instances:
   # `fleet_primary_host` pointed at this VM's static IP.
   - vm_name:      "insidellm-gen"
     vm_hostname:  "insidellm-gen"
-    vm_static_ip: "10.0.0.110/24"
+    vm_static_ip: "192.168.100.110/24"
     vm_role:      "primary"                  # explicit — wins over inference
     litellm_global_max_budget:   300
     litellm_default_user_budget: 5.0
@@ -226,8 +226,8 @@ instances:
   # --- Engineering gateway backend -------------------------------------------
   # Referenced by departments.engineering.backend -> auto vm_role = "gateway"
   # auto department = "engineering", auto fallback_department = "general"
-  - vm_name:      "insidellm-eng"
-    vm_hostname:  "insidellm-eng"
+  - vm_name:      "insidellm-gateway"
+    vm_hostname:  "insidellm-gateway"
     vm_static_ip: "10.0.0.120/24"
     litellm_global_max_budget:   500         # eng burns tokens fast
     litellm_default_user_budget: 10.0
@@ -258,8 +258,8 @@ instances:
     litellm_default_user_tpm:    80000
 
   # --- Exec / management gateway backend -------------------------------------
-  - vm_name:      "insidellm-mgmt"
-    vm_hostname:  "insidellm-mgmt"
+  - vm_name:      "insidellm-primary"
+    vm_hostname:  "insidellm-primary"
     vm_static_ip: "10.0.0.122/24"
     litellm_global_max_budget:   50
     litellm_default_user_budget: 3.0

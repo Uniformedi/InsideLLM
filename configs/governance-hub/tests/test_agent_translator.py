@@ -42,7 +42,7 @@ def _mk_manifest(**overrides: Any) -> AgentManifest:
     base = dict(
         schema_version="1.1",
         agent_id="dispute-handler",
-        tenant_id="organization-collections",
+        tenant_id="example-tenant",
         created_by="dan@uniformedi.com",
         team="collections",
         display=AgentDisplay(
@@ -155,7 +155,7 @@ def test_litellm_payload_carries_guardrail_metadata():
     payload = at.build_litellm_key_payload(
         manifest, manifest_hash="deadbeef" * 8, version=3
     )
-    assert payload["key_alias"] == "agent-organization-collections--dispute-handler"
+    assert payload["key_alias"] == "agent-example-tenant--dispute-handler"
     assert payload["models"] == ["claude-sonnet", "claude-haiku"]
     assert payload["rpm_limit"] == 10
     # Daily budget passthrough.
@@ -163,7 +163,7 @@ def test_litellm_payload_carries_guardrail_metadata():
     assert payload["budget_duration"] == "1d"
     # Metadata is the contract with the downstream OPA guardrail.
     md = payload["metadata"]
-    assert md["tenant_id"] == "organization-collections"
+    assert md["tenant_id"] == "example-tenant"
     assert md["agent_id"] == "dispute-handler"
     assert md["guardrail_profile"] == "tier_fdcpa_regulated"
     assert md["agent_version"] == 3
@@ -187,7 +187,7 @@ def test_litellm_payload_omits_budget_when_unset():
 def test_owui_payload_system_prompt_and_temperature_cap():
     manifest = _mk_manifest()
     payload = at.build_owui_model_payload(manifest)
-    assert payload["id"] == "insidellm-agent-organization-collections--dispute-handler"
+    assert payload["id"] == "insidellm-agent-example-tenant--dispute-handler"
     assert payload["base_model_id"] == "claude-sonnet"
     assert payload["params"]["system"].startswith("You are a compliance-first")
     # Cap pins temperature <= 0.3 even though default 0.7 was requested.
@@ -195,7 +195,7 @@ def test_owui_payload_system_prompt_and_temperature_cap():
     # Tags carry identity for OWUI-side filtering.
     tag_names = {t["name"] for t in payload["meta"]["tags"]}
     assert "tier_fdcpa_regulated" in tag_names
-    assert "tenant:organization-collections" in tag_names
+    assert "tenant:example-tenant" in tag_names
     assert "team:collections" in tag_names
 
 
@@ -234,8 +234,8 @@ async def test_provision_dry_run_makes_no_calls():
 
     assert result.state == "skipped"
     assert result.ok is True
-    assert result.litellm_key_alias == "agent-organization-collections--dispute-handler"
-    assert result.owui_model_id == "insidellm-agent-organization-collections--dispute-handler"
+    assert result.litellm_key_alias == "agent-example-tenant--dispute-handler"
+    assert result.owui_model_id == "insidellm-agent-example-tenant--dispute-handler"
     assert len(result.planned_calls) == 2
     assert llm.upserts == [] and owui.upserts == []
 
@@ -260,14 +260,14 @@ async def test_provision_happy_path():
     assert result.litellm_key_last4 == "1234"
     # Payload reached the fake client unchanged.
     assert llm.upserts[0]["metadata"]["agent_id"] == "dispute-handler"
-    assert owui.upserts[0]["id"] == "insidellm-agent-organization-collections--dispute-handler"
+    assert owui.upserts[0]["id"] == "insidellm-agent-example-tenant--dispute-handler"
 
     # apply_result pins the binding onto the row.
     at.AgentTranslator.apply_result(row, result)
     assert row.runtime_sync_state == "provisioned"
-    assert row.litellm_key_alias == "agent-organization-collections--dispute-handler"
+    assert row.litellm_key_alias == "agent-example-tenant--dispute-handler"
     assert row.litellm_key_last4 == "1234"
-    assert row.owui_model_id == "insidellm-agent-organization-collections--dispute-handler"
+    assert row.owui_model_id == "insidellm-agent-example-tenant--dispute-handler"
     assert row.runtime_manifest_hash == row.manifest_hash
 
 
@@ -288,7 +288,7 @@ async def test_provision_partial_records_what_succeeded():
     # apply_result preserves what worked, so a retry only touches the broken side.
     at.AgentTranslator.apply_result(row, result)
     assert row.runtime_sync_state == "partial"
-    assert row.litellm_key_alias == "agent-organization-collections--dispute-handler"
+    assert row.litellm_key_alias == "agent-example-tenant--dispute-handler"
     assert row.runtime_sync_error and "owui-down" in row.runtime_sync_error
 
 
@@ -320,8 +320,8 @@ async def test_deprovision_removes_from_both_backends():
     manifest = _mk_manifest()
     row = _mk_agent(
         manifest,
-        litellm_key_alias="agent-organization-collections--dispute-handler",
-        owui_model_id="insidellm-agent-organization-collections--dispute-handler",
+        litellm_key_alias="agent-example-tenant--dispute-handler",
+        owui_model_id="insidellm-agent-example-tenant--dispute-handler",
         runtime_sync_state="provisioned",
     )
     llm = _FakeLiteLLM()
@@ -332,8 +332,8 @@ async def test_deprovision_removes_from_both_backends():
 
     assert result.ok is True
     assert result.state == "deprovisioned"
-    assert llm.deletes == ["agent-organization-collections--dispute-handler"]
-    assert owui.deletes == ["insidellm-agent-organization-collections--dispute-handler"]
+    assert llm.deletes == ["agent-example-tenant--dispute-handler"]
+    assert owui.deletes == ["insidellm-agent-example-tenant--dispute-handler"]
 
     at.AgentTranslator.apply_result(row, result)
     assert row.runtime_sync_state == "deprovisioned"
@@ -355,7 +355,7 @@ async def test_deprovision_without_prior_binding_still_works():
     result = await t.deprovision(row)
 
     assert result.ok is True
-    assert result.litellm_key_alias == "agent-organization-collections--dispute-handler"
+    assert result.litellm_key_alias == "agent-example-tenant--dispute-handler"
     assert llm.deletes and owui.deletes
 
 

@@ -66,8 +66,8 @@ own instance with:
 
 Useful when troubleshooting:
 
-- `Dan@10.0.0.9`  — primary's governance, central DB sync, Grafana
-- `Dan@10.0.0.11` — engineering gateway LiteLLM quirks, dept-specific DLP
+- `Dan@192.168.100.10`  — primary's governance, central DB sync, Grafana
+- `Dan@192.168.100.11` — engineering gateway LiteLLM quirks, dept-specific DLP
 - `Dan@edge`      — routing.lua, oauth2-proxy, keepalived
 
 Work cross-fleet changes through Git + `scripts/Deploy-Fleet.ps1` from

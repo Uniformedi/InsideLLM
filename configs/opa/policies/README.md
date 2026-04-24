@@ -49,7 +49,7 @@ data never permits an action that required it).
 ```json
 {
   "// --- Tenant + session identity ---": null,
-  "tenant_id": "organization-collections",
+  "tenant_id": "example-tenant",
   "agent_id": "dispute-handler",
   "agent_version_hash": "sha256:abc123...",
   "user_id": "jsmith@organization.com",
@@ -205,7 +205,7 @@ sudo docker run --rm \
 ## Portfolio policy inheritance (Ultraplan v3 §5.3)
 
 ```
-Parent Organization portfolio baseline
+Parent Portfolio portfolio baseline
   └── Company override
        └── Agent manifest profile
             └── Session context

@@ -103,7 +103,7 @@ def _make_valid_envelope(secret: str, previous_hash: str | None = None) -> dict:
         "schema_version": "1.0",
         "tenant_id": "t1",
         "tenant_name": "Tenant One",
-        "parent_name": "Parent Org",
+        "parent_name": "Parent Portfolio",
         "generated_at": "2026-04-21T00:00:00+00:00",
         "sequence_from": 1,
         "sequence_to": 5,
