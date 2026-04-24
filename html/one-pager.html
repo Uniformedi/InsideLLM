@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>InsideLLM — One-Pager</title>
+<style>
+  :root {
+    --bg:#0a0e1a; --panel:#111827; --panel-2:#1a2234; --border:#2a3650;
+    --text:#e2e8f0; --text-muted:#94a3b8; --muted-deep:#64748b;
+    --cyan:#22d3ee; --green:#6ee7b7; --amber:#fcd34d; --red:#fca5a5;
+    --blue:#60a5fa; --purple:#a78bfa;
+    --font-mono:'Menlo','Consolas','Courier New',monospace;
+  }
+  @media print {
+    :root { --bg:#fff; --panel:#fff; --panel-2:#f5f5f5; --border:#bbb;
+            --text:#111; --text-muted:#333; --muted-deep:#666;
+            --cyan:#0369a1; --green:#065f46; --amber:#92400e; --red:#991b1b;
+            --blue:#1d4ed8; --purple:#6d28d9; }
+    body { font-size:10.5pt !important; max-width:none !important;
+           padding:0 !important; margin:0 !important; }
+    @page { size:letter; margin:0.6in; }
+    .section, .stats, .packs, .roadmap, .cta { page-break-inside:avoid; }
+    .noprint { display:none !important; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:32px; max-width:860px; margin:0 auto;
+         font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg);
+         color:var(--text); line-height:1.5; font-size:14px; }
+  h1 { font-size:26px; color:var(--cyan); font-family:var(--font-mono);
+       letter-spacing:-0.02em; margin:0 0 2px; }
+  .sub { color:var(--text-muted); font-size:15px; margin:0 0 10px;
+         font-family:var(--font-mono); }
+  .meta { font-family:var(--font-mono); font-size:10px; color:var(--muted-deep);
+          text-transform:uppercase; letter-spacing:0.08em; margin-bottom:24px;
+          padding-bottom:12px; border-bottom:2px solid var(--cyan); }
+  .meta span { display:inline-block; margin-right:16px; }
+  .meta b { color:var(--cyan); }
+  h2 { font-size:12px; color:var(--cyan); font-family:var(--font-mono);
+       text-transform:uppercase; letter-spacing:0.1em; margin:20px 0 8px;
+       padding-bottom:2px; border-bottom:1px solid var(--border); }
+  p { margin:0 0 10px; font-size:13.5px; }
+  ul { margin:6px 0 8px 20px; padding:0; }
+  li { font-size:13px; margin-bottom:4px; }
+  li b { color:var(--text); }
+  code { background:var(--panel-2); border:1px solid var(--border);
+         padding:1px 5px; border-radius:3px; font-family:var(--font-mono);
+         font-size:0.86em; color:var(--cyan); }
+  .section { background:var(--panel); border:1px solid var(--border);
+             border-radius:6px; padding:12px 16px; margin-bottom:10px;
+             border-left:3px solid var(--cyan); }
+  .section.accent-green { border-left-color:var(--green); }
+  .section.accent-blue  { border-left-color:var(--blue); }
+  .section.accent-purple { border-left-color:var(--purple); }
+  .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin:10px 0; }
+  .stat { background:var(--panel-2); border:1px solid var(--border);
+          border-radius:5px; padding:10px 12px; text-align:left; }
+  .stat .n { font-size:20px; color:var(--cyan); font-family:var(--font-mono);
+             line-height:1; font-weight:600; }
+  .stat .l { font-size:9.5px; color:var(--muted-deep); text-transform:uppercase;
+             letter-spacing:0.06em; font-family:var(--font-mono); margin-top:4px; }
+  table { width:100%; border-collapse:collapse; margin:8px 0;
+          background:var(--panel); border:1px solid var(--border);
+          border-radius:5px; overflow:hidden; }
+  th, td { padding:8px 10px; text-align:left; border-bottom:1px solid var(--border);
+           font-size:12.5px; vertical-align:top; }
+  th { background:var(--panel-2); color:var(--cyan); font-weight:600;
+       font-size:10px; text-transform:uppercase; letter-spacing:0.05em; }
+  tr:last-child td { border-bottom:none; }
+  .tag { display:inline-block; padding:2px 8px; border-radius:3px;
+         font-family:var(--font-mono); font-size:9.5px; text-transform:uppercase;
+         letter-spacing:0.05em; font-weight:600; }
+  .tag-shipping { background:#064e3b; color:var(--green); }
+  .tag-scaffold { background:#78350f; color:var(--amber); }
+  .tag-planned  { background:#1e3a8a; color:var(--blue); }
+  .cta { background:var(--panel-2); border:2px solid var(--cyan); border-radius:5px;
+         padding:12px 16px; margin:14px 0 6px; text-align:center;
+         font-family:var(--font-mono); }
+  .cta .label { font-size:9.5px; color:var(--cyan); text-transform:uppercase;
+                letter-spacing:0.1em; margin-bottom:4px; font-weight:600; }
+  .cta .val { font-size:13px; color:var(--text); font-weight:600; }
+  .footer { margin-top:16px; padding-top:10px; border-top:1px solid var(--border);
+            color:var(--muted-deep); font-size:10px; font-family:var(--font-mono);
+            display:flex; justify-content:space-between; }
+  @media (max-width:720px) {
+    .stats { grid-template-columns:repeat(2,1fr); }
+  }
+</style>
+</head>
+<body>
+
+<h1>InsideLLM</h1>
+<div class="sub">Governed AI for regulated operations</div>
+
+<div class="meta">
+  <span>Version <b>3.1.0</b></span>
+  <span>License <b>BSL 1.1 → Apache 2.0 (2030)</b></span>
+  <span>Repo <b>github.com/uniformedi/insidellm</b></span>
+</div>
+
+<h2>What it is</h2>
+<p>A self-hosted, on-premises AI governance gateway. One platform serves as
+both the platform for one regulated operation and the reference tenant for
+a portfolio of them. The wedge is not capability — it is
+<b>integrity you can audit</b>. Every LLM interaction inherits DLP scanning,
+Humility alignment, OPA policy enforcement, per-user budgets, and a
+hash-chained SHA-256 audit trail. Deployed by a single <code>terraform
+apply</code> on Hyper-V or a single PowerShell script on WSL2. No cloud
+dependency.</p>
+
+<div class="stats">
+  <div class="stat"><div class="n">46/46</div><div class="l">OPA tests passing</div></div>
+  <div class="stat"><div class="n">7</div><div class="l">regulatory overlays</div></div>
+  <div class="stat"><div class="n">6</div><div class="l">guardrail tiers</div></div>
+  <div class="stat"><div class="n">&lt;20ms</div><div class="l">P99 policy decision</div></div>
+</div>
+
+<h2>Industry Packs (shipping today)</h2>
+<p>Vertical starter kits — agents + DLP patterns + document templates +
+policy overlay — layered on top of the shipped guardrail profiles.</p>
+
+<table>
+  <thead>
+    <tr><th>Pack</th><th>Status</th><th>Regulatory scope</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><b>Collections</b></td>
+      <td><span class="tag tag-shipping">sample / reference</span></td>
+      <td>FDCPA, CFPB Reg F, TCPA, SOX, PCI-DSS, GLBA</td>
+    </tr>
+    <tr>
+      <td><b>Healthcare</b></td>
+      <td><span class="tag tag-scaffold">scaffolded</span></td>
+      <td>HIPAA, HITECH, 42 CFR Part 2</td>
+    </tr>
+    <tr>
+      <td><b>Financial Services</b></td>
+      <td><span class="tag tag-scaffold">scaffolded</span></td>
+      <td>SOX, GLBA, PCI-DSS, Reg E/Z</td>
+    </tr>
+    <tr>
+      <td><b>Education</b></td>
+      <td><span class="tag tag-planned">planned v3.3</span></td>
+      <td>FERPA, COPPA</td>
+    </tr>
+    <tr>
+      <td><b>Property Management</b></td>
+      <td><span class="tag tag-planned">planned v3.3</span></td>
+      <td>Fair Housing Act, state LL/T</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>What Parent Portfolio gets</h2>
+
+<div class="section accent-purple">
+  <ul>
+    <li><b>One platform, many deployments.</b> Each portfolio company becomes a tenant with the industry pack appropriate to its vertical. No new product per company.</li>
+    <li><b>Cross-portfolio governance visibility.</b> Compliance score, at-risk flags, and industry distribution roll up to a single dashboard. Every new company adds a row, not a new integration.</li>
+    <li><b>Tamper-evident compliance evidence.</b> When a regulator asks "show me everything AI did on this consumer in 2026," it's one query per tenant. The hash chain makes tampering detectable.</li>
+    <li><b>FOSS-first.</b> Every guardrail that shipped in v3.1.0 can be stood up with open-source components. Paid vendors plug in as optional downstream adapters if needed later.</li>
+  </ul>
+</div>
+
+<h2>What's next</h2>
+
+<div class="section accent-blue">
+  <ul>
+    <li><b>v3.2 (2026-05-12 portfolio showcase)</b> — visual declarative agent builder, action catalog + Activepieces piece for portfolio IT teams, Dispute Handler end-to-end reference implementation.</li>
+    <li><b>v3.3 (Q3 2026)</b> — Healthcare + Financial Services Industry Packs productionized, Managed Agents runtime, SBOM + SLSA supply-chain provenance, event schema for vendor-neutral audit export, state overlays for Collections (NY DFS, CA Rosenthal, IL).</li>
+    <li><b>v3.4 (Q4 2026)</b> — Zero Trust posture alignment (NIST SP 800-207) + WireGuard fleet mesh, SIEM forwarder (Splunk / Sentinel / Chronicle), SOC 2 Type II observation window starts.</li>
+    <li><b>v4.0 (Q1 2027)</b> — true multi-tenant control plane, cross-portfolio governance aggregation at scale, HITRUST CSF engagement.</li>
+  </ul>
+</div>
+
+<h2>Honest caveats</h2>
+
+<div class="section accent-green">
+  <ul>
+    <li>InsideLLM is a <b>substrate</b>, not a finished compliance program. It reduces the labor of building and auditing AI operations in regulated contexts. It does not replace operator judgment or compliance counsel.</li>
+    <li>FOSS eliminates license cost, not compliance effort. Validation evidence, audit preparation, and SME time survive the tool choice.</li>
+    <li>Every Industry Pack is a defensible starting point, not a finished program. Customers tailor to their specific regulatory posture.</li>
+  </ul>
+</div>
+
+<div class="cta">
+  <div class="label">How to pilot</div>
+  <div class="val">One portfolio company, 30-day proof of concept, no commercial commitment. Uniformedi co-deploys. Success criterion: one regulated workflow running under full governance within 30 days.</div>
+</div>
+
+<div class="footer">
+  <span>Uniformedi LLC · Dan Medina · dan.medina@uniformedi.com</span>
+  <span>Leave-behind · Print one page landscape or portrait</span>
+</div>
+
+</body>
+</html>

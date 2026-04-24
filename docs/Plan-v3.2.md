@@ -207,7 +207,7 @@ Do not claim the product replaces human compliance review.
 - Collections industry pack at `configs/industry-packs/collections/`
 - Seeded example tenant data in the portfolio dashboard
 - Dispute Handler agent from the Collections pack published and live
-- `lookup_account` + `draft_validation_notice` + `open_dispute_record`
+- `lookup_account` + `draft_fdcpa_letter` + `send_letter` + `schedule_callback`
   worker stubs returning canned but plausible responses
 - Pre-populated audit chain with ~100 representative events
 - RAG collection `collections-procedures` seeded with a handful of
@@ -247,7 +247,7 @@ Total live run: 26 minutes. 4 minutes slide framing. 15 minutes Q&A buffer.
 | Clean deploy of 3.1.0 on the demo VM (or snapshot-restore) | 2 h | ops | Low |
 | Seed `governance_instances` with 2–3 tenants including the example tenant | 1 h | backend | Low |
 | Register Collections pack agents in `governance_agents` as published | 1 h | backend | Low |
-| Stub workers for `lookup_account`, `draft_validation_notice`, `open_dispute_record` — canned, deterministic, idempotent | 4 h | backend | **Med** |
+| Stub workers for `lookup_account`, `draft_fdcpa_letter`, `send_letter`, `schedule_callback` — canned, deterministic, idempotent (already implemented in `configs/insidellm-workers/src/main.py`) | 4 h | backend | **Med** |
 | Pre-populate audit chain with ~100 events that tell a coherent story | 1 h | backend | Low |
 | Seed RAG `collections-procedures` collection | 1 h | backend | Low |
 | Seed RAG `hr-confidential` decoy collection (negative demo #2) | 0.5 h | backend | Low |
@@ -258,6 +258,11 @@ Total live run: 26 minutes. 4 minutes slide framing. 15 minutes Q&A buffer.
 | **Total** | **~17 h** | — | Fits in window |
 
 ### 5.6 Fallback scripts (one per segment)
+
+**Concrete rollback commands per segment:** see
+[`docs/Demo-Rollback-Commands.md`](Demo-Rollback-Commands.md). The bullets
+below are the narrative fallback; the companion doc is the command
+cheatsheet with `curl` / `ssh` / `docker exec` examples.
 
 - **Segment 1** (dashboard won't load): skip to Segment 2 slide; narrate.
 - **Segment 3** (agent flakes): "the worker returns a canned response

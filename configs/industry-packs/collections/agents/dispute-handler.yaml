@@ -47,18 +47,16 @@ spec:
   actions:
     - action_id: lookup_account
       required: true
-      notes: "Read-only; returns account id, balance, validation window status, authorized channels"
-    - action_id: draft_validation_notice
+      notes: "Read-only; returns account id, balance, validation window status, authorized channels."
+    - action_id: draft_fdcpa_letter
       required: true
-      backend: docforge
-      template: documents/fdcpa-validation-notice.md.tpl
-    - action_id: draft_dispute_acknowledgment
+      notes: "§1692g(b) dispute acknowledgment letter. Document text is rendered by the worker stub today; production wires DocForge against documents/fdcpa-validation-notice.md.tpl."
+    - action_id: send_letter
       required: true
-      backend: docforge
-      template: documents/dispute-resolution-letter.md.tpl
-    - action_id: open_dispute_record
+      notes: "Consumer-facing mail handoff. Always routes through the approval queue (compliance_manager) per obligations below — never auto-executes."
+    - action_id: schedule_callback
       required: true
-      notes: "Writes to dispute log; creates approval-queue entry for any outbound letter"
+      notes: "Records a callback request against the account. FDCPA §1692c(a)(1) permitted-hours (8am–9pm consumer-local) is enforced at the OPA layer before this action is reached."
 
   obligations:
     - type: attestation
