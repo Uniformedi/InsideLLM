@@ -143,6 +143,24 @@ PATTERNS: dict[str, dict[str, object]] = {
         "severity": "critical",
         "mask": "[REDACTED-ACCT]",
     },
+    "us_street_address": {
+        "regex": r"\b\d{1,6}\s+(?:[A-Z][a-zA-Z]*\s+){0,4}(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Drive|Dr|Lane|Ln|Court|Ct|Place|Pl|Square|Sq|Parkway|Pkwy|Circle|Cir|Way|Terrace|Ter|Trail|Trl|Highway|Hwy|Route|Rte)\b\.?(?:\s+(?:Apt|Apartment|Suite|Ste|Unit|#)\s*[\w-]+)?",
+        "description": "US Street Address",
+        "severity": "high",
+        "mask": "[REDACTED-ADDRESS]",
+    },
+    "us_zip_labeled": {
+        "regex": r"\b(?:zip|zipcode|postal\s*code)[\s:#]*\d{5}(?:-\d{4})?\b",
+        "description": "US Zip Code (labeled)",
+        "severity": "medium",
+        "mask": "[REDACTED-ZIP]",
+    },
+    "phone_us": {
+        "regex": r"\b(?:\+?1[-.\s]?)?\(?[2-9]\d{2}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b",
+        "description": "US Phone Number",
+        "severity": "high",
+        "mask": "[REDACTED-PHONE]",
+    },
 
     # ---- Gov-hub-only additions (not applicable to LLM-request blocking) -
     "email": {

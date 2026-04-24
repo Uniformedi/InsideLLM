@@ -13,7 +13,7 @@
 --   3. "_default" key — always required; Stream D populates real routes.
 --
 -- On miss (no _default + no dept match) we return 502 and log the dept so
--- the operator can diagnose. Rendered by Terraform; ${...} substitutes at
+-- the operator can diagnose. Rendered by Terraform; $${...} substitutes at
 -- apply time (none used here — the file is static today but kept as .tpl
 -- so future variables can be threaded through without refactoring).
 -- =============================================================================

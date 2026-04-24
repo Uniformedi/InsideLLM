@@ -141,6 +141,39 @@ PATTERNS: dict[str, dict[str, str]] = {
         "valve": "block_bank_accounts",
         "severity": "critical",
     },
+    # ------------------------------------------------------------------------
+    # PII contact (address / zip / phone / email) — closes the "physical
+    # addresses not blocked" gap. Address / zip / phone use the
+    # block_pii_contact valve (defaults ON). Email uses its own valve
+    # (block_email, defaults OFF) because emails legitimately appear in
+    # prompts ("reply to …@…"); blocking by default is disruptive.
+    # Operators opt in via DLP_BLOCK_EMAIL=true, or set DLP_MODE=redact
+    # globally to redact all PII including email.
+    # ------------------------------------------------------------------------
+    "us_street_address": {
+        "regex": r"\b\d{1,6}\s+(?:[A-Z][a-zA-Z]*\s+){0,4}(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Drive|Dr|Lane|Ln|Court|Ct|Place|Pl|Square|Sq|Parkway|Pkwy|Circle|Cir|Way|Terrace|Ter|Trail|Trl|Highway|Hwy|Route|Rte)\b\.?(?:\s+(?:Apt|Apartment|Suite|Ste|Unit|#)\s*[\w-]+)?",
+        "description": "US Street Address",
+        "valve": "block_pii_contact",
+        "severity": "high",
+    },
+    "us_zip_labeled": {
+        "regex": r"\b(?:zip|zipcode|postal\s*code)[\s:#]*\d{5}(?:-\d{4})?\b",
+        "description": "US Zip Code (labeled)",
+        "valve": "block_pii_contact",
+        "severity": "medium",
+    },
+    "phone_us": {
+        "regex": r"\b(?:\+?1[-.\s]?)?\(?[2-9]\d{2}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b",
+        "description": "US Phone Number",
+        "valve": "block_pii_contact",
+        "severity": "high",
+    },
+    "email": {
+        "regex": r"\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b",
+        "description": "Email Address",
+        "valve": "block_email",
+        "severity": "medium",
+    },
 }
 
 
@@ -232,6 +265,8 @@ class DLPGuardrailCallback(CustomLogger):
             "block_credentials": _env_bool("DLP_BLOCK_CREDENTIALS", True),
             "block_bank_accounts": _env_bool("DLP_BLOCK_BANK_ACCOUNTS", True),
             "block_standalone_dates": _env_bool("DLP_BLOCK_STANDALONE_DATES", True),
+            "block_pii_contact": _env_bool("DLP_BLOCK_PII_CONTACT", True),
+            "block_email": _env_bool("DLP_BLOCK_EMAIL", False),
             "scan_responses": _env_bool("DLP_SCAN_RESPONSES", True),
             "log_detections": _env_bool("DLP_LOG_DETECTIONS", True),
             "enabled": True,

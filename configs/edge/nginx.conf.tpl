@@ -3,7 +3,7 @@
 # -----------------------------------------------------------------------------
 # Terminates TLS for ${edge_domain}, runs OIDC subrequest auth via oauth2-proxy,
 # and proxies to department gateway backends chosen by routing.lua from the
-# X-Auth-Request-Department claim. Rendered by Terraform; ${...} tokens are
+# X-Auth-Request-Department claim. Rendered by Terraform; $${...} tokens are
 # substituted at apply time.
 # =============================================================================
 

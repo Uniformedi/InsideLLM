@@ -137,7 +137,7 @@ shared:
 
   # --- DLP --------------------------------------------------------------------
   dlp_enable:       true
-  dlp_action:       "block"                  # "block" or "redact"
+  dlp_mode:         "block"                  # "block" or "redact"
   # dlp_custom_patterns: ""
 
   # --- Environment label ------------------------------------------------------

@@ -9,6 +9,10 @@
 terraform.tfvars
 *.auto.tfvars
 
+# Rendered fleet-deploy output (per-VM tfvars, state, apply logs) — contains
+# live secrets (Anthropic API key, Hyper-V admin password, DB passwords)
+fleet-out/
+
 # SSH keys
 *.pem
 *.key

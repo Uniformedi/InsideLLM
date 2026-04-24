@@ -667,6 +667,18 @@ variable "dlp_block_credentials" {
   default     = true
 }
 
+variable "dlp_block_pii_contact" {
+  description = "Block messages containing US street addresses, zip codes, or phone numbers"
+  type        = bool
+  default     = true
+}
+
+variable "dlp_block_email" {
+  description = "Block messages containing email addresses. Off by default — emails are common in legitimate prompts (e.g., 'reply to …@…'). Flip to true when the use case requires email redaction."
+  type        = bool
+  default     = false
+}
+
 variable "dlp_custom_patterns" {
   description = "Additional regex patterns to block (map of name => regex)"
   type        = map(string)

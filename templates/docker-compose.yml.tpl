@@ -93,6 +93,8 @@ services:
       DLP_BLOCK_PHI: "${dlp_block_phi}"
       DLP_BLOCK_CREDENTIALS: "${dlp_block_credentials}"
       DLP_BLOCK_BANK_ACCOUNTS: "${dlp_block_bank_accounts}"
+      DLP_BLOCK_PII_CONTACT: "${dlp_block_pii_contact}"
+      DLP_BLOCK_EMAIL: "${dlp_block_email}"
       DLP_BLOCK_STANDALONE_DATES: "${dlp_block_standalone_dates}"
       DLP_SCAN_RESPONSES: "${dlp_scan_responses}"
       DLP_LOG_DETECTIONS: "true"
